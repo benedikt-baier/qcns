@@ -873,6 +873,27 @@ class Qubit:
             depolarization_error(self, self._qsystem._sparse, fidelity)
             depolarization_error(target, target._qsystem._sparse, fidelity)
 
+    def CX(self, target: Qubit, fidelity: float=1.) -> None:
+        
+        """
+        Applys the CNOT gate to a target qubit, with this qubit as the controll qubit
+        
+        Args:
+            target (qubit): target qubit to apply the CNOT gate to
+            fidelity (float): fidelity of the depolarization error
+        
+        Returns:
+            /
+        """
+        
+        key = f'{self._qsystem._sparse}_d_x_{target._qsystem._num_qubits}_{self._index}_{target._index}'
+        gate = get_double_operator(key, target._qsystem._sparse, gates[self._qsystem._sparse]['X'], self._index, target._index, target._qsystem._num_qubits)
+        target._qsystem._state = dot(target._qsystem._state, gate)
+        
+        if fidelity < 1.:
+            depolarization_error(self, self._qsystem._sparse, fidelity)
+            depolarization_error(target, target._qsystem._sparse, fidelity)
+
     def CY(self, target: Qubit, fidelity: float=1.) -> None:
         
         """
@@ -1001,9 +1022,29 @@ class Qubit:
             depolarization_error(self, self._qsystem._sparse, fidelity)
             depolarization_error(target, target._qsystem._sparse, fidelity)
     
-    def iSWAP(self, target: Qubit, theta: float, fidelity: float=1.) -> None:
+    def iSWAP(self, target: Qubit, fidelity: float=1.) -> None:
         
-        pass
+        """
+        Applys the Imaginary Swap gate to this qubit and target qubit
+        
+        Args:
+            target (qubit): target qubit to apply the CPHASE gate to
+            fidelity (float): fidelity of the depolarization error
+        
+        Returns:
+            /
+        """
+        
+        self.SWAP(target)
+        self.SZ()
+        target.SZ()
+        target.H()
+        self.CNOT(target)
+        target.H()
+        
+        if fidelity < 1.:
+            depolarization_error(self, self._qsystem._sparse, fidelity)
+            depolarization_error(target, self._qsystem._sparse, fidelity)
     
     def QAND(self, control: Qubit, target: Qubit, fidelity: float=1.) -> None:
         
