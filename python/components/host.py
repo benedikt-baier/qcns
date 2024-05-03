@@ -4,7 +4,7 @@ import asyncio as asc
 
 from copy import deepcopy
 from functools import partial
-from typing import List, Dict, Union, Type
+from typing import List, Dict, Tuple, Union, Type
 
 from python.components.simulation import Simulation
 from python.components.event import StopEvent, SendEvent, ReceiveEvent, GateEvent 
@@ -437,7 +437,7 @@ class Host:
         
         self._connections[_receiver]['sqs'][SEND]['c'].put(_qubit)
         
-    async def receive_qubit(self, _sender: str) -> Qubit:
+    async def receive_qubit(self, _sender: str=None) -> Union[Qubit, Tuple[str, Qubit]]:
         
         """
         Waits until a qubit is received
@@ -449,12 +449,24 @@ class Host:
             _qubit (Qubit): received qubit
         """
         
-        await self._resume.wait()
-        self._resume.clear()
+        if _sender is None:
+            
+            await self._resume.wait()
+            self._resume.clear()
+            
+            for sender in self._connections.keys():
+                if not self._connections[sender]['sqs'][RECEIVE].empty():
+                    return sender, self._connections[sender]['sqs'][RECEIVE].get()
         
-        return self._connections[_sender]['sqs'][RECEIVE].get()
+        while 1:
+        
+            await self._resume.wait()
+            self._resume.clear()
+        
+            if not self._connections[_sender]['sqs'][RECEIVE].empty():
+                return self._connections[_sender]['sqs'][RECEIVE].get()
     
-    async def receive_qubit_wait(self, _sender: str, _time_out: float=0.1) -> Union[Qubit, None]:
+    async def receive_qubit_wait(self, _sender: str=None, _time_out: float=0.1) -> Union[Qubit, Tuple[str, Qubit], None]:
         
         """
         Receives a qubit from the specified host with a timeout
@@ -466,11 +478,16 @@ class Host:
         Returns:
             _qubit (Qubit/None): received qubit
         """
-        
+
         try:
             await asc.wait_for(self._resume.wait(), timeout=_time_out)
         except asc.TimeoutError:
             return None
+        
+        if _sender is None:
+            for sender in self._connections.keys():
+                if not self._connections[sender]['sqs'][RECEIVE].empty():
+                    return sender, self._connections[sender]['sqs'][RECEIVE].get()
 
         return self._connections[_sender]['sqs'][RECEIVE].get()
     
@@ -494,7 +511,7 @@ class Host:
         
         self._connections[_packet._l2._dst]['packet'][SEND].put(_packet)
         
-    async def receive_packet(self, _sender: str) -> Packet:
+    async def receive_packet(self, _sender: str=None) -> Packet:
         
         """
         Receives a packet
@@ -506,12 +523,24 @@ class Host:
             _packet (Packet): received packet
         """
         
-        await self._resume.wait()
-        self._resume.clear()
+        if _sender is None:
+            
+            await self._resume.wait()
+            self._resume.clear()
+            
+            for sender in self._connections.keys():
+                if not self._connections[sender]['packet'][RECEIVE].empty():
+                    return self._connections[sender]['packet'][RECEIVE].get()
         
-        return self._connections[_sender]['packet'][RECEIVE].get()
+        while 1:
+        
+            await self._resume.wait()
+            self._resume.clear()
+        
+            if not self._connections[_sender]['packet'][RECEIVE].empty():
+                return self._connections[_sender]['packet'][RECEIVE].get()
     
-    async def receive_packet_wait(self, _sender: str, _time_out: float=0.1) -> Union[Packet, None]:
+    async def receive_packet_wait(self, _sender: str=None, _time_out: float=0.1) -> Union[Packet, None]:
         
         """
         Receives a packet with a timeout
@@ -529,6 +558,11 @@ class Host:
         except asc.TimeoutError:
             return None
         
+        if _sender is None:
+            for sender in self._connections.keys():
+                if not self._connections[sender]['packet'][RECEIVE].empty():
+                    return self._connections[sender]['packet'][RECEIVE].get()
+
         return self._connections[_sender]['packet'][RECEIVE].get()
     
     def l0_num_qubits(self, _store: int, _channel: str) -> int:
