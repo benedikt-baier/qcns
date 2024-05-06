@@ -395,7 +395,7 @@ class Host:
             res (int/None): result of the gate
         """
         
-        self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(gate, 5e-6), self._node_id))
+        self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(_gate, 5e-6), self._node_id))
         
         await self._resume.wait()
         self._resume.clear()

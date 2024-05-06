@@ -35,6 +35,20 @@ class QChannel:
         if _errors is None:
             self._errors: List[QuantumError] = []
     
+    def empty(self):
+        
+        """
+        Returns whether the channel is empty
+        
+        Args:
+            /
+            
+        Returns:
+            _empty (bool): whether the channel is empty 
+        """
+        
+        return self._queue.empty()
+    
     def set_lose_prob(self, lose_prob: float=0.) -> None:
         
         """
@@ -111,6 +125,10 @@ class QChannel:
        
 class PChannel:
     
+    """
+    Represents a classical pacekt channel
+    """
+    
     def __init__(self, _length: float=0.0) -> None:
         
         """
@@ -125,7 +143,21 @@ class PChannel:
         
         self._signal_time: float = _length * (5e-6) + 16e-6
         self._queue: Queue = Queue()
+    
+    def empty(self):
         
+        """
+        Returns whether the channel is empty
+        
+        Args:
+            /
+            
+        Returns:
+            _empty (bool): whether the channel is empty 
+        """
+        
+        return self._queue.empty()
+     
     def put(self, _packet: Packet) -> None:
         
         """

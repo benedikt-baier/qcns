@@ -411,7 +411,7 @@ def remove_qubits(q_l: List[Qubit]) -> None:
     """
     
     for qubit in q_l:
-        if q._qsystem._sparse:
+        if qubit._qsystem._sparse:
             ptrace_sparse(qubit)
         else:
             ptrace(qubit)

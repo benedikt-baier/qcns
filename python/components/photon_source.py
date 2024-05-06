@@ -3,8 +3,7 @@ from typing import List, Tuple, Any
 
 from python.components.event import ReceiveEvent
 from python.components.simulation import Simulation
-from python.components.channel import QChannel
-from code.qcns.python.components.photon_source import Packet
+from python.components.packet import Packet
 from python.components.qubit import tensor_operator, remove_qubits
 
 __all__ = ['SinglePhotonSource', 'AtomPhotonSource', 'TwoPhotonSource', 'BSM']
@@ -123,8 +122,8 @@ class AtomPhotonSource:
             
             q_1, q_2, q_3 = qsys.qubits
             
-            self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, _curr_time, -1)
-            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_3, _curr_time, -1)
+            self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, -1, _curr_time)
+            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_3, -1, _curr_time)
             
             self._receiver._connections[self._sender._node_id]['eqs'][RECEIVE].put(q_2)
             
@@ -141,7 +140,7 @@ class AtomPhotonSource:
             
             _curr_time += self._gate_time
             
-            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_3, _curr_time, -1)
+            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_3, -1, _curr_time)
             packet.update_l1_success(i)
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + self._gate_time, self._receiver._node_id))
@@ -203,8 +202,8 @@ class TwoPhotonSource:
             
             q_1, q_2, q_3, q_4 = qsys.qubits
             
-            self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, _curr_time, -1)
-            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_4, _curr_time, -1)
+            self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, -1, _curr_time)
+            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_4, -1, _curr_time)
             
             self._sender._connections[self._receiver._node_id]['eqs'][RECEIVE].put(q_2)
             self._receiver._connections[self._sender._node_id]['eqs'][RECEIVE].put(q_3)
@@ -218,14 +217,14 @@ class TwoPhotonSource:
                 q_1 = self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_retrieve_qubit(-1, _curr_time)
                 _new_time = _curr_time + self._gate_time_sender
                 q_1.state_transfer(q_2)
-                self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, _new_time, -1)
+                self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, -1, _new_time)
                 packet_s.update_l1_success(i)
                 
             if q_3 is not None:
                 q_4 = self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_retrieve_qubit(-1, _curr_time)
                 _new_time = _curr_time + self._gate_time_receiver
                 q_4.state_transfer(q_3)
-                self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_4, _new_time, -1)
+                self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_4, -1, _new_time)
                 packet_r.update_l1_success(i)
       
         packet_s.set_l1_ps()
@@ -293,8 +292,8 @@ class BSM:
             
             q_1, q_2, q_3, q_4 = qsys._qubits
             
-            self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, _curr_time, -1)
-            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_4, _curr_time, -1)
+            self._sender._connections[self._receiver._node_id]['memory'][SEND].l0_store_qubit(q_1, -1, _curr_time)
+            self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_4, -1, _curr_time)
             
             self._sender._connections[self._receiver._node_id]['eqs'][RECEIVE].put(q_2)
             self._receiver._connections[self._sender._node_id]['eqs'][RECEIVE].put(q_3)
