@@ -91,15 +91,15 @@ class QuantumMemory:
         
         return len(self._l3_memory)
     
-    def l0_store_qubit(self, _qubit: Qubit, _time: float, _index: int) -> None:
+    def l0_store_qubit(self, _qubit: Qubit, _index: int, _time: float) -> None:
         
         """
         Stores a qubit in the L0 memory
         
         Args:
             _qubit (Qubit): qubit to store
-            _time (float): time stamp
             _index (int): index at which to store qubit
+            _time (float): time stamp
             
         Returns:
             /
@@ -111,15 +111,15 @@ class QuantumMemory:
         
         self._l0_memory.insert(_index, (_qubit, _time))
     
-    def l1_store_qubit(self, _qubit: Qubit, _time: float, _index: int) -> None:
+    def l1_store_qubit(self, _qubit: Qubit, _index: int, _time: float) -> None:
         
         """
         Stores a qubit in the L1 memory
         
         Args:
             _qubit (Qubit): qubit to store
-            _time (float): time stamp
             _index (int): index at which to store qubit
+            _time (float): time stamp
             
         Returns:
             /
@@ -131,15 +131,15 @@ class QuantumMemory:
         
         self._l1_memory.insert(_index, (_qubit, _time))
     
-    def l2_store_qubit(self, _qubit: Qubit, _time: float, _index: int) -> None:
+    def l2_store_qubit(self, _qubit: Qubit, _index: int, _time: float) -> None:
         
         """
         Stores a qubit in the L2 memory
         
         Args:
             _qubit (Qubit): qubit to store
-            _time (float): time stamp
             _index (int): index at which to store qubit
+            _time (float): time stamp
             
         Returns:
             /
@@ -151,15 +151,15 @@ class QuantumMemory:
         
         self._l2_memory.insert(_index, (_qubit, _time))
     
-    def l3_store_qubit(self, _qubit: Qubit, _time: float, _index: int) -> None:
+    def l3_store_qubit(self, _qubit: Qubit, _index: int, _time: float) -> None:
         
         """
         Stores a qubit in the L3 memory
         
         Args:
             _qubit (Qubit): qubit to store
-            _time (float): time stamp
             index (int): index at which to store qubit
+            _time (float): time stamp
             
         Returns:
             /
@@ -291,7 +291,7 @@ class QuantumMemory:
     
         return _qubit  
     
-    def l0_peek_qubit(self, _index: int=-1) -> Qubit:
+    def l0_peek_qubit(self, _index: int) -> Qubit:
         
         """
         Takes a look at the qubit in L0 memory at index without extracting it
@@ -310,7 +310,7 @@ class QuantumMemory:
         
         return _qubit
     
-    def l1_peek_qubit(self, _index: int=-1) -> Qubit:
+    def l1_peek_qubit(self, _index: int) -> Qubit:
         
         """
         Takes a look at the qubit in L1 memory at index without extracting it
@@ -329,7 +329,7 @@ class QuantumMemory:
         
         return _qubit
     
-    def l2_peek_qubit(self, _index: int=-1) -> Qubit:
+    def l2_peek_qubit(self, _index: int) -> Qubit:
         
         """
         Takes a look at the qubit in L2 memory at index without extracting it
@@ -348,7 +348,7 @@ class QuantumMemory:
         
         return _qubit
     
-    def l3_peek_qubit(self, _index: int=-1) -> Qubit:
+    def l3_peek_qubit(self, _index: int) -> Qubit:
         
         """
         Takes a look at the qubit in L3 memory at index without extracting it
@@ -511,7 +511,7 @@ class QuantumMemory:
         
         return self.l1_retrieve_qubit(_index_src, _time), self.l1_retrieve_qubit(_index_dst, _time)
     
-    def l0_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+    def l0_estimate_fidelity(self, _index: int, _time: float) -> float:
         
         """
         Estimates the fidelity of a qubit in the L0 memory given current time
@@ -536,7 +536,7 @@ class QuantumMemory:
         
         return (1 - depolar / 2) * (1 - dephase)
     
-    def l1_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+    def l1_estimate_fidelity(self, _index: int, _time: float) -> float:
         
         """
         Estimates the fidelity of a qubit in the L1 memory given current time
@@ -561,7 +561,7 @@ class QuantumMemory:
         
         return (1 - depolar / 2) * (1 - dephase)
     
-    def l2_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+    def l2_estimate_fidelity(self, _index: int, _time: float) -> float:
         
         """
         Estimates the fidelity of a qubit in the L2 memory given current time
@@ -586,7 +586,7 @@ class QuantumMemory:
         
         return (1 - depolar / 2) * (1 - dephase)
     
-    def l3_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+    def l3_estimate_fidelity(self, _index: int, _time: float) -> float:
         
         """
         Estimates the fidelity of a qubit in the L3 memory given current time

@@ -83,246 +83,248 @@ def cache(func):
         return _cache[key]
     return wrapper
 
-def kronecker_product_full(op_1: np.array, op_2: np.array) -> np.array:
+def kronecker_product_full(_op_1: np.array, _op_2: np.array) -> np.array:
     
     """
     Computes the kronecker product of two full 2d matrices
 
     Args:
-        op_1 (np.array): first matrix
-        op_2 (np.array): second matrix
+        _op_1 (np.array): first matrix
+        _op_2 (np.array): second matrix
 
     Returns:
         op (np.array): result of the kronecker product
     """
 
-    op = op_1[:, None, :, None] * op_2[None, :, None, :]
-    op.shape = (op_1.shape[0] * op_2.shape[0], op_1.shape[1] * op_2.shape[1])
+    _op = _op_1[:, None, :, None] * _op_2[None, :, None, :]
+    _op.shape = (_op_1.shape[0] * _op_2.shape[0], _op_1.shape[1] * _op_2.shape[1])
 
-    return op
+    return _op
 
-def kronecker_product_sparse(op_1: sp.csr_matrix, op_2: sp.csr_matrix) -> sp.csr_matrix:
+def kronecker_product_sparse(_op_1: sp.csr_matrix, _op_2: sp.csr_matrix) -> sp.csr_matrix:
     
     """
     Computes the kronecker product of two sparse 2d matrices
 
     Args:
-        op_1 (sp.csr_matrix): first matrix
-        op_2 (sp.csr_matrix): second matrix
+        _op_1 (sp.csr_matrix): first matrix
+        _op_2 (sp.csr_matrix): second matrix
 
     Returns:
-        op (sp.csr_matrix): result of the kronecker product
+        _op (sp.csr_matrix): result of the kronecker product
     """
     
-    return sp.kron(op_1, op_2)
+    return sp.kron(_op_1, _op_2)
 
 _KRON_DICT = {0: kronecker_product_full, 1: kronecker_product_sparse}
 
-def tensor_operator(sparse: bool, operator_l: np.array) -> Union[np.array, sp.csr_matrix]:
+def tensor_operator(_sparse: bool, _operator_l: np.array) -> Union[np.array, sp.csr_matrix]:
     
     """
     Creates the tensor operator out of a operator list
     
     Args:
-        sparse (bool): indicator whether the operators are full or sparse
-        operator_l (list): list of 2x2 np.arrays
+        _sparse (bool): indicator whether the operators are full or sparse
+        _operator_l (list): list of 2x2 np.arrays
         
     Returns:
         res (np.array): resulting tensor operator
     """
 
-    return ft.reduce(_KRON_DICT[sparse], operator_l)
+    return ft.reduce(_KRON_DICT[_sparse], _operator_l)
 
-def dot(state: Union[np.array, sp.csr_matrix], gate: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.csr_matrix]:
+def dot(_state: Union[np.array, sp.csr_matrix], _gate: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.csr_matrix]:
     
     """
     Performs the linalg dot for quantum gates
     
     Args:
-        state (np.array): state to apply the gate to
-        gate (np.array): gate to apply
+        _state (np.array): state to apply the gate to
+        _gate (np.array): gate to apply
         
     Returns:
-        state (np.array): resulting state
+        _state (np.array): resulting state
     """
     
-    return gate.dot(state).dot(gate.conj().T)
+    return _gate.dot(_state).dot(_gate.conj().T)
 
 @cache
-def get_single_operator(sparse: bool, gate: Union[np.array, sp.csr_matrix], index: int, num_qubits: int) -> np.array:
+def get_single_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _index: int, _num_qubits: int) -> np.array:
 
     """
     Creates the tensor operator for a single qubit gate
     
     Args:
-        sparse (bool): indicator whether the operators are full or sparse
-        gate (np.array): 2x2 gate to apply to the target qubit
-        index (int): index of target qubit in QSystem
-        num_qubits (int): number of qubits in QSystem
+        _sparse (bool): indicator whether the operators are full or sparse
+        _gate (np.array): 2x2 gate to apply to the target qubit
+        _index (int): index of target qubit in QSystem
+        _num_qubits (int): number of qubits in QSystem
         
     Returns:
-        operator (np.array): resulting tensor for the single qubit
+        _op (np.array): resulting tensor for the single qubit
     """
     
-    operator_l = np.array([gates[sparse]['I']] * num_qubits)    
-    operator_l[index] = gate
+    operator_l = np.array([gates[_sparse]['I']] * _num_qubits)    
+    operator_l[_index] = _gate
     
-    return tensor_operator(sparse, operator_l)
+    return tensor_operator(_sparse, operator_l)
 
 @cache
-def get_double_operator(sparse: bool, gate: Union[np.array, sp.csr_matrix], c_index: int, t_index: int, t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
+def get_double_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _c_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
     
     """
     Creates the tensor operator for a controlled qubit gate
     
     Args:
-        sparse (bool): indicator whether the operators are full or sparse
-        gate (np.array): 2x2 gate to apply to the target qubit
-        c_index (int): index of control qubit
-        t_index (int): index of target index
-        t_num_qubits (int): number of qubits in target QSystem
+        _sparse (bool): indicator whether the operators are full or sparse
+        _gate (np.array): 2x2 gate to apply to the target qubit
+        _c_index (int): index of control qubit
+        _t_index (int): index of target index
+        _t_num_qubits (int): number of qubits in target QSystem
         
     Returns:
-        operator (np.array): resulting tensor for the controlled qubit gate
+        _op (np.array): resulting tensor for the controlled qubit gate
     """
     
-    key = f'{sparse}_s_m0_{1}_{1}_{t_num_qubits}_{c_index}'
-    proj0 = get_single_operator(key, sparse, gates[sparse]['P0'], c_index, t_num_qubits)
+    key = f'{_sparse}_s_m0_{1}_{1}_{_t_num_qubits}_{_c_index}'
+    proj0 = get_single_operator(key, _sparse, gates[_sparse]['P0'], _c_index, _t_num_qubits)
     
-    proj1 = np.array([gates[sparse]['I']] * t_num_qubits)
-    proj1[c_index] = gates[sparse]['P1']
-    proj1[t_index] = gate
+    proj1 = np.array([gates[_sparse]['I']] * _t_num_qubits)
+    proj1[_c_index] = gates[_sparse]['P1']
+    proj1[_t_index] = _gate
 
-    return proj0 + tensor_operator(sparse, proj1)
+    return proj0 + tensor_operator(_sparse, proj1)
 
 @cache
-def get_triple_operator(sparse: bool, gate_l: Union[np.array, sp.csr_matrix], c1_index: int, c2_index: int, t_index: int, t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
+def get_triple_operator(_sparse: bool, _gate_l: Union[np.array, sp.csr_matrix], _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
     
     """
     Generates the operator for a 3 qubit gate
     
     Args:
-        sparse (bool): indicator whether the operators are full or sparse
-        gate_l (np.array): gate list to apply to target
-        c1_index (int): index of first control qubit
-        c2_index (int): index of second control qubit
-        t_index (int): index of target qubit
-        t_num_qubit (int): number of qubits in target QSystem
+        _sparse (bool): indicator whether the operators are full or sparse
+        _gate_l (np.array): gate list to apply to target
+        _c1_index (int): index of first control qubit
+        _c2_index (int): index of second control qubit
+        _t_index (int): index of target qubit
+        _t_num_qubits (int): number of qubits in target QSystem
         
     Returns:
-        operator (np.array): resulting tensor for the controlled controlled qubit gate
+        _op (np.array): resulting tensor for the controlled controlled qubit gate
     """
     
-    c1, c2 = sorted([c1_index, c2_index])
+    c1, c2 = sorted([_c1_index, _c2_index])
     
-    gates_list = [[gates[sparse]['P0'], gates[sparse]['P0'], gate_l[0]], 
-                  [gates[sparse]['P0'], gates[sparse]['P1'], gate_l[1]], 
-                  [gates[sparse]['P1'], gates[sparse]['P0'], gate_l[2]], 
-                  [gates[sparse]['P1'], gates[sparse]['P1'], gate_l[3]]]
-    ops = np.array([gates[sparse]['I']] * t_num_qubits)
+    gates_list = [[gates[_sparse]['P0'], gates[_sparse]['P0'], _gate_l[0]], 
+                  [gates[_sparse]['P0'], gates[_sparse]['P1'], _gate_l[1]], 
+                  [gates[_sparse]['P1'], gates[_sparse]['P0'], _gate_l[2]], 
+                  [gates[_sparse]['P1'], gates[_sparse]['P1'], _gate_l[3]]]
+    ops = np.array([gates[_sparse]['I']] * _t_num_qubits)
         
     CNOTijk = 0
     for gates in gates_list:
         ops[c1] = gates[0]
         ops[c2] = gates[1]
-        ops[t_index] = gates[2]
-        CNOTijk += tensor_operator(sparse, ops)
+        ops[_t_index] = gates[2]
+        CNOTijk += tensor_operator(_sparse, ops)
     return CNOTijk
 
 @cache
-def get_bell_operator(sparse: bool, bell_state: int, c_index: int, t_index: int, t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
+def get_bell_operator(_sparse: bool, _bell_state: int, _c_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
     
     """
     Generates the bell operator
     
     Args:
-        sparse (bool): indicator whether the operators are full or sparse
-        c_index (int): index of control qubit
-        t_index (int): index of target qubit
-        t_num_qubits (int): number of qubits in target QSystem
+        _sparse (bool): indicator whether the operators are full or sparse
+        _bell_state (int): bell state to calculate
+        _c_index (int): index of control qubit
+        _t_index (int): index of target qubit
+        _t_num_qubits (int): number of qubits in target QSystem
         
     Returns:
-        res (np.array): resulting tensor for the bsm operator
+        _op (np.array): resulting tensor for the bell state operator
     """
     
-    h_gate = get_single_operator(f'{sparse}_s_h_{t_num_qubits}_{c_index}', sparse, gates[sparse]['H'], c_index, t_num_qubits)
-    cnot_gate = get_double_operator(f'{sparse}_d_x_{t_num_qubits}_{c_index}_{t_index}', sparse, gates[sparse]['X'], c_index, t_index, t_num_qubits)
+    h_gate = get_single_operator(f'{_sparse}_s_h_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['H'], _c_index, _t_num_qubits)
+    cnot_gate = get_double_operator(f'{_sparse}_d_x_{_t_num_qubits}_{_c_index}_{_t_index}', _sparse, gates[_sparse]['X'], _c_index, _t_index, _t_num_qubits)
     
-    if bell_state == 0:
+    if _bell_state == 0:
         return cnot_gate.dot(h_gate)
-    if bell_state == 1:
-        x_gate = get_single_operator(f'{sparse}_s_x_{t_num_qubits}_{t_index}', sparse, gates[sparse]['X'], t_index, t_num_qubits)
+    if _bell_state == 1:
+        x_gate = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_t_index}', _sparse, gates[_sparse]['X'], _t_index, _t_num_qubits)
         return cnot_gate.dot(h_gate).dot(x_gate)
-    if bell_state == 2:
-        x_gate = get_single_operator(f'{sparse}_s_x_{t_num_qubits}_{c_index}', sparse, gates[sparse]['X'], c_index, t_num_qubits)
+    if _bell_state == 2:
+        x_gate = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['X'], _c_index, _t_num_qubits)
         return cnot_gate.dot(h_gate).dot(x_gate)
-    if bell_state == 3:
-        x_gate_c = get_single_operator(f'{sparse}_s_x_{t_num_qubits}_{c_index}', sparse, gates[sparse]['X'], c_index, t_num_qubits)
-        x_gate_t = get_single_operator(f'{sparse}_s_x_{t_num_qubits}_{t_index}', sparse, gates[sparse]['X'], t_index, t_num_qubits)
+    if _bell_state == 3:
+        x_gate_c = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['X'], _c_index, _t_num_qubits)
+        x_gate_t = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_t_index}', _sparse, gates[_sparse]['X'], _t_index, _t_num_qubits)
         return cnot_gate.dot(h_gate).dot(x_gate_c).dot(x_gate_t)
 
 @cache
-def get_bsm_operator(sparse: bool, c_index: int, t_index: int, t_num_qubits: int) -> np.array:
+def get_bsm_operator(_sparse: bool, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
     
     """
     Generates the bsm operator
     
     Args:
-        sparse (bool): indicator whether the operators are full or sparse
-        c_index (int): index of control qubit
-        t_index (int): index of target qubit
-        t_num_qubits (int): number of qubits in target QSystem
+        _sparse (bool): indicator whether the operators are full or sparse
+        _c_index (int): index of control qubit
+        _t_index (int): index of target qubit
+        _t_num_qubits (int): number of qubits in target QSystem
         
     Returns:
-        res (np.array): resulting tensor for the bsm operator
+        _op (np.array): resulting tensor for the bsm operator
     """
     
-    cnot_gate = get_double_operator(f'{sparse}_d_x_{t_num_qubits}_{c_index}_{t_index}', sparse, gates[sparse]['X'], c_index, t_index, t_num_qubits)
-    h_gate = get_single_operator(f'{sparse}_s_h_{t_num_qubits}_{c_index}', sparse, gates[sparse]['H'], c_index, t_num_qubits)
+    cnot_gate = get_double_operator(f'{_sparse}_d_x_{_t_num_qubits}_{_c_index}_{_t_index}', _sparse, gates[_sparse]['X'], _c_index, _t_index, _t_num_qubits)
+    h_gate = get_single_operator(f'{_sparse}_s_h_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['H'], _c_index, _t_num_qubits)
     
     return h_gate.dot(cnot_gate) 
 
-def depolarization_error(sparse: bool, qubit: Qubit, fidelity: float) -> None:
+def depolarization_error(_sparse: bool, _qubit: Qubit, _fidelity: float) -> None:
     
     """
     Applys a depolarization error to the qubit given a fidelity
     
     Args:
-        qubit (Qubit): qubit to apply error to
-        fidelity (float): fidelity of the depolarization error
+        _sparse (bool): sparsity of QSystem
+        _qubit (Qubit): qubit to apply error to
+        _fidelity (float): fidelity of the depolarization error
         
     Returns:
         /
     """
     
-    key_x = f'{sparse}_s_x_{qubit._qsystem._num_qubits}_{qubit._index}'
-    key_y = f'{sparse}_s_y_{qubit._qsystem._num_qubits}_{qubit._index}'
-    key_z = f'{sparse}_s_z_{qubit._qsystem._num_qubits}_{qubit._index}'
+    key_x = f'{_sparse}_s_x_{_qubit._qsystem._num_qubits}_{_qubit._index}'
+    key_y = f'{_sparse}_s_y_{_qubit._qsystem._num_qubits}_{_qubit._index}'
+    key_z = f'{_sparse}_s_z_{_qubit._qsystem._num_qubits}_{_qubit._index}'
     
-    gate_x = get_single_operator(key_x, sparse, gates[sparse]['X'], qubit._index, qubit._qsystem._num_qubits)    
-    gate_y = get_single_operator(key_y, sparse, gates[sparse]['y'], qubit._index, qubit._qsystem._num_qubits)
-    gate_z = get_single_operator(key_z, sparse, gates[sparse]['Z'], qubit._index, qubit._qsystem._num_qubits)
+    gate_x = get_single_operator(key_x, _sparse, gates[_sparse]['X'], _qubit._index, _qubit._qsystem._num_qubits)    
+    gate_y = get_single_operator(key_y, _sparse, gates[_sparse]['y'], _qubit._index, _qubit._qsystem._num_qubits)
+    gate_z = get_single_operator(key_z, _sparse, gates[_sparse]['Z'], _qubit._index, _qubit._qsystem._num_qubits)
         
-    qubit._qsystem._state = fidelity * qubit._qsystem._state + ((1 - fidelity) / 3) * (dot(qubit._qsystem._state, gate_x) + dot(qubit._qsystem._state, gate_y) + dot(qubit._qsystem._state, gate_z))
+    _qubit._qsystem._state = _fidelity * _qubit._qsystem._state + ((1 - _fidelity) / 3) * (dot(_qubit._qsystem._state, gate_x) + dot(_qubit._qsystem._state, gate_y) + dot(_qubit._qsystem._state, gate_z))
 
-def combine_state(_q_l: List[Qubit]) -> QSystem:
+def combine_state(q_l: List[Qubit]) -> QSystem:
         
         """
         Combines multiple qsystems into one qsystem
         
         Args:
-            _q_l (list): List of qsystems
+            q_l (list): List of qsystems
             
         Returns:
             qsys_n (QSystem): new qsystem
         """
         
-        if len(set([id(qubit._qsystem) for qubit in _q_l])) == 1:
+        if len(set([id(qubit._qsystem) for qubit in q_l])) == 1:
             return q_l[0]._qsystem
         
-        qsys_n = Simulation.create_qsystem(1, sparse=_q_l[0]._qsystem._sparse)
+        qsys_n = QSystem(1, q_l[0]._qsystem._sparse)
         
-        qsys_l = [q._qsystem for n, q in enumerate(_q_l) if q not in _q_l[:n]]
+        qsys_l = [q._qsystem for n, q in enumerate(q_l) if q not in q_l[:n]]
         
         num_qubits_n = sum([qsys._num_qubits for qsys in qsys_l])
         
@@ -383,10 +385,10 @@ def ptrace_sparse(_q: Qubit) -> None:
     key_3 = f'{1}_v2_{_q._qsystem._num_qubits}_{_q._index}'
     key_4 = f'{1}_v2T_{_q._qsystem._num_qubits}_{_q._index}'
     
-    op_1_a = get_single_operator_gate(key_1, 1, v1, _q._index, _q._qsystem._num_qubits)
-    op_1_b = get_single_operator_gate(key_2, 1, v1.T, _q._index, _q._qsystem._num_qubits)
-    op_2_a = get_single_operator_gate(key_3, 1, v2, _q._index, _q._qsystem._num_qubits)
-    op_2_b = get_single_operator_gate(key_4, 1, v2.T, _q._index, _q._qsystem._num_qubits)
+    op_1_a = get_single_operator(key_1, 1, v1, _q._index, _q._qsystem._num_qubits)
+    op_1_b = get_single_operator(key_2, 1, v1.T, _q._index, _q._qsystem._num_qubits)
+    op_2_a = get_single_operator(key_3, 1, v2, _q._index, _q._qsystem._num_qubits)
+    op_2_b = get_single_operator(key_4, 1, v2.T, _q._index, _q._qsystem._num_qubits)
 
     _q._qsystem._state = sp.csr_matrix(op_1_a.dot(_q._qsystem._state.dot(op_1_b)) + op_2_a.dot(_q._qsystem._state.dot(op_2_b)))
     _q._qsystem._state.eliminate_zeros()
@@ -396,7 +398,7 @@ def ptrace_sparse(_q: Qubit) -> None:
     for i in range(_q._qsystem._num_qubits):
         _q._qsystem._qubits[i]._index = i
 
-def remove_qubits(_q_l: List[Qubit]) -> None:
+def remove_qubits(q_l: List[Qubit]) -> None:
 
     """
     Traces out the given qubits from the state, adjusts the QSystem accordingly
@@ -408,11 +410,11 @@ def remove_qubits(_q_l: List[Qubit]) -> None:
         /
     """
     
-    for q in _q_l:
+    for qubit in q_l:
         if q._qsystem._sparse:
-            ptrace_sparse(q)
+            ptrace_sparse(qubit)
         else:
-            ptrace(q)
+            ptrace(qubit)
 
 class Qubit:
     
@@ -1445,7 +1447,7 @@ class QSystem:
     Represents a system consisting of multiple entanglable qubits
     """
     
-    def __init__(self, _num_qubits: int=1, _fidelity: float=1., _sparse: bool=0) -> None:
+    def __init__(self, num_qubits: int=1, fidelity: float=1., sparse: bool=0) -> None:
         
         """
         Instantiates the qubit state for a qubit system, initializes to the zero state
@@ -1453,22 +1455,23 @@ class QSystem:
         Args:
             num_qubits (int): number of qubits in the system
             fidelity (float): fidelity of the initial quantum system
+            sparse (bool): sparsity of quantum system
             
         Returns:
             /
         """
         
-        self._num_qubits = _num_qubits
-        self._qubits = [Qubit(self, i) for i in range(self._num_qubits)]
-        self._sparse = _sparse
+        self._num_qubits: int = num_qubits
+        self._qubits: List[Qubit] = [Qubit(self, i) for i in range(self._num_qubits)]
+        self._sparse: bool = sparse
         
-        init_state = np.array([[_fidelity, 0], [0, 1 - _fidelity]], dtype=np.complex128)
-        if _sparse:
-            init_state = sp.csr_matrix([[_fidelity, 0], [0, 1 - _fidelity]], dtype=np.complex128)
+        init_state = np.array([[fidelity, 0], [0, 1 - fidelity]], dtype=np.complex128)
+        if sparse:
+            init_state = sp.csr_matrix([[fidelity, 0], [0, 1 - fidelity]], dtype=np.complex128)
 
-        self._state = init_state
+        self._state: Union[np.array, sp.csr_matrix] = init_state
         if self._num_qubits > 1:
-            self._state = tensor_operator(_sparse, np.array([init_state] * self._num_qubits))
+            self._state: Union[np.array, sp.csr_matrix] = tensor_operator(sparse, np.array([init_state] * self._num_qubits))
     
     def __len__(self) -> int:
         

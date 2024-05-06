@@ -30,9 +30,23 @@ class Simulation:
             /
         """
         
-        self._event_queue: List = []
-        self._hosts: List = []
+        self._event_queue: List[Event] = []
+        self._hosts: List[Host] = []
         self._sim_time: float = 0.
+    
+    def add_host(self, _host: Host) -> None:
+        
+        """
+        Adds a host to the simulation
+        
+        Args:
+            _host (Host): host to add to simulation
+            
+        Returns:
+            /
+        """
+        
+        self._hosts.append(_host)
     
     def add_hosts(self, _hosts: List[Host]) -> None:
         
@@ -63,7 +77,7 @@ class Simulation:
         heappush(self._event_queue, _event)
     
     @staticmethod
-    def create_qsystem(_num_qubits: int, _fidelity: float=1., _sparse: bool=False) -> QSystem:
+    def create_qsystem(_num_qubits: int, fidelity: float=1., sparse: bool=False) -> QSystem:
         
         """
         Creates qsystem
@@ -77,7 +91,7 @@ class Simulation:
             qsys (QSystem): created Qsystem
         """
         
-        return QSystem(_num_qubits, _fidelity, _sparse)
+        return QSystem(_num_qubits, fidelity, sparse)
     
     @staticmethod
     def delete_qsystem(_qsys: QSystem) -> None:
@@ -94,21 +108,21 @@ class Simulation:
         
         del _qsys
     
-    async def handle_event(self) -> None:
+    async def handle_event(self, _num_hosts: int) -> None:
         
         """
         Handles Events in the event queue
         
         Args:
-            /
+            _num_hosts (int): number of non terminating hosts
             
         Returns:
             / 
         """
         
-        tasks = {idx: asc.create_task(host.run()) for idx, host in self._hosts.items()}
+        tasks = [asc.create_task(host.run()) for host in self._hosts]
         
-        num_hosts = len(tasks)
+        num_hosts = len(tasks) - _num_hosts
         
         while num_hosts:
             
@@ -126,18 +140,16 @@ class Simulation:
             self._sim_time = event._end_time
             self._hosts[event._node_id]._resume.set()
     
-    def run(self) -> None:
+    def run(self, num_hosts: int=0) -> None:
         
         """
         Runs the simulation by handling all Events in the event queue
         
         Args:
-            /
+            num_hosts (int): number of hosts that are not terminating
             
         Returns:
             /
         """
         
-        self._hosts = {host._node_id: host for host in self._hosts}
-        
-        asc.run(self.handle_event())
+        asc.run(self.handle_event(num_hosts))

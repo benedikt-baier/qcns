@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Any
+from typing import List, Tuple, Any
 
 from python.components.event import ReceiveEvent
 from python.components.simulation import Simulation
@@ -64,7 +64,7 @@ class SinglePhotonSource:
             return qsys.qubits
         
         _qubits = []
-        for i in range(_num_requested):
+        for _ in range(_num_requested):
             qsys = Simulation.create_qsystem(1)
             qsys._state = np.array([[self._model[1], np.sqrt(self._model[1] * (1 - self._model[1]))], [np.sqrt(self._model[1] * (1 - self._model[1])), 1 - self._model[1]]])
             _qubits.append(qsys.qubits)
@@ -227,6 +227,10 @@ class TwoPhotonSource:
                 q_4.state_transfer(q_3)
                 self._receiver._connections[self._sender._node_id]['memory'][RECEIVE].l0_store_qubit(q_4, _new_time, -1)
                 packet_r.update_l1_success(i)
+      
+        packet_s.set_l1_ps()
+        packet_r.set_l1_ps()
+        packet_r.set_l1_ack()
       
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + self._gate_time_sender, self._sender._node_id))
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + self._gate_time_receiver, self._receiver._node_id))

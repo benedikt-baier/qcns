@@ -3,8 +3,7 @@ from queue import Queue
 from typing import Union, List
 
 from python.components.qubit import Qubit, remove_qubits
-from code.qcns.python.components.photon_source import *
-from python.components.error import *
+from python.components.packet import Packet
 
 __all__ = ['QChannel', 'PChannel']
 
@@ -30,13 +29,13 @@ class QChannel:
         self._lose_prob: float = 0.
         self._lose_qubits: bool = _lose_qubits
         if self._lose_qubits:
-            self._lose_prob = 1 - 10 ** (_length * _attenuation_coefficient)
-        self._queue = Queue()
-        self._errors = _errors
+            self._lose_prob: float = 1 - 10 ** (_length * _attenuation_coefficient)
+        self._queue: Queue = Queue()
+        self._errors: List[QuantumError] = _errors
         if _errors is None:
-            self._errors = []
+            self._errors: List[QuantumError] = []
     
-    def set_lose_prob(self, _lose_prob: float=0.) -> None:
+    def set_lose_prob(self, lose_prob: float=0.) -> None:
         
         """
         Sets the lose probability for the channel
@@ -48,10 +47,10 @@ class QChannel:
             /
         """
         
-        if not (0. <= _lose_prob <= 1.0):
+        if not (0. <= lose_prob <= 1.0):
             raise ValueError('Probability should be between 0 and 1')
         
-        self._lose_prob = _lose_prob
+        self._lose_prob = lose_prob
         self._lose_qubits = True
         
     def lose_qubit(self, _qubit: Qubit) -> Union[Qubit, None]:
@@ -119,14 +118,13 @@ class PChannel:
         
         Args:
             _length (float): length of channel in Km
-            pulse_length (float): pulse length
 
         Returns:
             /
         """
         
-        self._signal_time = _length * (5e-6) + 16e-6
-        self._queue = Queue()
+        self._signal_time: float = _length * (5e-6) + 16e-6
+        self._queue: Queue = Queue()
         
     def put(self, _packet: Packet) -> None:
         

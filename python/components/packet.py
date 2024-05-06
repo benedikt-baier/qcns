@@ -10,13 +10,29 @@ class Packet:
     Represents a classical packet
     """
     
-    def __init__(self, l2_src: int, l2_dst: int, l1_requested: int=0, l1_needed: int=0, l2_requested: int=0, l2_needed: int=0, l3_src: int=None, l3_dst: int=None, mode: int=0, num_channels: int=1, l4_src: int=None, l4_dst: int=None, l4_purifications: int=0, time_stamp: float=0., payload: Any=None, upayload: Any='') -> None:
+    def __init__(self, _l2_src: int, _l2_dst: int, l1_requested: int=0, l1_needed: int=0, l2_requested: int=0, l2_needed: int=0, l3_src: int=None, l3_dst: int=None, mode: int=0, num_channels: int=1, l4_src: int=None, l4_dst: int=None, l4_requested: int=0, l4_needed: int=0, time_stamp: float=0., payload: Any=None, upayload: Any='') -> None:
         
         """
         Instantiates a classical packet tracked and untracked payload with respect to timing update
         
         Args:
-            
+            _l2_src (int): L2 source address
+            _l2_dst (int): L2 destination address
+            l1_requested (int): number of requested qubits for L1 transmission
+            l1_needed (int): number of needed qubits for L1 transmission
+            l2_requested (int): number of requested qubit pairs for L2 purification
+            l2_needed (int): number of needed qubit pairs for L2 purification
+            l3_src (int): L3 source address
+            l3_dst (int): L3 destination address
+            mode (bool): L3 mode of packet, whether to just apply quantum operations or just forward packet
+            num_channels (int): number of channels for L3 protocol
+            l4_src (int): L4 source port
+            l4_dst (int): L4 destination port
+            l4_requested (int): number of requested qubits for L4 purification
+            l4_needed (int): number of needed qubits for L4 purification
+            time_stamp (float): time stamp of packet creation
+            payload (Any): tracked payload of packet, has influence on sending time of packet
+            upayload (Any): untracked payload of packet, has no influence on sending time of packet
             
         Returns:
             /
@@ -31,7 +47,7 @@ class Packet:
         
         # layer 2
         self._is_l2 = 0
-        self._l2 = Layer2(l2_src, l2_dst, l2_requested, l2_needed)
+        self._l2 = Layer2(_l2_src, _l2_dst, l2_requested, l2_needed)
         
         if l2_needed:
             self._is_l2 = 1
@@ -47,7 +63,7 @@ class Packet:
         self._is_l4 = 0
         self._l4 = ''
         if l4_src is not None or l4_dst is not None:
-            self._l4 = Layer4(l4_src, l4_dst, l4_purifications)
+            self._l4 = Layer4(l4_src, l4_dst, l4_requested, l4_needed)
             self._is_l4 = 1
         
         # layer 7
@@ -361,21 +377,6 @@ class Packet:
         """
         
         return self._l2._dst
-    
-    @property
-    def l2_num_purification(self) -> int:
-        
-        """
-        Returns the number of L2 purification attempts
-        
-        Args:
-            /
-            
-        Returns:
-            l2_num_purification (int): number of L2 purification
-        """
-
-        return self._l2._num_purification
     
     @property
     def l2_ack(self) -> bool:
@@ -748,6 +749,16 @@ class Packet:
     @property
     def payload(self) -> List[Any]:
         
+        """
+        Return the L7 payload
+        
+        Args:
+            /
+            
+        Returns:
+            l7_payload (list): payload
+        """
+        
         return self._l7._payload
     
     def reset_payload(self):
@@ -781,60 +792,169 @@ class Packet:
     
 class Layer1:
     
-    def __init__(self, num_requested: int, num_needed: int) -> None:
+    """
+    Represents the Physical Layer (L1) of a packet
+    """
+    
+    def __init__(self, _num_requested: int, _num_needed: int) -> None:
         
-        self._num_requested = num_requested
-        self._num_needed = num_needed
-        self._entanglement_success = np.zeros(num_needed, dtype=np.bool_)
+        """
+        Instantiates a L1 object
+        
+        Args:
+            _num_requested (int): number of requested qubits for L1
+            _num_needed (int): number of needed qubits for L1
+            
+        Retunrs:
+            /
+        """
+        
+        self._num_requested = _num_requested
+        self._num_needed = _num_needed
+        self._entanglement_success = np.zeros(_num_needed, dtype=np.bool_)
         self._ack = 0
         self._ps = 0
 
     def __len__(self) -> int:
         
-        return 25
+        """
+        Returns the length of Layer 1
+        
+        Args:
+            /
+            
+        Returns:
+            _len (int): length of Layer 1
+        """
+        
+        return 98
 
     def __repr__(self) -> str:
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            _repr (str): stringified Layer 1
+        """
         
         return f'L1: Num Requested: {self._num_requested}, Num: Needed {self._num_needed}, ACK: {self._ack}, PS: {self._ps}, Success: {self._entanglement_success} | '
 
 class Layer2:
     
-    def __init__(self, src: int, dst: int, num_requested: int, num_needed: int) -> None:
+    """
+    Represents the MAC Layer (L2) of a packet
+    """
+    
+    def __init__(self, _src: int, _dst: int, _num_requested: int, _num_needed: int) -> None:
         
-        self._src = src
-        self._dst = dst
-        self._num_requested = num_requested
-        self._num_needed = num_needed
-        self._purification_success = np.zeros(num_requested, dtype=np.bool_)
+        """
+        Instantiates a L2 object
+        
+        Args:
+            _src (int): L2 source address
+            _dst (int): L2 destination address
+            _num_requested (int): number of requested qubit pairs for purification
+            _num_needed (int): number of needed qubit pairs for purification
+            
+        Returns:
+            /
+        """
+        
+        self._src = _src
+        self._dst = _dst
+        self._num_requested = _num_requested
+        self._num_needed = _num_needed
+        self._purification_success = np.zeros(_num_needed, dtype=np.bool_)
         self._ack = 0
     
-    def __repr__(self):
-        
-        return f'L2: Src: {self._src}, Dst: {self._dst}, Num Requested: {self._num_requested}, Num Needed: {self._num_needed}, Success: {self._purification_success}, Flag: {self._ack} | '
-     
     def __len__(self):
         
-        return 112
+        """
+        Returns the length of Layer 2
+        
+        Args:
+            /
+            
+        Returns:
+            _len (int): length of Layer 2
+        """
+        
+        return 193
+        
+    def __repr__(self):
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            _repr (str): stringified Layer 2
+        """
+        
+        return f'L2: Src: {self._src}, Dst: {self._dst}, Num Requested: {self._num_requested}, Num Needed: {self._num_needed}, Success: {self._purification_success}, Flag: {self._ack} | '
     
 class Layer3:
     
-    def __init__(self, src: int, dst: int, mode: bool, num_channels: int=1) -> None:
-        
-        self._src = src
-        self._dst = dst
-        self._mode = mode
-        self._num_channels = num_channels
-        self._swap_success = np.zeros(num_channels, dtype=np.bool_)
-        self._x_count = np.zeros(num_channels, dtype=np.bool_)
-        self._z_count = np.zeros(num_channels, dtype=np.bool_)
+    """
+    Represents the Network Layer (L3) of a packet
+    """
     
-    def __repr__(self):
+    def __init__(self, _src: int, _dst: int, _mode: bool, _num_channels: int=1) -> None:
         
-        return f'L3: Src: {self._src}, Dst: {self._dst}, Mode: {self._mode}, Num: {self._num_channels}, Success: {self._swap_success}, X: {self._x_count}, Z: {self._z_count} | '
-    
+        """
+        Instantiates a Layer 3 object
+        
+        Args:
+            _src (int): L3 source address
+            _dst (int): L3 destintaion address
+            _mode (bool): whether to perform quantum operations or not
+            _num_channels (int): number of channels to swap
+            
+        Returns:
+            /
+        """
+        
+        self._src = _src
+        self._dst = _dst
+        self._mode = _mode
+        self._num_channels = _num_channels
+        self._swap_success = np.zeros(_num_channels, dtype=np.bool_)
+        self._x_count = np.zeros(_num_channels, dtype=np.bool_)
+        self._z_count = np.zeros(_num_channels, dtype=np.bool_)
+
     def __len__(self):
         
-        return 129
+        """
+        Returns the length of Layer 3
+        
+        Args:
+            /
+            
+        Returns:
+            _len (int): length of Layer 3
+        """
+        
+        return 385
+    
+    def __repr__(self) -> str:
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            _repr (str): stringified Layer 3
+        """
+        
+        return f'L3: Src: {self._src}, Dst: {self._dst}, Mode: {self._mode}, Num: {self._num_channels}, Success: {self._swap_success}, X: {self._x_count}, Z: {self._z_count} | '
     
     def reset(self) -> None:
         
@@ -851,7 +971,7 @@ class Layer3:
         self._x_count = np.zeros(self._num_channels, dtype=np.bool_)
         self._z_count = np.zeros(self._num_channels, dtype=np.bool_)
         
-    def update(self, res: int, channel: int):
+    def update(self, res: int, channel: int) -> None:
         
         """
         Updates the x_count and z_count of layer 3 given the result and the channel
@@ -874,34 +994,106 @@ class Layer3:
     
 class Layer4:
     
-    def __init__(self, src: int, dst: int, num_purification: int) -> None:
+    """
+    Represents the Transport Layer (L4) of a packet
+    """
+    
+    def __init__(self, _src: int, _dst: int, _num_requested: int, _num_needed: int) -> None:
         
-        self._src = src
-        self._dst = dst
-        self._num_purification = num_purification
-        self._purification_success = np.zeros(num_purification, dtype=np.bool_)
+        """
+        Instantiates a L4 object
+        
+        Args:
+            _src (int): L4 source port
+            _dst (int): L4 destination port
+            _num_requested (int): number of requested qubits for E2E purification
+            _num_needed (int): number of needed qubits for E2E purification
+            
+        Returns:
+            /
+        """
+        
+        self._src = _src
+        self._dst = _dst
+        self._num_requested = _num_requested
+        self._num_needed = _num_needed
+        self._purification_success = np.zeros(_num_needed, dtype=np.bool_)
         self._ack = 0
+
+    def __len__(self):
+        
+        """
+        Returns the length of Layer 4
+        
+        Args:
+            /
+            
+        Returns:
+            _len (int): length of Layer 4
+        """
+        
+        return 129
     
     def __repr__(self):
         
-        return f'L4: Src: {self._src}, Dst: {self._dst}, Num: {self._num_purification}, Success: {self._purification_success} | '
-    
-    def __len__(self):
+        """
+        Custom print function
         
-        return 48
+        Args:
+            /
+            
+        Returns:
+            _repr (str): stringified Layer 4
+        """
+        
+        return f'L4: Src: {self._src}, Dst: {self._dst}, Num Requested: {self._num_requested}, Num Needed: {self._num_needed}, Success: {self._purification_success} | '
     
 class Layer7:
     
-    def __init__(self, payload: List):
-        
-        self._payload = payload
-        if payload is None:
-            self._payload = []
-            
-    def __repr__(self):
-        
-        return f'L7: Payload: {self._payload}'
+    """
+    Represents the Application Layer (L7) of a packet
+    """
     
+    def __init__(self, _payload: List[Any]):
+        
+        """
+        Instantiates a L7 object
+        
+        Args:
+            _payload (list): payload of packet
+            
+        Returns:
+            /
+        """
+        
+        self._payload = _payload
+        if _payload is None:
+            self._payload = []
+        
     def __len__(self):
         
+        """
+        Returns the length of Layer 7
+        
+        Args:
+            /
+            
+        Returns:
+            _len (int): length of Layer 7
+        """
+        
         return len(self._payload)
+    
+    def __repr__(self):
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            _repr (str): stringified Layer 7
+        """
+        
+        return f'L7: Payload: {self._payload}'
