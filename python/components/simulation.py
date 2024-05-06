@@ -108,6 +108,21 @@ class Simulation:
         
         del _qsys
     
+    def stop_simulation(self):
+        
+        """
+        Stops the simulation
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        for host in self._hosts.values():
+            host.stop = True
+    
     async def handle_event(self, _num_hosts: int) -> None:
         
         """
@@ -120,11 +135,15 @@ class Simulation:
             / 
         """
         
-        tasks = [asc.create_task(host.run()) for host in self._hosts]
+        tasks = [asc.create_task(host.run()) for host in self._hosts.values()]
         
         num_hosts = len(tasks) - _num_hosts
         
-        while num_hosts:
+        while 1:
+            
+            if not num_hosts:
+                self.stop_simulation()
+                return
             
             await asc.sleep(0)
             
@@ -151,5 +170,7 @@ class Simulation:
         Returns:
             /
         """
+        
+        self._hosts = {host._node_id: host for host in self._hosts}
         
         asc.run(self.handle_event(num_hosts))

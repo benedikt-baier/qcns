@@ -4,7 +4,7 @@ import asyncio as asc
 
 from copy import deepcopy
 from functools import partial
-from typing import List, Dict, Tuple, Union, Type
+from typing import List, Dict, Tuple, Union, Type, Any
 
 from python.components.simulation import Simulation
 from python.components.event import StopEvent, SendEvent, ReceiveEvent, GateEvent 
@@ -76,7 +76,7 @@ class Host:
         self._node_id: int = _node_id
         self._sim: Simulation = _sim
         self._pulse_duration: float = _pulse_duration
-        self._gates: Dict[str, QUBIT] = {k: v for k, v in Qubit.__dict__.items() if not k.startswith(('__', 'f'))}
+        self._gates: Dict[str, Qubit] = {k: v for k, v in Qubit.__dict__.items() if not k.startswith(('__', 'f'))}
         self._gate_duration: Dict[str, float] = _gate_duration
         self._gate_parameters: Dict[str, float] = _gate_parameters
         
@@ -87,7 +87,8 @@ class Host:
         self._layer_results: Dict[str, Dict[int, Dict[int, np.array]]] = {}
         self._packets: Dict[str, Dict[int, Dict[int, Packet]]] = {}
         
-        self._resume: asyncio.Event = asc.Event()
+        self._resume: asc.Event = asc.Event()
+        self.stop = False
     
         self.run = partial(self.log_exceptions, self.run)
     
@@ -360,14 +361,15 @@ class Host:
         
         return self._connections[_receiver]['sqs'][SEND]['s'].create_qubit(num_requested)
     
-    async def create_bell_pairs(self, _receiver: int, num_requested: int=1) -> None:
+    async def create_bell_pairs(self, _receiver: int, store: int=0, num_requested: int=1) -> None:
         
         """
         Creates number of requested bell pairs
         
         Args:
             _receiver (int): receiver of bell pairs
-            _num_requested (int): number of requested bell pairs
+            store (int): SEND or RECEIVE store
+            num_requested (int): number of requested bell pairs
             
         Returns:
             /
@@ -378,7 +380,10 @@ class Host:
         await self._resume.wait()
         self._resume.clear()
         
-        self._connections[_receiver]['eqs'][SEND]['s'].create_bell_pairs(num_requested, num_requested)
+        if not store:
+            self._connections[_receiver]['eqs'][SEND]['s'].create_bell_pairs(num_requested, num_requested)
+        if store:
+            self._sim._hosts[_receiver]._connections[self._node_id]['eqs'][SEND]['s'].create_bell_pairs(num_requested, num_requested)
     
     async def apply_gate(self, _gate: str, *args: str, combine: bool=False, remove: bool=False) -> Union[int, None]:
         
@@ -488,6 +493,7 @@ class Host:
             for _sender in self._connections.keys():
                 if not self._connections[_sender]['sqs'][RECEIVE].empty():
                     return _sender, self._connections[_sender]['sqs'][RECEIVE].get()
+            return None
 
         return self._connections[sender]['sqs'][RECEIVE].get()
     
@@ -562,6 +568,7 @@ class Host:
             for _sender in self._connections.keys():
                 if not self._connections[_sender]['packet'][RECEIVE].empty():
                     return self._connections[_sender]['packet'][RECEIVE].get()
+            return None
 
         return self._connections[sender]['packet'][RECEIVE].get()
     
