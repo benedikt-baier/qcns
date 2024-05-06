@@ -1,5 +1,4 @@
 import numpy as np
-from numpy import inf
 from numpy.random import uniform
 from typing import List, Union, Tuple
 from python.components.qubit import Qubit
@@ -190,7 +189,7 @@ class QuantumMemory:
             
         _qubit, _store_time = self._l0_memory.pop(_index)
         
-        if np.random.uniform(0, 1) > self._efficiency:
+        if uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -220,7 +219,7 @@ class QuantumMemory:
             
         _qubit, _store_time = self._l1_memory.pop(_index)
         
-        if np.random.uniform(0, 1) > self._efficiency:
+        if uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -250,7 +249,7 @@ class QuantumMemory:
             
         _qubit, _store_time = self._l2_memory.pop(_index)
         
-        if np.random.uniform(0, 1) > self._efficiency:
+        if uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -280,7 +279,7 @@ class QuantumMemory:
             
         _qubit, _store_time = self._l3_memory.pop(_index)
         
-        if np.random.uniform(0, 1) > self._efficiency:
+        if uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -512,10 +511,10 @@ class QuantumMemory:
         
         return self.l1_retrieve_qubit(_index_src, _time), self.l1_retrieve_qubit(_index_dst, _time)
     
-    def estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+    def l0_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
         
         """
-        Estimates the fidelity of a qubit given current time
+        Estimates the fidelity of a qubit in the L0 memory given current time
         
         Args:
             _index (int): index of qubit
@@ -528,11 +527,86 @@ class QuantumMemory:
         if not self._errors:
             return 1
         
-        _, t1 = self._memory[_index]
+        _, _store_time = self._l0_memory[_index]
 
-        store_time = _time - t1
+        _diff = _time - _store_time
 
-        depolar = 1 - np.exp(-(store_time / self._errors[0].depolar_time))
-        dephase = 0.5 * (1 - np.exp(-store_time * (1/self._errors[0].dephase_time - 1/(2*self._errors[0].depolar_time))))
+        depolar = 1 - np.exp(-(_diff / self._errors[0].depolar_time))
+        dephase = 0.5 * (1 - np.exp(-_diff * (1/self._errors[0].dephase_time - 1/(2*self._errors[0].depolar_time))))
         
-        return (1 - depolar ** 2) * (1 - dephase)
+        return (1 - depolar / 2) * (1 - dephase)
+    
+    def l1_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+        
+        """
+        Estimates the fidelity of a qubit in the L1 memory given current time
+        
+        Args:
+            _index (int): index of qubit
+            _time (float): time of storage access
+            
+        Returns:
+            _fidelity (float): estimated fidelity
+        """
+        
+        if not self._errors:
+            return 1
+        
+        _, _store_time = self._l1_memory[_index]
+
+        _diff = _time - _store_time
+
+        depolar = 1 - np.exp(-(_diff / self._errors[0].depolar_time))
+        dephase = 0.5 * (1 - np.exp(-_diff * (1/self._errors[0].dephase_time - 1/(2*self._errors[0].depolar_time))))
+        
+        return (1 - depolar / 2) * (1 - dephase)
+    
+    def l2_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+        
+        """
+        Estimates the fidelity of a qubit in the L2 memory given current time
+        
+        Args:
+            _index (int): index of qubit
+            _time (float): time of storage access
+            
+        Returns:
+            _fidelity (float): estimated fidelity
+        """
+        
+        if not self._errors:
+            return 1
+        
+        _, _store_time = self._l2_memory[_index]
+
+        _diff = _time - _store_time
+
+        depolar = 1 - np.exp(-(_diff / self._errors[0].depolar_time))
+        dephase = 0.5 * (1 - np.exp(-_diff * (1/self._errors[0].dephase_time - 1/(2*self._errors[0].depolar_time))))
+        
+        return (1 - depolar / 2) * (1 - dephase)
+    
+    def l3_estimate_fidelity(self, _index: int=-1, _time: float=0.) -> float:
+        
+        """
+        Estimates the fidelity of a qubit in the L3 memory given current time
+        
+        Args:
+            _index (int): index of qubit
+            _time (float): time of storage access
+            
+        Returns:
+            _fidelity (float): estimated fidelity
+        """
+        
+        if not self._errors:
+            return 1
+        
+        _, _store_time = self._l3_memory[_index]
+
+        _diff = _time - _store_time
+
+        depolar = 1 - np.exp(-(_diff / self._errors[0].depolar_time))
+        dephase = 0.5 * (1 - np.exp(-_diff * (1/self._errors[0].dephase_time - 1/(2*self._errors[0].depolar_time))))
+        
+        return (1 - depolar / 2) * (1 - dephase)

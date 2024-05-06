@@ -1499,7 +1499,7 @@ class QSystem:
         return str(self._state)
     
     @property    
-    def qubits(self) -> List[Qubit]:
+    def qubits(self) -> Union[Qubit, List[Qubit]]:
         
         """
         Makes the retrieving of qubits out of a QSystem more convienent
@@ -1515,7 +1515,7 @@ class QSystem:
             return self._qubits
         return self._qubits[0]
     
-    def qubit(self, index: int) -> Qubit:
+    def qubit(self, _index: int) -> Qubit:
         
         """
         Returns the qubit at the specified index
@@ -1527,5 +1527,5 @@ class QSystem:
             qubit (qubit): qubit at specified index
         """
         
-        return self._qubits[index]
+        return self._qubits[_index]
     

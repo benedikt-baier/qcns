@@ -3,7 +3,7 @@ import scipy.sparse as sp
 
 from typing import Union, List
 
-from python.components.qubit import Qubit, dot, get_single_operator, remove_qubits
+from python.components.qubit import Qubit, dot, get_single_operator
 
 __all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError',
            'SystematicDephasingError', 'SystematicError', 'DepolarizationMemoryError', 'DephasingMemoryError', 'TimeDependentMemoryError']

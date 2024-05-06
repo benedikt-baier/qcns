@@ -967,10 +967,10 @@ class Host:
         
         return _res
     
-    def estimate_fidelity(self, _store: int, _channel: str, _index: int=-1) -> float:
+    def l0_estimate_fidelity(self, _store: int, _channel: str, _index: int=-1) -> float:
         
         """
-        Estimates the fidelity of a qubit in memory
+        Estimates the fidelity of a qubit in L0 memory
         
         Args:
             _store (int): SEND or RECEIVE memory
@@ -981,7 +981,55 @@ class Host:
             _fidelity (float): estimated fidelity
         """
         
-        return self._connections[_channel]['memory'][_store].estimate_fidelity(_index, self._sim._sim_time)
+        return self._connections[_channel]['memory'][_store].l0_estimate_fidelity(_index, self._sim._sim_time)
+    
+    def l1_estimate_fidelity(self, _store: int, _channel: str, _index: int=-1) -> float:
+        
+        """
+        Estimates the fidelity of a qubit in L1 memory
+        
+        Args:
+            _store (int): SEND or RECEIVE memory
+            _channel (str): channel
+            _index (int): _index of qubit
+            
+        Returns:
+            _fidelity (float): estimated fidelity
+        """
+        
+        return self._connections[_channel]['memory'][_store].l1_estimate_fidelity(_index, self._sim._sim_time)
+    
+    def l2_estimate_fidelity(self, _store: int, _channel: str, _index: int=-1) -> float:
+        
+        """
+        Estimates the fidelity of a qubit in L2 memory
+        
+        Args:
+            _store (int): SEND or RECEIVE memory
+            _channel (str): channel
+            _index (int): _index of qubit
+            
+        Returns:
+            _fidelity (float): estimated fidelity
+        """
+        
+        return self._connections[_channel]['memory'][_store].l2_estimate_fidelity(_index, self._sim._sim_time)
+    
+    def l3_estimate_fidelity(self, _store: int, _channel: str, _index: int=-1) -> float:
+        
+        """
+        Estimates the fidelity of a qubit in L3 memory
+        
+        Args:
+            _store (int): SEND or RECEIVE memory
+            _channel (str): channel
+            _index (int): _index of qubit
+            
+        Returns:
+            _fidelity (float): estimated fidelity
+        """
+        
+        return self._connections[_channel]['memory'][_store].l3_estimate_fidelity(_index, self._sim._sim_time)
     
     def l1_check_results(self, _store: int, _channel: str) -> bool:
         
