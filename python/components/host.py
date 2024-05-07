@@ -88,7 +88,7 @@ class Host:
         self._packets: Dict[str, Dict[int, Dict[int, Packet]]] = {}
         
         self._resume: asc.Event = asc.Event()
-        self.stop = False
+        self.stop: bool = False
     
         self.run = partial(self.log_exceptions, self.run)
     
@@ -361,14 +361,13 @@ class Host:
         
         return self._connections[_receiver]['sqs'][SEND]['s'].create_qubit(num_requested)
     
-    async def create_bell_pairs(self, _receiver: int, store: int=0, num_requested: int=1) -> None:
+    async def create_bell_pairs(self, _receiver: int, num_requested: int=1) -> None:
         
         """
         Creates number of requested bell pairs
         
         Args:
             _receiver (int): receiver of bell pairs
-            store (int): SEND or RECEIVE store
             num_requested (int): number of requested bell pairs
             
         Returns:
@@ -380,10 +379,7 @@ class Host:
         await self._resume.wait()
         self._resume.clear()
         
-        if not store:
-            self._connections[_receiver]['eqs'][SEND]['s'].create_bell_pairs(num_requested, num_requested)
-        if store:
-            self._sim._hosts[_receiver]._connections[self._node_id]['eqs'][SEND]['s'].create_bell_pairs(num_requested, num_requested)
+        self._connections[_receiver]['eqs'][SEND]['s'].create_bell_pairs(num_requested, num_requested)
     
     async def apply_gate(self, _gate: str, *args: str, combine: bool=False, remove: bool=False) -> Union[int, None]:
         
