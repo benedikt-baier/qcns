@@ -382,7 +382,7 @@ class QuantumMemory:
         for index in _indices:
             qubit, time = self._l0_memory.pop(0)
             if index:
-                self.l1_store_qubit(qubit, time, -1)
+                self.l1_store_qubit(qubit, -1, time)
     
     def l1_remove_qubits(self, _indices: List[bool]) -> None:
         
@@ -399,7 +399,7 @@ class QuantumMemory:
         for index in _indices:
             qubit, time = self._l1_memory.pop(0)
             if index:
-                self.l2_store_qubit(qubit, time, -1)
+                self.l2_store_qubit(qubit, -1, time)
     
     def l2_remove_qubits(self, _indices: List[bool]) -> None:
         
@@ -416,7 +416,7 @@ class QuantumMemory:
         for index in _indices:
             qubit, time = self._l2_memory.pop(0)
             if index:
-                self.l3_store_qubit(qubit, time, -1)
+                self.l3_store_qubit(qubit, -1, time)
 
     def l3_remove_qubits(self, _indices: List[bool]) -> None:
         
@@ -433,7 +433,7 @@ class QuantumMemory:
         for index in _indices:
             qubit, time = self._l3_memory.pop(0)
             if index:
-                self.l3_store_qubit(qubit, time, -1)
+                self.l3_store_qubit(qubit, -1, time)
     
     def l0_discard_qubits(self) -> None:
         

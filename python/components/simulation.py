@@ -151,6 +151,7 @@ class Simulation:
                 continue
             
             event = heappop(self._event_queue)
+            # print(f'Simulation: {event}')
             
             if not event._id:
                 num_hosts -= 1

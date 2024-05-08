@@ -106,7 +106,7 @@ class Host:
         
         pass
     
-    def log_exceptions(self, func) -> None:
+    async def log_exceptions(self, func) -> None:
         
         """
         Wrapper to log exceptions in the run function
@@ -119,11 +119,10 @@ class Host:
         """
         
         try:
-            res = func()
+            await func()
             self._sim.schedule_event(StopEvent(self._node_id))
-            return res
         except Exception as e:
-            traceback.print_exc()
+            print(e)
     
     def set_sqs_connection(self, host: Host, length: float=0.0, com_errors: List[QuantumError]=None, mem_errors: List[QuantumError]=None, model_s: str='standard_model', model_r: str='standard_model', lose_qubits_s: bool=False, lose_qubits_r: bool=False, attenuation_coefficient_s: float=-0.016, attenuation_coefficient_r: float=-0.016, efficiency_s: float=1.0, efficiency_r: float=1.0) -> None:
         
@@ -361,7 +360,7 @@ class Host:
         
         return self._connections[_receiver]['sqs'][SEND]['s'].create_qubit(num_requested)
     
-    async def create_bell_pairs(self, _receiver: int, num_requested: int=1) -> None:
+    async def create_bell_pairs(self, _receiver: int, num_requested: int=1, estimate: bool=False) -> None:
         
         """
         Creates number of requested bell pairs
@@ -379,7 +378,11 @@ class Host:
         await self._resume.wait()
         self._resume.clear()
         
-        self._connections[_receiver]['eqs'][SEND]['s'].create_bell_pairs(num_requested, num_requested)
+        _num_needed = num_requested
+        if estimate:
+            _num_needed = int(np.ceil(_num_needed / (1 - self._connections[_receiver]['eqs'][SEND]['c']._lose_prob)))
+        
+        self._connections[_receiver]['eqs'][SEND]['s'].create_bell_pairs(num_requested, _num_needed)
     
     async def apply_gate(self, _gate: str, *args: str, combine: bool=False, remove: bool=False) -> Union[int, None]:
         
@@ -963,7 +966,7 @@ class Host:
         
         return int(np.floor(self.l1_num_qubits(_store, _channel) / 2))
     
-    def l2_purify(self, _store: int, _channel: int, _direction: bool=0, _gate: str='CNOT', _basis: str='Z', _index_src: int=None, _index_dst: int=None) -> int:
+    async def l2_purify(self, _store: int, _channel: int, _direction: bool=0, _gate: str='CNOT', _basis: str='Z', _index_src: int=None, _index_dst: int=None) -> int:
         
         """
         Purifies the two qubits in the store given the indices
@@ -984,13 +987,13 @@ class Host:
         if _index_src is None:
             _index_src = 0
         if _index_dst is None:
-            index_dst = 0
+            _index_dst = 0
         
         _qubit_src, _qubit_dst = self._connections[_channel]['memory'][_store].l2_purify(_index_src, _index_dst, self._sim._sim_time)
         
-        _res = self.apply_gate('purification', _qubit_src, _qubit_dst, _direction, _gate, _basis, combine=True, remove=True)
+        _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, _direction, _gate, _basis, combine=True, remove=True)
         
-        self._connections[_channel]['memory'][_store].l2_store_qubit(_qubit_src, self._sim._sim_time, 0)
+        self._connections[_channel]['memory'][_store].l2_store_qubit(_qubit_src, -1, self._sim._sim_time)
         
         return _res
     
@@ -1150,7 +1153,7 @@ class Host:
             /
         """
         
-        self._layer_results[_packet.l2_src][_store][L2].append(_packet._l2._purification_success)
+        self._layer_results[_packet.l2_dst][_store][L2].append(_packet._l2._purification_success)
         
     def l1_retrieve_result(self, _store: int, _channel: str) -> np.array:
         

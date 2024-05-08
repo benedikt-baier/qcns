@@ -868,7 +868,7 @@ class Layer2:
         self._dst = _dst
         self._num_requested = _num_requested
         self._num_needed = _num_needed
-        self._purification_success = np.zeros(_num_needed, dtype=np.bool_)
+        self._purification_success = np.zeros(_num_requested, dtype=np.bool_)
         self._ack = 0
     
     def __len__(self):
@@ -897,7 +897,7 @@ class Layer2:
             _repr (str): stringified Layer 2
         """
         
-        return f'L2: Src: {self._src}, Dst: {self._dst}, Num Requested: {self._num_requested}, Num Needed: {self._num_needed}, Success: {self._purification_success}, Flag: {self._ack} | '
+        return f'L2: Src: {self._src}, Dst: {self._dst}, Num Requested: {self._num_requested}, Num Needed: {self._num_needed}, Success: {self._purification_success}, ACK: {self._ack} | '
     
 class Layer3:
     
