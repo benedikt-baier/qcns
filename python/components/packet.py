@@ -347,7 +347,21 @@ class Packet:
         """
         
         self._l1._entanglement_success[index] = True
+    
+    def compare_l1_entanglement(self, l1_entanglement: np.array) -> np.array:
         
+        """
+        Compares the l1 entanglement with the success of this packet
+        
+        Args:
+            l1_entanglement (np.array): l1 success to compare with
+            
+        Returns:
+            _res (np.array): comparison result
+        """
+        
+        return np.logical_and(self._l1._entanglement_success, l1_entanglement)
+    
     @property
     def l2_src(self) -> int:
         

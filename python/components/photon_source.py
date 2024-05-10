@@ -308,9 +308,17 @@ class BSM:
             
             remove_qubits([q_2, q_3])
             
+            if res == 1:
+                q_1.Z()
+            if res == 2:
+                q_1.X()
+            if res == 3:
+                q_1.Y()
+            
             packet_s.update_l1_success(i)
             packet_r.update_l1_success(i)
             
+        packet_r.set_l1_ack()
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + self._gate_time, self._sender._node_id))
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + self._gate_time, self._receiver._node_id))
         self._sender._connections[self._receiver._node_id]['packet'][RECEIVE].put(packet_s)
