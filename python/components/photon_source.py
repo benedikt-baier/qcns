@@ -309,9 +309,9 @@ class BSM:
             remove_qubits([q_2, q_3])
             
             if res == 1:
-                q_1.Z()
-            if res == 2:
                 q_1.X()
+            if res == 2:
+                q_1.Z()
             if res == 3:
                 q_1.Y()
             

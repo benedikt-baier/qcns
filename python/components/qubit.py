@@ -1310,13 +1310,14 @@ class Qubit:
             self._qsystem._state = dot(self._qsystem._state, measure_1) / (1 - prob)
             return 1
 
-    def state_transfer(self, source: Qubit) -> None:
+    def state_transfer(self, source: Qubit, fidelity: float=1.0) -> None:
         
         """
-        Transfers a state from the source qubit
+        Transfers a state from the source qubit to this qubit
         
         Args:
             source (Qubit): qubit from which state is taken
+            fidelity (float): fidelity of the depolarization error
             
         Returns:
             /
@@ -1329,6 +1330,11 @@ class Qubit:
         
         if res:
             self.X()
+            
+        # self.H()
+        
+        if fidelity < 1.:
+            depolarization_error(self, self._qsystem._sparse, fidelity)
 
     def bsm(self, target: Qubit, basis_0: str='z', basis_1: str='z', fid_0: float=1., fid_1: float=1.) -> int:
         
