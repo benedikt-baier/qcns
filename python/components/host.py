@@ -827,10 +827,10 @@ class Host:
         
         return self._connections[_channel]['memory'][_store].l3_peek_qubit(index)
     
-    def l0_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+    def l0_move_qubits_l1(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L0 store given indices
+        Moves qubits given the indices from L0 memory to L1 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -841,12 +841,12 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l0_remove_qubits(_indices)
+        self._connections[_channel]['memory'][_store].l0_move_qubits_l1(_indices)
         
-    def l1_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+    def l1_move_qubits_l2(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L1 store given indices
+        Moves qubits given the indices from L1 memory to L2 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -857,12 +857,12 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l1_remove_qubits(_indices)
+        self._connections[_channel]['memory'][_store].l1_move_qubits_l2(_indices)
         
-    def l2_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+    def l2_move_qubits_l3(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L2 store given indices
+        Moves qubits given the indices from L2 memory to L3 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -873,12 +873,12 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l2_remove_qubits(_indices)
-        
-    def l3_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+        self._connections[_channel]['memory'][_store].l2_move_qubits_l3(_indices)
+
+    def l3_move_qubits_l1(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L3 store given indices
+        Moves qubits given the indices from L3 memory to L1 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -889,7 +889,7 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l3_remove_qubits(_indices)
+        self._connections[_channel]['memory'][_store].l3_move_qubits_l1(_indices)
         
     def l0_discard_qubits(self, _store: int, _channel: str) -> None:
         
