@@ -12,7 +12,7 @@ B_0 = np.array([[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
 M_0 = np.array([[0.5, 0.5], [0.5, 0.5]], dtype=np.complex128)
 
 SINGLE_PHOTON_SOURCE_MODELS = {'standard_model': (5e-6, 0.81, 1.0, 1.0)}
-ATOM_PHOTON_SOURCE_MODELS = {'standard_model': (5e-6, 0.81, 1.0, 1.0)}
+ATOM_PHOTON_SOURCE_MODELS = {'standard_model': (5e-6, 0.81, 1.0, 1.0), 'perfect_model': (5e-6, 1.0, 1.0, 1.0)}
 TWO_PHOTON_SOURCE_MODELS = {'standard_model': (5e-6, 0.81, 1.0, 1.0)}
 
 SEND = 0
