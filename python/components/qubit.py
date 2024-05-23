@@ -1018,6 +1018,7 @@ class Qubit:
             /
         """
         
+        self._qsystem._qubits[self._index], self._qsystem._qubits[target._index] = self._qsystem._qubits[target._index], self._qsystem._qubits[self._index]
         self._index, target._index = target._index, self._index
         
         if fidelity < 1.:
