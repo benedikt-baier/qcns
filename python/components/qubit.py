@@ -9,6 +9,8 @@ B_0 = np.array([[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]],
 
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),
+              'P01': np.array([[0, 1], [0, 0]], dtype=np.complex128),
+              'P10': np.array([[0, 0], [1, 0]], dtype=np.complex128),
               'I': np.array([[1, 0], [0, 1]], dtype=np.complex128),
               'X': np.array([[0, 1], [1, 0]], dtype=np.complex128),
               'Y': np.array([[0, -1j], [1j, 0]], dtype=np.complex128),
@@ -27,6 +29,8 @@ full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
 
 sparse_gates = {'P0': sp.csr_matrix([[1, 0], [0, 0]], dtype=np.complex128),
                 'P1': sp.csr_matrix([[0, 0], [0, 1]], dtype=np.complex128),
+                'P01': sp.csr_matrix([[0, 1], [0, 0]], dtype=np.complex128),
+                'P10': sp.csr_matrix([[0, 0], [1, 0]], dtype=np.complex128),
                 'I': sp.csr_matrix([[1, 0], [0, 1]], dtype=np.complex128),
                 'X': sp.csr_matrix([[0, 1], [1, 0]], dtype=np.complex128),
                 'Y': sp.csr_matrix([[0, -1j], [1j, 0]], dtype=np.complex128),
@@ -164,7 +168,7 @@ def get_single_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _i
         _op (np.array): resulting tensor for the single qubit
     """
     
-    operator_l = np.array([gates[_sparse]['I']] * _num_qubits)    
+    operator_l = np.array([gates[_sparse]['I']] * _num_qubits)  
     operator_l[_index] = _gate
     
     return tensor_operator(_sparse, operator_l)
@@ -283,6 +287,44 @@ def get_bsm_operator(_sparse: bool, _c_index: int, _t_index: int, _t_num_qubits:
     
     return h_gate.dot(cnot_gate) 
 
+@cache
+def get_swap_operator(_sparse: bool, _index_1: int, _index_2: int, _num_qubits: int) -> np.arry:
+    
+    """
+    Generates the swap operator
+    
+    Args:
+        _sparse (bool): whether the operators are full or sparse
+        _index_1 (int): index of first qubit
+        _index_2 (int): index of second qubit
+        _num_qubits (int):  number of qubits in QSystem
+        
+    Returns:
+        _op (np.array): resulting tensor for the bsm operator
+    """
+    
+    _op = np.array([gates[_sparse]['I']] * _num_qubits)
+    
+    _op[_index_1] = gates[_sparse]['P0']
+    _op[_index_2] = gates[_sparse]['P0']
+    
+    _res = tensor_operator(_sparse, _op)
+    
+    _op[_index_1] = gates[_sparse]['P01']
+    _op[_index_2] = gates[_sparse]['P10']
+    
+    _res += tensor_operator(_sparse, _op)
+    
+    _op[_index_1] = gates[_sparse]['P10']
+    _op[_index_2] = gates[_sparse]['P01']
+    
+    _res += tensor_operator(_sparse, _op)
+    
+    _op[_index_1] = gates[_sparse]['P1']
+    _op[_index_2] = gates[_sparse]['P1']
+    
+    return _res + tensor_operator(_sparse, _op)
+
 def depolarization_error(_sparse: bool, _qubit: Qubit, _fidelity: float) -> None:
     
     """
@@ -322,10 +364,8 @@ def combine_state(q_l: List[Qubit]) -> QSystem:
         if len(set([id(qubit._qsystem) for qubit in q_l])) == 1:
             return q_l[0]._qsystem
         
-        qsys_n = QSystem(1, q_l[0]._qsystem._sparse)
-        
+        qsys_n = q_l[0]._qsystem
         qsys_l = [q._qsystem for n, q in enumerate(q_l) if q not in q_l[:n]]
-        
         num_qubits_n = sum([qsys._num_qubits for qsys in qsys_l])
         
         qsys_n._qubits = [q for qsys in qsys_l for q in qsys._qubits]
@@ -1017,6 +1057,10 @@ class Qubit:
         Returns:
             /
         """
+        
+        key = f'{self._qsystem._sparse}_d_sw_{self._qsystem._num_qubits}_{self._index}_{target._index}'
+        swap_gate = get_swap_operator(key, self._qsystem._sparse, self._index, target._index, self._qsystem._num_qubits)
+        self._qsystem._state = dot(self._qsystem._state, swap_gate)
         
         self._qsystem._qubits[self._index], self._qsystem._qubits[target._index] = self._qsystem._qubits[target._index], self._qsystem._qubits[self._index]
         self._index, target._index = target._index, self._index

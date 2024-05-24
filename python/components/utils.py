@@ -295,8 +295,6 @@ def load_qasm_3_0_file(path):
 
 async def apply_circuit(host, circuit, qubits):
     
-    print(circuit, qubits.keys())
-    
     for circuit_p in circuit:
         
         if circuit_p[0] == 'U':
