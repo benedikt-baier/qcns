@@ -299,21 +299,31 @@ async def apply_circuit(host, circuit, qubits):
         
         if circuit_p[0] == 'U':
             await host.apply_gate('general_rotation', qubits[circuit_p[1]], circuit_p[2], circuit_p[3], circuit_p[4])
-        if circuit_p[0] == 'cx':
+            continue
+        if circuit_p[0] == 'CNOT':
             await host.apply_gate('CNOT', qubits[circuit_p[1]], qubits[circuit_p[2]])
-        if circuit_p[0] == 'rx':
+            continue
+        if circuit_p[0] == 'Rx':
             await host.apply_gate('Rx', qubits[circuit_p[1]], circuit_p[2])
-        if circuit_p[0] == 'ry':
+            continue
+        if circuit_p[0] == 'Ry':
             await host.apply_gate('Ry', qubits[circuit_p[1]], circuit_p[2])
-        if circuit_p[0] == 'rz':
+            continue
+        if circuit_p[0] == 'Rz':
             await host.apply_gate('Rz', qubits[circuit_p[1]], circuit_p[2])
+            continue
         if circuit_p[0] == 'measure':
             host.classical_bits[circuit_p[2]] = await host.apply_gate('measure', qubits[circuit_p[1]])
+            continue
         if circuit_p[0] == 'x':
             await host.apply_gate('X', qubits[circuit_p[1]])
+            continue
         if circuit_p[0] == 'y':
             await ost.apply_gate('Y', qubits[circuit_p[1]])
+            continue
         if circuit_p[0] == 'z':
             await host.apply_gate('Z', qubits[circuit_p[1]])
+            continue
         if circuit_p[0] == 'h':
             await host.apply_gate('H', qubits[circuit_p[1]])
+            continue

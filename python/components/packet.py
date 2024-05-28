@@ -4,6 +4,27 @@ from typing import Any, List
 
 __all__ = ['Packet']
 
+class Layer1:
+    
+    pass
+
+class Layer2:
+    
+    pass
+
+class Layer3:
+    
+    pass
+
+class Layer4:
+    
+    pass
+
+class Layer7:
+    
+    pass
+
+
 class Packet:
     
     """
@@ -39,39 +60,39 @@ class Packet:
         """
         
         # layer 1
-        self._is_l1 = 0
-        self._l1 = Layer1(l1_requested, l1_needed)
+        self._is_l1: bool = 0
+        self._l1: Layer1 = Layer1(l1_requested, l1_needed)
         
         if not l2_needed:
             self._is_l1 = 1
         
         # layer 2
-        self._is_l2 = 0
-        self._l2 = Layer2(_l2_src, _l2_dst, l2_requested, l2_needed)
+        self._is_l2: bool = 0
+        self._l2: Layer2 = Layer2(_l2_src, _l2_dst, l2_requested, l2_needed)
         
         if l2_needed:
             self._is_l2 = 1
         
         # layer 3
-        self._is_l3 = 0
-        self._l3 = ''
+        self._is_l3: bool = 0
+        self._l3: Layer3 = ''
         if l3_src is not None or l3_dst is not None:
             self._l3 = Layer3(l3_src, l3_dst, mode, num_channels)
             self._is_l3 = 1
 
         # layer 4
-        self._is_l4 = 0
-        self._l4 = ''
+        self._is_l4: bool = 0
+        self._l4: Layer4 = ''
         if l4_src is not None or l4_dst is not None:
             self._l4 = Layer4(l4_src, l4_dst, l4_requested, l4_needed)
             self._is_l4 = 1
         
         # layer 7
-        self._l7 = Layer7(payload)
+        self._l7: Layer7 = Layer7(payload)
         
         # misc
-        self._time_stamp = time_stamp   
-        self._upayload = upayload
+        self._time_stamp: float = time_stamp   
+        self._upayload: List[Any] = upayload
     
     def __len__(self) -> int:
         
@@ -823,11 +844,11 @@ class Layer1:
             /
         """
         
-        self._num_requested = _num_requested
-        self._num_needed = _num_needed
-        self._entanglement_success = np.zeros(_num_needed, dtype=np.bool_)
-        self._ack = 0
-        self._ps = 0
+        self._num_requested: int = _num_requested
+        self._num_needed: int = _num_needed
+        self._entanglement_success: np.array = np.zeros(_num_needed, dtype=np.bool_)
+        self._ack: bool = 0
+        self._ps: bool = 0
 
     def __len__(self) -> int:
         
@@ -878,12 +899,12 @@ class Layer2:
             /
         """
         
-        self._src = _src
-        self._dst = _dst
-        self._num_requested = _num_requested
-        self._num_needed = _num_needed
-        self._purification_success = np.zeros(_num_requested, dtype=np.bool_)
-        self._ack = 0
+        self._src: int = _src
+        self._dst: int = _dst
+        self._num_requested: int = _num_requested
+        self._num_needed: int = _num_needed
+        self._purification_success: np.array = np.zeros(_num_requested, dtype=np.bool_)
+        self._ack: bool = 0
     
     def __len__(self):
         
@@ -934,13 +955,13 @@ class Layer3:
             /
         """
         
-        self._src = _src
-        self._dst = _dst
-        self._mode = _mode
-        self._num_channels = _num_channels
-        self._swap_success = np.zeros(_num_channels, dtype=np.bool_)
-        self._x_count = np.zeros(_num_channels, dtype=np.bool_)
-        self._z_count = np.zeros(_num_channels, dtype=np.bool_)
+        self._src: int = _src
+        self._dst: int = _dst
+        self._mode: bool = _mode
+        self._num_channels: int = _num_channels
+        self._swap_success: np.array = np.zeros(_num_channels, dtype=np.bool_)
+        self._x_count: np.array = np.zeros(_num_channels, dtype=np.bool_)
+        self._z_count: np.array = np.zeros(_num_channels, dtype=np.bool_)
 
     def __len__(self):
         
@@ -985,26 +1006,26 @@ class Layer3:
         self._x_count = np.zeros(self._num_channels, dtype=np.bool_)
         self._z_count = np.zeros(self._num_channels, dtype=np.bool_)
         
-    def update(self, res: int, channel: int) -> None:
+    def update(self, _res: int, _channel: int) -> None:
         
         """
         Updates the x_count and z_count of layer 3 given the result and the channel
         
         Args:
-            res (int): result of the entanglement swapping
+            _res (int): result of the entanglement swapping
             channel (int): channel of the entanglement swapping
             
         Returns:
             /
         """
         
-        if res == 1:
-            self._x_count[channel] ^= 1
-        if res == 2:
-            self._z_count[channel] ^= 1
-        if res == 3:
-            self._x_count[channel] ^= 1
-            self._z_count[channel] ^= 1
+        if _res == 1:
+            self._x_count[_channel] ^= 1
+        if _res == 2:
+            self._z_count[_channel] ^= 1
+        if _res == 3:
+            self._x_count[_channel] ^= 1
+            self._z_count[_channel] ^= 1
     
 class Layer4:
     
@@ -1027,12 +1048,12 @@ class Layer4:
             /
         """
         
-        self._src = _src
-        self._dst = _dst
-        self._num_requested = _num_requested
-        self._num_needed = _num_needed
-        self._purification_success = np.zeros(_num_needed, dtype=np.bool_)
-        self._ack = 0
+        self._src: int = _src
+        self._dst: int = _dst
+        self._num_requested: int = _num_requested
+        self._num_needed: int = _num_needed
+        self._purification_success: np.array = np.zeros(_num_needed, dtype=np.bool_)
+        self._ack: bool = 0
 
     def __len__(self):
         
@@ -1080,7 +1101,7 @@ class Layer7:
             /
         """
         
-        self._payload = _payload
+        self._payload: List[Any] = _payload
         if _payload is None:
             self._payload = []
         

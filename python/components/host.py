@@ -1,4 +1,5 @@
 
+import traceback
 import numpy as np
 import asyncio as asc
 
@@ -85,7 +86,9 @@ class Host:
         self._entanglement_connection: Dict[str, Type[PhotonSource]] = {'rs': AtomPhotonSource, 'ps': TwoPhotonSource, 'bsm': BSM}
         
         self._layer_results: Dict[str, Dict[int, Dict[int, np.array]]] = {}
-        self._packets: Dict[str, Dict[int, Dict[int, Packet]]] = {}
+        self._l1_packets: List[Packet] = []
+        self._l2_packets: List[Packet] = []
+        self._l3_packets: List[Packet] = []
         
         self._resume: asc.Event = asc.Event()
         self.stop: bool = False
@@ -122,7 +125,7 @@ class Host:
             await func()
             self._sim.schedule_event(StopEvent(self._node_id))
         except Exception as e:
-            print(e)
+            print(traceback.format_exc())
     
     def set_sqs_connection(self, host: Host, length: float=0.0, com_errors: List[QuantumError]=None, mem_errors: List[QuantumError]=None, model_s: str='standard_model', model_r: str='standard_model', lose_qubits_s: bool=False, lose_qubits_r: bool=False, attenuation_coefficient_s: float=-0.016, attenuation_coefficient_r: float=-0.016, efficiency_s: float=1.0, efficiency_r: float=1.0) -> None:
         
@@ -250,9 +253,6 @@ class Host:
     
         self._layer_results[host._node_id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
         host._layer_results[self._node_id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
-        
-        self._packets[host._node_id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
-        host._packets[self._node_id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
     
     def set_lose_prob(self, _host: str, _lose_prob: float) -> None:
         
@@ -827,10 +827,10 @@ class Host:
         
         return self._connections[_channel]['memory'][_store].l3_peek_qubit(index)
     
-    def l0_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+    def l0_move_qubits_l1(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L0 store given indices
+        Moves qubits given the indices from L0 memory to L1 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -841,12 +841,12 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l0_remove_qubits(_indices)
+        self._connections[_channel]['memory'][_store].l0_move_qubits_l1(_indices)
         
-    def l1_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+    def l1_move_qubits_l2(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L1 store given indices
+        Moves qubits given the indices from L1 memory to L2 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -857,12 +857,12 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l1_remove_qubits(_indices)
+        self._connections[_channel]['memory'][_store].l1_move_qubits_l2(_indices)
         
-    def l2_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+    def l2_move_qubits_l3(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L2 store given indices
+        Moves qubits given the indices from L2 memory to L3 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -873,12 +873,12 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l2_remove_qubits(_indices)
-        
-    def l3_remove_qubits(self, _store: int, _channel: str, _indices: List[int]) -> None:
+        self._connections[_channel]['memory'][_store].l2_move_qubits_l3(_indices)
+
+    def l3_move_qubits_l1(self, _store: int, _channel: str, _indices: List[int]) -> None:
         
         """
-        Removes qubits from the L3 store given indices
+        Moves qubits given the indices from L3 memory to L1 memory
         
         Args:
             _store (int): entanglement store Send or Receive
@@ -889,7 +889,7 @@ class Host:
             /
         """
         
-        self._connections[_channel]['memory'][_store].l3_remove_qubits(_indices)
+        self._connections[_channel]['memory'][_store].l3_move_qubits_l1(_indices)
         
     def l0_discard_qubits(self, _store: int, _channel: str) -> None:
         
@@ -1215,188 +1215,221 @@ class Host:
         stor_res = self.l2_retrieve_result(_packet.l2_ack, _packet.l2_src)
         return np.logical_not(np.logical_xor(_packet.l2_purification_success, stor_res))
     
-    def l1_check_packets(self, _store: int, _channel: str) -> bool:
+    @property
+    def l1_packets(self) -> List[Packet]:
+        
+        """
+        Returns all packets in L1 packet store
+        
+        Args:
+            /
+            
+        Returns:
+            l1_packets (list): packets in L1 store
+        """
+        
+        return self._l1_packets
+    
+    @property
+    def l2_packets(self) -> List[Packet]:
+        
+        """
+        Returns all packets in L2 packet store
+        
+        Args:
+            /
+            
+        Returns:
+            l2_packets (list): packets in L2 store
+        """
+        
+        return self._l2_packets
+    
+    @property
+    def l3_packets(self) -> List[Packet]:
+        
+        """
+        Returns all packets in L3 packet store
+        
+        Args:
+            /
+            
+        Returns:
+            l3_packets (list): packets in L3 store
+        """
+        
+        return self._l3_packets
+    
+    def l1_check_packets(self) -> bool:
         
         """
         Checks whether packets are in L1 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _l1_check_packets (bool): check if packets in L1 store
         """
         
-        if self._packets[_channel][_store][L1]:
+        if self._l1_packets:
             return True
         return False
     
-    def l2_check_packets(self, _store: int, _channel: str) -> bool:
+    def l2_check_packets(self) -> bool:
         
         """
         Checks whether packets are in L2 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _l2_check_packets (bool): check if packets in L2 store
         """
         
-        if self._packets[_channel][_store][L2]:
+        if self._l2_packets:
             return True
         return False
     
-    def l3_check_packets(self, _store: int, _channel: str) -> bool:
+    def l3_check_packets(self) -> bool:
         
         """
         Checks whether packets are in L3 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _l3_check_packets (bool): check if packets in L3 store
         """
         
-        if self._packets[_channel][_store][L3]:
+        if self._l3_packets:
             return True
         return False
     
-    def l1_num_packets(self, _store: int, _channel: str) -> int:
+    def l1_num_packets(self) -> int:
         
         """
         Returns the number of packets in L1 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _l1_num_packets (int): number of packets in L1 store
         """
         
-        return len(self._packet[_channel][_store][L1])
+        return len(self._l1_packets)
     
-    def l2_num_packets(self, _store: int, _channel: str) -> int:
+    def l2_num_packets(self) -> int:
         
         """
         Returns the number of packets in L2 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _l2_num_packets (int): number of packets in L2 store
         """
         
-        return len(self._packet[_channel][_store][L2])
+        return len(self._l2_packets)
     
-    def l3_num_packets(self, _store: int, _channel: str) -> int:
+    def l3_num_packets(self) -> int:
         
         """
         Returns the number of packets in L3 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _l3_num_packets (int): number of packets in L3 store
         """
         
-        return len(self._packet[_channel][_store][L3])
+        return len(self._l3_packets)
     
-    def l1_store_packet(self, _store: int, _packet: Packet) -> None:
+    def l1_store_packet(self, _packet: Packet) -> None:
         
         """
         Stores a packet in the L1 store
         
         Args:
-            _store (int): SEND or RECEIVE store
             _packet (Packet): packet to store
             
         Returns:
             /
         """
         
-        self._packets[_packet.l2_src][_store][L1].append(_packet)
+        self._l1_packets.append(_packet)
         
-    def l2_store_packet(self, _store: int, _packet: Packet) -> None:
+    def l2_store_packet(self, _packet: Packet) -> None:
         
         """
         Stores a packet in the L2 store
         
         Args:
-            _store (int): SEND or RECEIVE store
             _packet (Packet): packet to store
             
         Returns:
             /
         """
         
-        self._packets[_packet.l2_src][_store][L2].append(_packet)
+        self._l2_packets.append(_packet)
         
-    def l3_store_packet(self, _store: int, _packet: Packet) -> None:
+    def l3_store_packet(self, _packet: Packet) -> None:
         
         """
         Stores a packet in the L3 store
         
         Args:
-            _store (int): SEND or RECEIVE store
             _packet (Packet): packet to store
             
         Returns:
             /
         """
         
-        self._packets[_packet.l3_src][_store][L3].append(_packet)
+        self._l3_packets.append(_packet)
         
-    def l1_retrieve_packet(self, _store: int, _channel: str) -> Packet:
+    def l1_retrieve_packet(self) -> Packet:
         
         """
         Retrieves a packet from the L1 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _packet (Packet): retrieved packet
         """
         
-        return self._packets[_channel][_store][L1].pop(0)
+        return self._l1_packets.pop(0)
     
-    def l2_retrieve_packet(self, _store: int, _channel: str) -> Packet:
+    def l2_retrieve_packet(self) -> Packet:
         
         """
         Retrieves a packet from the L2 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _packet (Packet): retrieved packet
         """
         
-        return self._packets[_channel][_store][L2].pop(0)
+        return self._l2_packets.pop(0)
         
-    def l3_retrieve_packet(self, _store: int, _channel: str) -> Packet:
+    def l3_retrieve_packet(self) -> Packet:
         
         """
         Retrieves a packet from the L3 store
         
         Args:
-            _store (int): SEND or RECEIVE store
-            _channel (str): channel
+            /
             
         Returns:
             _packet (Packet): retrieved packet
         """
         
-        return self._packets[_channel][_store][L3].pop(0)
+        return self._l3_packets.pop(0)
