@@ -165,7 +165,7 @@ def sqrt_matrix(_state: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.cs
     """
     
     evs, vecs = np.linalg.eigh(_state)
-    return dot(np.diag(np.sqrt(evs)), vecs)
+    return dot(np.diag(np.sqrt(np.abs(evs))), vecs)
 
 @cache
 def get_single_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _index: int, _num_qubits: int) -> np.array:
@@ -303,7 +303,7 @@ def get_bsm_operator(_sparse: bool, _c_index: int, _t_index: int, _t_num_qubits:
     return h_gate.dot(cnot_gate) 
 
 @cache
-def get_swap_operator(_sparse: bool, _index_1: int, _index_2: int, _num_qubits: int) -> np.arry:
+def get_swap_operator(_sparse: bool, _index_1: int, _index_2: int, _num_qubits: int) -> np.array:
     
     """
     Generates the swap operator
