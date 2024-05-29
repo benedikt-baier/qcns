@@ -152,6 +152,21 @@ def dot(_state: Union[np.array, sp.csr_matrix], _gate: Union[np.array, sp.csr_ma
     
     return _gate.dot(_state).dot(_gate.conj().T)
 
+def sqrt_matrix(_state: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.csr_matrix]:
+    
+    """
+    Calculates the square root of a matrix
+    
+    Args:
+        _state (np.array): _state to calculate square root of
+        
+    Returns:
+        _sqrt (np.array): square root of matrix
+    """
+    
+    evs, vecs = np.linalg.eigh(_state)
+    return dot(np.diag(np.sqrt(np.abs(evs))), vecs)
+
 @cache
 def get_single_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _index: int, _num_qubits: int) -> np.array:
 
@@ -1475,23 +1490,21 @@ class Qubit:
         if fidelity < 1.:
             depolarization_error(self, self._qsystem._sparse, fidelity)
 
-    def fidelity(self, operator: np.array) -> float:
+    def fidelity(self, _op: np.array) -> float:
 
         """
         Computes the quantum fidelity of this qubit state and a operator
 
         Args:
-            operator (np.array): operator to compare the state of this qubit to
+            _op (np.array): operator to compare the state of this qubit to
 
         Returns:
             fidelity (float): fidelity of the quantum state
         """
-            
-        if self._qsystem._sparse:
-            return float(np.real((self._qsystem._state.dot(operator).trace())) + 2 * np.real(np.sqrt(sp.linalg.det(self._qsystem._state) * sp.linalg.det(operator))))
-        else:
-            return float(np.real(np.einsum('ij,ji', self._qsystem._state, operator)) + 2 * np.real(np.sqrt(np.linalg.det(self._qsystem._state) * np.linalg.det(operator))))
-    
+        
+        _sqrt_mat = sqrt_matrix(self._qsystem._state)
+        return float((np.real(np.trace(sqrt_matrix(np.dot(_sqrt_mat, np.dot(_op, _sqrt_mat)))))**2))
+        
 class QSystem:
     
     """
