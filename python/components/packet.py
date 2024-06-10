@@ -79,6 +79,8 @@ class Packet:
         if l3_src is not None or l3_dst is not None:
             self._l3 = Layer3(l3_src, l3_dst, mode, num_channels)
             self._is_l3 = 1
+            self._is_l1 = 0
+            self._is_l0 = 0
 
         # layer 4
         self._is_l4: bool = 0
@@ -86,9 +88,20 @@ class Packet:
         if l4_src is not None or l4_dst is not None:
             self._l4 = Layer4(l4_src, l4_dst, l4_requested, l4_needed)
             self._is_l4 = 1
+            self._is_l3 = 0
+            self._is_l1 = 0
+            self._is_l0 = 0
         
         # layer 7
-        self._l7: Layer7 = Layer7(payload)
+        self._is_l7 = 0
+        self._l7 = ''
+        if payload is not None:
+            self._l7: Layer7 = Layer7(payload)
+            self._is_l7 = 1
+            self._is_l4 = 0
+            self._is_l3 = 0
+            self._is_l1 = 0
+            self._is_l0 = 0
         
         # misc
         self._time_stamp: float = time_stamp   
