@@ -475,6 +475,10 @@ class Qubit:
     
     """
     Represents a single qubit
+    
+    Attr:
+        _qsystem (QSystem): qsystem qubit belongs to
+        _index (int): index of qubit in qsystem
     """
     
     def __init__(self, _qsystem: QSystem, _index: int) -> None:
@@ -483,8 +487,8 @@ class Qubit:
         Instantiate a single qubit
         
         Args:
-            qsystem (QSystem): reference to parent qsystem, which the qubit is part of
-            index (int): index of the qubit in the parent qsystem
+            _qsystem (QSystem): reference to parent qsystem, which the qubit is part of
+            _index (int): index of the qubit in the parent qsystem
             
         Returns:
             /
@@ -1509,6 +1513,12 @@ class QSystem:
     
     """
     Represents a system consisting of multiple entanglable qubits
+    
+    Attr:
+        _num_qubits (int): number of qubits in the qsystem
+        _qubits (list): qubits in the qsystem
+        _sparse (bool): whether the representation of the density matrix is sparse or not
+        _state (np.array): density matrix of qsystem
     """
     
     def __init__(self, num_qubits: int=1, fidelity: float=1., sparse: bool=0) -> None:

@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
 
-from typing import Union, List
+from typing import Union, Dict
 
 from python.components.qubit import Qubit, dot, get_single_operator
 
@@ -26,6 +26,11 @@ class DepolarizationError:
     
     """
     Represents a Depolarization Error
+    
+    Attr:
+        _depolar_time (float): depolarization time of error
+        _gate_e0 (dict): precalculated E0 matrix representing depolarization
+        _gate_e1 (dict): precalculated E1 matrix representing depolarization
     """
     
     def __init__(self, depolar_time: float=1e-3) -> None:
@@ -56,8 +61,8 @@ class DepolarizationError:
 
         depolar_prob = np.exp(-(_length * (5e-6)) / self._depolar_time)
         
-        self._gate_e0: Union[np.array, sp.csr_matrix] = {0: full_gates['P0'] + np.sqrt(1 - depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(1 - depolar_prob) * sparse_gates['P1']}
-        self._gate_e1: Union[np.array, sp.csr_matrix] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(1 - depolar_prob) * sparse_gates['P01']}
+        self._gate_e0: Dict[int, Union[np.array, sp.csr_matrix]] = {0: full_gates['P0'] + np.sqrt(1 - depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(1 - depolar_prob) * sparse_gates['P1']}
+        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(1 - depolar_prob) * sparse_gates['P01']}
         
     def apply(self, _qubit: Qubit) -> None:
         
@@ -81,6 +86,11 @@ class DephasingError:
     
     """
     Represents a Dephasing Error
+    
+    Attr:
+        _dephase_time (float): dephasing time of error
+        _dephase_prob (float): dephasing probability
+        _dephase_prob_inv (float): 1 - dephase probability
     """
     
     def __init__(self, dephase_time: float=1e-3) -> None:
@@ -133,7 +143,15 @@ class DephasingError:
 class TimeDependentError:
     
     """
-    Represents a Time Dependent Error
+    Represents a Time Dependent Error consisting of depolarization and dephasing
+    
+    Attr:
+        _depolar_time (float): depolarization time
+        _dephase_time (float): dephasing time
+        _gate_e0 (dict): precalculated E0 matrix representing depolarization
+        _gate_e1 (dict): precalculated E1 matrix representing depolarization
+        _dephase_prob (float): dephasing probability
+        _dephase_prob_inv (float): 1 - dephase probability
     """
     
     def __init__(self, depolar_time: float=1e-3, dephase_time: float=1e-3) -> None:
@@ -170,8 +188,8 @@ class TimeDependentError:
         signal_time = _length * (5e-6)
         
         depolar_prob = 1 - np.exp(-(signal_time / self._depolar_time))
-        self._gate_e0: Union[np.array, sp.csr_matrix] = {0: full_gates['P0'] + np.sqrt(1 - depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(1 - depolar_prob) * sparse_gates['P1']}
-        self._gate_e1: Union[np.array, sp.csr_matrix] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(depolar_prob) * sparse_gates['P01']}
+        self._gate_e0: Dict[int, Union[np.array, sp.csr_matrix]] = {0: full_gates['P0'] + np.sqrt(1 - depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(1 - depolar_prob) * sparse_gates['P1']}
+        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(depolar_prob) * sparse_gates['P01']}
         
         self._dephase_prob: float = 0.5 * (1 - np.exp(-signal_time * (1/self._dephase_time - 1/(2*self._depolar_time))))
         self._dephase_prob_inv: float = 1 - self._dephase_prob
@@ -202,6 +220,9 @@ class RandomDepolarizationError:
     
     """
     Represents a Random Depolarization Error
+    
+    Attr:
+        _variance (float): variance of normally distributed angles
     """
     
     def __init__(self, variance: float) -> None:
@@ -253,6 +274,9 @@ class RandomDephasingError:
     
     """
     Represents a Random Dephasing Error
+    
+    Attr:
+        _variance (float): variance of normally distributed angles
     """
     
     def __init__(self, variance: float) -> None:
@@ -304,6 +328,9 @@ class RandomError:
     
     """
     Represents a Random Error
+    
+    Attr:
+        _variance (float): variance of normally distributed angles
     """
     
     def __init__(self, x_variance: float, z_variance: float) -> None:
@@ -359,6 +386,8 @@ class SystematicDepolarizationError:
     
     """
     Represents a Systematic Depolarization Error
+    
+    _theta (float): depolarization angle
     """
     
     def __init__(self, variance: float) -> None:
@@ -409,6 +438,9 @@ class SystematicDephasingError:
     
     """
     Represents a Systematic Dephasing Error
+    
+    Attr:
+        _theta (float): dephasing angle
     """
     
     def __init__(self, variance: float) -> None:
@@ -459,6 +491,9 @@ class SystematicError:
     
     """
     Represents a Systematic Error
+    
+    _theta_x (float): depolarization angle
+    _theta_z (float): dephasing angle
     """
 
     def __init__(self, x_variance: float, z_variance: float) -> None:
@@ -513,21 +548,24 @@ class DepolarizationMemoryError:
     
     """
     Represents a Depolarization Error in Memory
+    
+    Attr:
+        _depolar_time (float): depolarization time
     """
     
-    def __init__(self, depolar_time: float=1e-3) -> None:
+    def __init__(self, _depolar_time: float=1e-3) -> None:
         
         """
         Initializes a Depolarization Error in Memory
         
         Args:
-            depolar_time (float): depolarization time
+            _depolar_time (float): depolarization time
             
         Returns:
             /
         """
         
-        self._depolar_time: float = depolar_time
+        self._depolar_time: float = _depolar_time
 
     def apply(self, _qubit: Qubit, _time: float) -> None:
         
@@ -556,21 +594,24 @@ class DephasingMemoryError:
     
     """
     Represents a Depolarization Error in Memory
+    
+    Attr:
+        _dephase_time (float): dephasing time
     """
     
-    def __init__(self, dephase_time: float=1e-3) -> None:
+    def __init__(self, _dephase_time: float=1e-3) -> None:
         
         """
         Initializes a Depolarization Error in Memory
         
         Args:
-            _depolar_time (float): depolarization time
+            _dephase_time (float): depolarization time
             
         Returns:
             /
         """
         
-        self._dephase_time: float = dephase_time
+        self._dephase_time: float = _dephase_time
 
     def apply(self, _qubit: Qubit, _time: float) -> None:
         
@@ -598,6 +639,10 @@ class TimeDependentMemoryError:
     
     """
     Represents a Time Dependent Errors in Memories
+    
+    Attr:
+        _depolar_time (float): depolarization time
+        _dephase_time (float): dephasing time
     """
     
     def __init__(self, depolar_time: float=1e-3, dephase_time: float=1e-3) -> None:

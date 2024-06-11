@@ -9,6 +9,11 @@ class Event:
     
     """
     Reprents a generic event
+    
+    Attr:
+        _id (int): ID to distinguish events
+        _end_time (float): time when event finishes
+        _node_id (int): ID of Host which scheduled event
     """
     
     def __init__(self, _id: int, _end_time: float, _node_id: int) -> None:
@@ -47,6 +52,11 @@ class StopEvent(Event):
     
     """
     Represents a StopEvent
+    
+    Attr:
+        _id (int): ID to distinguish events
+        _end_time (float): time when event finishes
+        _node_id (int): ID of Host which scheduled event
     """
     
     def __init__(self, _node_id: str) -> None:
@@ -83,6 +93,11 @@ class SendEvent(Event):
     
     """
     Represents a SendEvent
+    
+    Attr:
+        _id (int): ID to distinguish events
+        _end_time (float): time when event finishes
+        _node_id (int): ID of Host which scheduled event
     """
     
     def __init__(self, _end_time: float, _node_id: int) -> None:
@@ -92,14 +107,13 @@ class SendEvent(Event):
         
         Args:
             _end_time (float): time at which Event is scheduled
-            _type (int): type of send event
             _node_id (int): ID of Host which created Event
             
         Returns:
             /
         """
     
-        self._id: int = 4
+        self._id: int = 1
         self._end_time: float = _end_time
         self._node_id: int = _node_id
         
@@ -121,6 +135,11 @@ class ReceiveEvent(Event):
     
     """
     Represents a Receive Event
+    
+    Attr:
+        _id (int): ID to distinguish events
+        _end_time (float): time when event finishes
+        _node_id (int): ID of Host which scheduled event
     """
     
     def __init__(self, _end_time: float, _node_id: int) -> None:
@@ -130,14 +149,13 @@ class ReceiveEvent(Event):
         
         Args:
             _end_time (float): time at which Event is scheduled
-            _type (int): type of receive event
             _node_id (int): ID of Host which created Event
             
         Returns:
             /
         """
     
-        self._id: int = 5
+        self._id: int = 2
         self._end_time: float = _end_time
         self._node_id: int = _node_id
         
@@ -155,47 +173,15 @@ class ReceiveEvent(Event):
         
         return f'ReceiveEvent Time: {self._end_time} Receiver: {self._node_id}'
     
-class CreateQubitEvent(Event):
-    
-    """
-    Represents a Create Qubit Event
-    """
-    
-    def __init__(self, _end_time: float, _node_id: int) -> None:
-        
-        """
-        Initializes a Create Qubit Event
-        
-        Args:
-            _end_time (float): time at which Event is scheduled
-            _node_id (int): Host which schedules Event
-            
-        Returns:
-            /
-        """
-        
-        self._id: int = 2
-        self._end_time = _end_time
-        self._node_id = _node_id
-        
-    def __repr__(self) -> str:
-        
-        """
-        Custom print function for Create Qubit Event
-        
-        Args:
-            /
-            
-        Returns:
-            _event (str): printable representation of Event
-        """
-        
-        return f'CreateQubitEvent Time: {self._end_time} Node: {self._node_id}'
-    
 class GateEvent(Event):
     
     """
     Represents a Gate Event
+    
+    Attr:
+        _id (int): ID to distinguish events
+        _end_time (float): time when event finishes
+        _node_id (int): ID of Host which scheduled event
     """
     
     def __init__(self, _end_time: float, _node_id: int) -> None:

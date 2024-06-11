@@ -1,4 +1,3 @@
-import sys
 import numpy as np
 from typing import Any, List
 
@@ -29,9 +28,28 @@ class Packet:
     
     """
     Represents a classical packet
+    
+    Attr:
+        _is_l1 (bool): whether the packet is l1
+        _l1 (Layer1): Layer 1 implementation
+        _is_l2 (bool): whether the packet is l2
+        _l2 (Layer2): Layer 2 implementation
+        _is_l3 (bool): whether the packet is l3
+        _l3 (Layer3): Layer 3 implementation
+        _is_l4 (bool): whether the packet is l4
+        _l4 (Layer4): Layer 4 implementation
+        _is_l7 (bool): whether the packet is l7
+        _l7 (Layer7): Layer 7 implementation
+        _time_stamp (float): timestamp of the packet
+        _upayload (Any): untracked payload of packet
     """
     
-    def __init__(self, _l2_src: int, _l2_dst: int, l1_requested: int=0, l1_needed: int=0, l2_requested: int=0, l2_needed: int=0, l3_src: int=None, l3_dst: int=None, mode: int=0, num_channels: int=1, l4_src: int=None, l4_dst: int=None, l4_requested: int=0, l4_needed: int=0, time_stamp: float=0., payload: Any=None, upayload: Any='') -> None:
+    def __init__(self, _l2_src: int, _l2_dst: int, 
+                 l1_requested: int=0, l1_needed: int=0, 
+                 l2_requested: int=0, l2_needed: int=0, 
+                 l3_src: int=None, l3_dst: int=None, mode: int=0, num_channels: int=1, 
+                 l4_src: int=None, l4_dst: int=None, l4_requested: int=0, l4_needed: int=0, 
+                 time_stamp: float=0., payload: Any=None, upayload: Any='') -> None:
         
         """
         Instantiates a classical packet tracked and untracked payload with respect to timing update
@@ -79,6 +97,7 @@ class Packet:
         if l3_src is not None or l3_dst is not None:
             self._l3 = Layer3(l3_src, l3_dst, mode, num_channels)
             self._is_l3 = 1
+            self._is_l2 = 0
             self._is_l1 = 0
             self._is_l0 = 0
 
@@ -89,17 +108,19 @@ class Packet:
             self._l4 = Layer4(l4_src, l4_dst, l4_requested, l4_needed)
             self._is_l4 = 1
             self._is_l3 = 0
+            self._is_l2 = 0
             self._is_l1 = 0
             self._is_l0 = 0
         
         # layer 7
-        self._is_l7 = 0
-        self._l7 = ''
+        self._is_l7: bool = 0
+        self._l7: Layer7 = ''
         if payload is not None:
             self._l7: Layer7 = Layer7(payload)
             self._is_l7 = 1
             self._is_l4 = 0
             self._is_l3 = 0
+            self._is_l2 = 0
             self._is_l1 = 0
             self._is_l0 = 0
         
@@ -133,7 +154,8 @@ class Packet:
             /
         """
     
-        return f'Time Stamp: {self._time_stamp} {str(self._l1)}{str(self._l2)}{str(self._l3)}{str(self._l4)}{str(self._l7)}'
+        # return f'Time Stamp: {self._time_stamp} {str(self._l1)}{str(self._l2)}{str(self._l3)}{str(self._l4)}{str(self._l7)}'
+        return f'Time Stamp: {self._time_stamp} {self._l1}{self._l2}{self._l3}{self._l4}{self._l7}'
     
     @property
     def is_l1(self) -> bool:
@@ -807,6 +829,8 @@ class Packet:
             l7_payload (list): payload
         """
         
+        if not self._is_l7:
+            raise ValueError('No Layer 7 in this packet')
         return self._l7._payload
     
     def reset_payload(self):
@@ -821,6 +845,8 @@ class Packet:
             /
         """
         
+        if not self._is_l7:
+            raise ValueError('No Layer 7 in this packet')
         self._l7._payload = []
     
     def __iter__(self) -> Any:
@@ -835,6 +861,9 @@ class Packet:
             item (any): item in payload
         """
         
+        if not self._is_l7:
+            raise ValueError('No Layer 7 in this packet')
+        
         for _ in range(len(self.payload)):
             yield self.payload.pop(0)
     
@@ -842,6 +871,13 @@ class Layer1:
     
     """
     Represents the Physical Layer (L1) of a packet
+    
+    Attr:
+        _num_requested (int): number of requested qubits
+        _num_needed (int): number of needed qubits
+        _entanglement_success (np.array): entanglement success array
+        _ack (bool): acknowledgenment flag
+        _ps (bool): photon source flag
     """
     
     def __init__(self, _num_requested: int, _num_needed: int) -> None:
@@ -895,6 +931,14 @@ class Layer2:
     
     """
     Represents the MAC Layer (L2) of a packet
+    
+    Attr:
+        _src (int): source MAC address
+        _dst (int): destination MAC address
+        _num_requested (int): number of requested qubits
+        _num_needed (int): number of needed qubits
+        _purification_success (np.array): purification success array
+        _ack (bool): acknowledgement flag
     """
     
     def __init__(self, _src: int, _dst: int, _num_requested: int, _num_needed: int) -> None:
@@ -951,6 +995,15 @@ class Layer3:
     
     """
     Represents the Network Layer (L3) of a packet
+    
+    Attr:
+        _src (int): source IP address
+        _dst (int): destination IP address
+        _mode (bool): whether to perform quantum operations or not
+        _num_channels (int): number of channels to swap
+        _swap_success (np.array): swapping success array
+        _x_count (np.array): amplitude flip arraay
+        _z_count (np.array): phase flip array
     """
     
     def __init__(self, _src: int, _dst: int, _mode: bool, _num_channels: int=1) -> None:
@@ -1044,6 +1097,14 @@ class Layer4:
     
     """
     Represents the Transport Layer (L4) of a packet
+    
+    Attr:
+        _src (int): source port
+        _dst (int): destination port
+        _num_requested (int): number of requested qubits
+        _num_needed (int): number of needed qubits
+        _purification_success (np.array): purification success array
+        _ack (bool): acknowledgement flag
     """
     
     def __init__(self, _src: int, _dst: int, _num_requested: int, _num_needed: int) -> None:
@@ -1100,6 +1161,9 @@ class Layer7:
     
     """
     Represents the Application Layer (L7) of a packet
+    
+    Attr:
+        _payload (list): tracked payload of packet
     """
     
     def __init__(self, _payload: List[Any]):

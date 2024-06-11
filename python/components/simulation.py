@@ -16,6 +16,11 @@ class Simulation:
     
     """
     Represents a Simulation consisting of host running different protocols in parallel
+    
+    Attr:
+        _event_queue (list): event queue of simulation
+        _hosts (list): list of hosts in the simulation
+        _sim_time (float): current simulation time
     """
     
     def __init__(self) -> None:
@@ -151,7 +156,6 @@ class Simulation:
                 continue
             
             event = heappop(self._event_queue)
-            # print(f'Simulation: {event}')
             
             if not event._id:
                 num_hosts -= 1

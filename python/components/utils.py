@@ -5,7 +5,8 @@ import itertools as it
 from re import sub, findall
 from typing import List, Tuple, Dict
 
-from python.components.qubit import Qubit
+class Qubit:
+    pass
 
 __all__ = ['GHZ_state', 'W_state', 'graph_state', 'ghz_m', 'get_measure_dict', 'get_normalized_probability_amplitudes', 'load_qasm_2_0_file', 'load_qasm_3_0_file', 'apply_circuit']
 

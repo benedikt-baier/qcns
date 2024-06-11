@@ -1,9 +1,11 @@
+
 import numpy as np
-from numpy.random import uniform
-from typing import List, Union, Tuple
-from python.components.qubit import Qubit
+from typing import List, Tuple, Union
 
 __all__ = ['QuantumMemory']
+
+class Qubit:
+    pass
 
 class QuantumError:
     pass
@@ -12,29 +14,42 @@ class QuantumMemory:
     
     """
     Represents a Quantum Memory
+    
+    Attr:
+        _l0_memory (list): memory section of qubits, which have no confirmed corresponding qubit
+        _l1_memory (list): memory section of qubits, which have a confirmed corresponding qubit, ready for purification
+        _l2_memory (list): memory section of qubits, which are purified, but the purification was not confirmed successful
+        _l3_memory (list): memory section of qubits, which are confirmed purified
+        _size (int): size in qubits of memory of all four memory sections
+        _efficiency (float): efficiency of extracting qubits from the memory
+        _errors (list): list of errors to apply to qubits at extraction 
     """
     
-    def __init__(self, _errors: List[QuantumError]=None, _efficiency: float=1.0) -> None:
+    def __init__(self, _size: int=-1, _efficiency: float=1., _errors: List[QuantumError]=None) -> None:
+        
+        self._l0_memory: List[Qubit] = []
+        self._l1_memory: List[Qubit] = []
+        self._l2_memory: List[Qubit] = []
+        self._l3_memory: List[Qubit] = []
+        
+        self._size: int = _size
+        self._efficiency: float = _efficiency
+        self._errors: List[QuantumError] = _errors
+     
+    def __len__(self) -> int:
         
         """
-        Instantiates a Quantum Memory, a quantum memory holds qubits at and applys errors based on the storage time and retrieve time
+        Custom Length function
         
         Args:
-            _errors (List): List of QuantumMemoryErrors
+            /
             
         Returns:
-            /
+            _len (int): number of elements in the memory
         """
         
-        self._l0_memory = []
-        self._l1_memory = []
-        self._l2_memory = []
-        self._l3_memory = []
-        self._efficiency = _efficiency
-        self._errors = _errors
-        if _errors is None:
-            self._errors = []
-    
+        return len(self._l0_memory) + len(self._l1_memory) + len(self._l2_memory) + len(self._l3_memory)
+        
     def l0_num_qubits(self) -> int:
         
         """
@@ -105,6 +120,9 @@ class QuantumMemory:
             /
         """
         
+        if self._size + 1 > 0 and len(self) + 1 > self._size:
+            raise ValueError('Memory exceeds size limit')
+        
         if not (_index + 1):
             self._l0_memory.append((_qubit, _time))
             return
@@ -124,6 +142,9 @@ class QuantumMemory:
         Returns:
             /
         """
+        
+        if self._size + 1 > 0 and len(self) + 1 > self._size:
+            raise ValueError('Memory exceeds size limit')
         
         if not (_index + 1):
             self._l1_memory.append((_qubit, _time))
@@ -145,6 +166,9 @@ class QuantumMemory:
             /
         """
         
+        if self._size + 1 > 0 and len(self) + 1 > self._size:
+            raise ValueError('Memory exceeds size limit')
+        
         if not (_index + 1):
             self._l2_memory.append((_qubit, _time))
             return
@@ -164,6 +188,9 @@ class QuantumMemory:
         Returns:
             /
         """
+        
+        if self._size + 1 > 0 and len(self) + 1 > self._size:
+            raise ValueError('Memory exceeds size limit')
         
         if not (_index + 1):
             self._l3_memory.append((_qubit, _time))
@@ -185,11 +212,11 @@ class QuantumMemory:
         """
     
         if not self._l0_memory:
-            return None
+            raise ValueError('No Qubit in memory')
             
         _qubit, _store_time = self._l0_memory.pop(_index)
         
-        if uniform(0, 1) > self._efficiency:
+        if np.random.uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -215,11 +242,11 @@ class QuantumMemory:
         """
     
         if not self._l1_memory:
-            return None
+            raise ValueError('No Qubit in memory')
             
         _qubit, _store_time = self._l1_memory.pop(_index)
         
-        if uniform(0, 1) > self._efficiency:
+        if np.random.uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -245,11 +272,11 @@ class QuantumMemory:
         """
     
         if not self._l2_memory:
-            return None
+            raise ValueError('No Qubit in memory')
             
         _qubit, _store_time = self._l2_memory.pop(_index)
         
-        if uniform(0, 1) > self._efficiency:
+        if np.random.uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -275,11 +302,11 @@ class QuantumMemory:
         """
     
         if not self._l3_memory:
-            return None
+            raise ValueError('No Qubit in memory')
             
         _qubit, _store_time = self._l3_memory.pop(_index)
         
-        if uniform(0, 1) > self._efficiency:
+        if np.random.uniform(0, 1) > self._efficiency:
             return None
         
         _diff = _time - _store_time
@@ -290,6 +317,29 @@ class QuantumMemory:
             _qubit = error.apply(_qubit, _diff)
     
         return _qubit  
+    
+    def l0_retrieve_qubit_prob(self, _index: int, _time: float) -> Qubit:
+        
+        """
+        Retrieves a qubit without storage inefficiencies
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        _qubit, _store_time = self._l0_memory.pop(_index)
+        
+        _diff = _time - _store_time
+        if _diff <= 0.:
+            return _qubit
+        
+        for error in self._errors:
+            _qubit = error.apply(_qubit, _diff)
+            
+        return _qubit
     
     def l0_peek_qubit(self, _index: int) -> Qubit:
         
