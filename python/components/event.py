@@ -1,6 +1,6 @@
 import numpy as np
 
-__all__ = ['StopEvent', 'SendEvent', 'ReceiveEvent', 'CreateQubitEvent', 'GateEvent']
+__all__ = ['StopEvent', 'SendEvent', 'ReceiveEvent', 'GateEvent']
 
 class Event:
     pass
