@@ -1,7 +1,6 @@
 
 import numpy as np
 from typing import List
-from __future__ import annotations
 
 from python.components.photon_source import SinglePhotonSource, AtomPhotonSource, PhotonPhotonSource
 from python.components.photon_detector import PhotonDetector

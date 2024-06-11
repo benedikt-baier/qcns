@@ -4,7 +4,7 @@ import asyncio as asc
 
 from copy import deepcopy
 from functools import partial
-from typing import List, Dict, Tuple, Union, Type, Any
+from typing import List, Dict, Tuple, Set, Union, Type, Any
 
 from python.components.simulation import Simulation
 from python.components.event import StopEvent, SendEvent, ReceiveEvent, GateEvent 
@@ -64,6 +64,7 @@ class Host:
         _gate_duration (dict): duration of gates
         _gate_parameters (dict): parameters for quantum gates
         _connections (dict): collection of single, entangled, packet and memory connections to other hosts
+        _neighbors (set): collection of other host this host is connected with
         _layer_results (dict): saved results of packet layer
         _l1_packets (list): L1 packet puffer
         _l2_packets (list): L2 packet puffer
@@ -96,6 +97,7 @@ class Host:
         self._gate_parameters: Dict[str, float] = _gate_parameters
         
         self._connections: Dict[str, Dict[str, Any]] = {'sqs': {}, 'eqs': {}, 'packet': {}, 'memory': {}}
+        self._neighbors: Set[int] = set()
         
         self._layer_results: Dict[str, Dict[int, Dict[int, np.array]]] = {}
         self._l1_packets: List[Packet] = []
@@ -353,6 +355,8 @@ class Host:
             /
         """
         
+        self._neighbors.add(host._node_id)
+        
         self.set_sqs_connection(host, sp_sender_source, sp_receiver_source, 
                                 sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
                                 receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors)
@@ -609,12 +613,27 @@ class Host:
             return None
         
         if sender is None:
-            for _sender in self._connections.keys():
+            for _sender in self.neighbors:
                 if not self._connections['packet'][_sender][RECEIVE].empty():
                     return self._connections['packet'][_sender][RECEIVE].get()
             return None
 
         return self._connections['packet'][sender][RECEIVE].get()
+    
+    @property
+    def neighbors(self) -> Set[int]:
+        
+        """
+        Retrieves the neighbors of the host
+        
+        Args:
+            /
+            
+        Returns:
+            _neighbors (set): neighbors
+        """
+        
+        return self._neighbors
     
     def l0_num_qubits(self, _host: int, _store: int) -> int:
         

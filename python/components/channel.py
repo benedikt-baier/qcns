@@ -84,6 +84,20 @@ class QChannel:
         
         self._lose_prob = _prob
     
+    def empty(self) -> bool:
+        
+        """
+        Checks wether the channel is empty
+        
+        Args:
+            /
+            
+        Returns:
+            _empty (bool): whether channel is empty
+        """
+        
+        return self._channel.empty()
+    
     def put(self, _qubit: Qubit) -> None:
         
         """
@@ -189,7 +203,21 @@ class PChannel:
         
         self._signal_time: float = _length * (5e-6)# + 16e-6
         self._channel: Queue = Queue()
+    
+    def empty(self) -> bool:
         
+        """
+        Checks wether the channel is empty
+        
+        Args:
+            /
+            
+        Returns:
+            _empty (bool): whether channel is empty
+        """
+        
+        return self._channel.empty()
+    
     def put(self, _packet: Packet) -> None:
         
         """
