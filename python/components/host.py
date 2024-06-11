@@ -241,7 +241,7 @@ class Host:
             connection_s_r = SenderReceiverConnection(self, host, self._sim, sender_model, sender_source, receiver_detector, 
                                                       sender_length + receiver_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
                                                       sender_memory_send, receiver_memory_receive)
-            sender_length += receiver_length
+            _sender_length = sender_length + receiver_length
         
         if sender_type == 'tps':
             connection_s_r = TwoPhotonSourceConnection(self, host, self._sim, sender_model, sender_source, 
@@ -249,6 +249,7 @@ class Host:
                                                        sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
                                                        receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
                                                        sender_memory_send, receiver_memory_receive)
+            _sender_length = sender_length
         
         if sender_type == 'bsm':
             connection_s_r = BellStateMeasurementConnection(self, host, self._sim, sender_model, sender_source, receiver_source, 
@@ -256,12 +257,13 @@ class Host:
                                                             sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
                                                             receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
                                                             sender_memory_send, receiver_memory_receive)
+            _sender_length = sender_length
         
         if receiver_type == 'sr':
             connection_r_s = SenderReceiverConnection(host, self, self._sim, receiver_model, receiver_source, sender_detector, 
                                                       sender_length + receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
                                                       receiver_memory_send, sender_memory_receive)
-            receiver_length += sender_length
+            _receiver_length = sender_length + receiver_length
             
         if receiver_type == 'tps':
             connection_r_s = TwoPhotonSourceConnection(host, self, self._sim, receiver_model, receiver_source,
@@ -269,6 +271,7 @@ class Host:
                                                        receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
                                                        sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
                                                        receiver_memory_send, sender_memory_receive)
+            _receiver_length = receiver_length
         
         if receiver_model == 'bsm':
             connection_r_s = BellStateMeasurementConnection(host, self, self._sim, receiver_model, receiver_source, sender_source, 
@@ -276,12 +279,13 @@ class Host:
                                                             receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
                                                             sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
                                                             receiver_memory_send, sender_memory_receive)
+            _receiver_length = receiver_length
         
         for com_error in sender_com_errors:
-            com_error.add_signal_time(sender_length)
+            com_error.add_signal_time(_sender_length)
         
         for com_error in receiver_com_errors:
-            com_error.add_signal_time(receiver_length)
+            com_error.add_signal_time(_receiver_length)
         
         self._connections['eqs'][host._node_id] = connection_s_r
         host._connections['eqs'][self._node_id] = connection_r_s
@@ -356,6 +360,7 @@ class Host:
         """
         
         self._neighbors.add(host._node_id)
+        host._neighbors.add(self._node_id)
         
         self.set_sqs_connection(host, sp_sender_source, sp_receiver_source, 
                                 sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
@@ -616,7 +621,6 @@ class Host:
             for _sender in self.neighbors:
                 if not self._connections['packet'][_sender][RECEIVE].empty():
                     return self._connections['packet'][_sender][RECEIVE].get()
-            return None
 
         return self._connections['packet'][sender][RECEIVE].get()
     

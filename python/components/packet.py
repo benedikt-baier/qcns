@@ -76,55 +76,30 @@ class Packet:
         Returns:
             /
         """
-        
-        # layer 1
-        self._is_l1: bool = 0
+
+        self._layer_counter: int = 0
+
         self._l1: Layer1 = Layer1(l1_requested, l1_needed)
         
-        if not l2_needed:
-            self._is_l1 = 1
-        
-        # layer 2
-        self._is_l2: bool = 0
         self._l2: Layer2 = Layer2(_l2_src, _l2_dst, l2_requested, l2_needed)
-        
-        if l2_needed:
-            self._is_l2 = 1
-        
-        # layer 3
-        self._is_l3: bool = 0
+        if l2_requested:
+            self._layer_counter = 1
+            
         self._l3: Layer3 = ''
         if l3_src is not None or l3_dst is not None:
             self._l3 = Layer3(l3_src, l3_dst, mode, num_channels)
-            self._is_l3 = 1
-            self._is_l2 = 0
-            self._is_l1 = 0
-            self._is_l0 = 0
-
-        # layer 4
-        self._is_l4: bool = 0
+            self._layer_counter = 2
+            
         self._l4: Layer4 = ''
         if l4_src is not None or l4_dst is not None:
             self._l4 = Layer4(l4_src, l4_dst, l4_requested, l4_needed)
-            self._is_l4 = 1
-            self._is_l3 = 0
-            self._is_l2 = 0
-            self._is_l1 = 0
-            self._is_l0 = 0
-        
-        # layer 7
-        self._is_l7: bool = 0
+            self._layer_counter = 3
+            
         self._l7: Layer7 = ''
         if payload is not None:
             self._l7: Layer7 = Layer7(payload)
-            self._is_l7 = 1
-            self._is_l4 = 0
-            self._is_l3 = 0
-            self._is_l2 = 0
-            self._is_l1 = 0
-            self._is_l0 = 0
-        
-        # misc
+            self._layer_counter = 4
+
         self._time_stamp: float = time_stamp   
         self._upayload: List[Any] = upayload
     
@@ -153,8 +128,7 @@ class Packet:
         Returns:
             /
         """
-    
-        # return f'Time Stamp: {self._time_stamp} {str(self._l1)}{str(self._l2)}{str(self._l3)}{str(self._l4)}{str(self._l7)}'
+        
         return f'Time Stamp: {self._time_stamp} {self._l1}{self._l2}{self._l3}{self._l4}{self._l7}'
     
     @property
@@ -167,16 +141,16 @@ class Packet:
             /
             
         Returns:
-            l1 (bool): flag if l1 is implemented
+            l1 (bool): flag if L1 is implemented
         """
         
-        return self._is_l1
+        return self._layer_counter == 0
     
     @property
     def is_l2(self) -> bool:
         
         """
-        Returns if this packet is L2
+        Returns if this packet is purely L2
         
         Args:
             /
@@ -185,13 +159,13 @@ class Packet:
             l2 (bool): flag if l2 is implemented
         """
         
-        return self._is_l2
+        return self._layer_counter == 1
     
     @property
     def is_l3(self) -> bool:
         
         """
-        Returns if L3 is implemented in the packet
+        Returns if this packet is L3
         
         Args:
             /
@@ -200,13 +174,13 @@ class Packet:
             l3 (bool): flag if l3 is implemented
         """
         
-        return self._is_l3
+        return self._layer_counter == 2
     
     @property
     def is_l4(self) -> bool:
         
         """
-        Returns if L4 is implemented in the packet
+        Returns if this packet is purely L4
         
         Args:
             /
@@ -215,7 +189,97 @@ class Packet:
             l4 (bool): flag if l4 is implemented
         """
         
-        return self._is_l4
+        return self._layer_counter == 3
+    
+    @property
+    def is_l7(self) -> bool:
+        
+        """
+        Returns if this packet is purely L7
+        
+        Args:
+            /
+            
+        Returns:
+            _is_l7 (bool): whether L7 is in the packet
+        """
+        
+        return self._layer_counter == 4
+    
+    @property
+    def has_l1(self) -> bool:
+        
+        """
+        Returns wether L1 is implemented in the packet
+        
+        Args:
+            /
+            
+        Returns:
+            _has_l1 (bool): whether L1 is in this packet
+        """
+        
+        return True
+    
+    @property
+    def has_l2(self) -> bool:
+        
+        """
+        Returns wether L2 is implemented in the packet
+        
+        Args:
+            /
+            
+        Returns:
+            _has_l2 (bool): whether L2 is in this packet
+        """
+        
+        return self._layer_counter > 0
+    
+    @property
+    def has_l3(self) -> bool:
+        
+        """
+        Returns wether L3 is implemented in the packet
+        
+        Args:
+            /
+            
+        Returns:
+            _has_l3 (bool): whether L3 is in this packet
+        """
+        
+        return self._layer_counter > 1
+    
+    @property
+    def has_l4(self) -> bool:
+        
+        """
+        Returns wether L4 is implemented in the packet
+        
+        Args:
+            /
+            
+        Returns:
+            _has_l4 (bool): whether L4 is in this packet
+        """
+        
+        return self._layer_counter > 2
+    
+    @property
+    def has_l7(self) -> bool:
+        
+        """
+        Returns wether L7 is implemented in the packet
+        
+        Args:
+            /
+            
+        Returns:
+            _has_l7 (bool): whether L7 is in this packet
+        """
+        
+        return self._layer_counter > 3
     
     @property
     def l1_requested(self) -> int:
@@ -433,6 +497,18 @@ class Packet:
         
         return self._l2._src
     
+    @l2_src.setter
+    def l2_src(self, _l2_src: int) -> None:
+        
+        """
+        Sets the L2 src address
+        
+        Args:
+            _l2_src (int): L2 source address
+        """
+        
+        self._l2._src = _l2_src
+    
     @property
     def l2_dst(self) -> int:
         
@@ -447,6 +523,18 @@ class Packet:
         """
         
         return self._l2._dst
+    
+    @l2_dst.setter
+    def l2_dst(self, _l2_dst: int) -> None:
+        
+        """
+        Sets the L2 dst address
+        
+        Args:
+            _l2_dst (int): L2 destinatioon address
+        """
+    
+        self._l2._dst = _l2_dst
     
     @property
     def l2_ack(self) -> bool:
@@ -561,7 +649,7 @@ class Packet:
             l3_src (int): L3 source address
         """
         
-        if not self._is_l3:
+        if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         return self._l3._src
     
@@ -578,7 +666,7 @@ class Packet:
             l3_dst (int): L3 destination address
         """
         
-        if not self._is_l3:
+        if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         return self._l3._dst
     
@@ -595,7 +683,7 @@ class Packet:
             l3_mode (bool): l3 mode
         """
         
-        if not self._is_l3:
+        if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         return self._l3._mode
     
@@ -612,7 +700,7 @@ class Packet:
             l3_num_channels (int): l3 number of channels
         """
         
-        if not self._is_l3:
+        if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         return self._l3._num_channels
     
@@ -629,6 +717,8 @@ class Packet:
             l3_x_count (np.array): L3 X count
         """
         
+        if not self.has_l3:
+            raise ValueError('No Layer 3 in this packet')
         return self._l3._x_count
     
     @property
@@ -644,6 +734,8 @@ class Packet:
             l3_z_count (np.array): L3 Z count
         """
         
+        if not self.has_l3:
+            raise ValueError('No Layer 3 in this packet')
         return self._l3._z_count
     
     def switch_l3_src_dst(self) -> None:
@@ -658,7 +750,7 @@ class Packet:
             /
         """
         
-        if not self._is_l3:
+        if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         
         self._l3._src, self._l3._dst = self._l3._dst, self._l3._src
@@ -675,7 +767,7 @@ class Packet:
             /
         """
         
-        if not self._is_l3:
+        if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         self._l3.reset()
         
@@ -691,7 +783,7 @@ class Packet:
             /
         """
         
-        if not self._is_l3:
+        if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         self._l3.update(res, channel)
     
@@ -708,7 +800,7 @@ class Packet:
             l4_src (int): L4 source port
         """
         
-        if not self._is_l4:
+        if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
         return self._l4._src
         
@@ -725,7 +817,7 @@ class Packet:
             l4_src (int): L4 destination port
         """
         
-        if not self._is_l4:
+        if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
         return self._l4._dst
     
@@ -742,7 +834,7 @@ class Packet:
             l2_num_purification (int): number of L2 purification
         """
 
-        if not self._is_l4:
+        if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
 
         return self._l4._num_purification
@@ -760,7 +852,7 @@ class Packet:
             l4_ack (bool): L4 ACK flag
         """
         
-        if not self._is_l4:
+        if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
         
         return self._l4._ack
@@ -777,7 +869,7 @@ class Packet:
             /
         """
         
-        if not self._is_l4:
+        if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
         
         self._l4._src, self._l4._dst = self._l4._dst, self._l4._src
@@ -794,7 +886,7 @@ class Packet:
             /
         """
         
-        if not self._is_l4:
+        if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
         
         self._l4._ack = 1
@@ -811,7 +903,7 @@ class Packet:
             /
         """
         
-        if not self._is_l4:
+        if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
         
         self._l4._ack = 0
@@ -829,7 +921,7 @@ class Packet:
             l7_payload (list): payload
         """
         
-        if not self._is_l7:
+        if not self.has_l7:
             raise ValueError('No Layer 7 in this packet')
         return self._l7._payload
     
@@ -845,7 +937,7 @@ class Packet:
             /
         """
         
-        if not self._is_l7:
+        if not self._has_l7:
             raise ValueError('No Layer 7 in this packet')
         self._l7._payload = []
     
@@ -861,7 +953,7 @@ class Packet:
             item (any): item in payload
         """
         
-        if not self._is_l7:
+        if not self._has_l7:
             raise ValueError('No Layer 7 in this packet')
         
         for _ in range(len(self.payload)):

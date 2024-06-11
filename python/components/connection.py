@@ -77,7 +77,7 @@ class SingleQubitConnection:
         
         self._success_prob: float = self._channel._coupling_prob * self._channel._lose_prob
         self._duration: float = self._channel._sending_time + self._source._duration
-    
+        
     def create_qubit(self, _num_needed: int=1) -> None:
         
         """
@@ -164,6 +164,9 @@ class SenderReceiverConnection:
         
         self._sim: Simulation = _sim
         
+        if _model_name == 'perfect':
+            self._channel._lose_prob = 1.0
+        
         self._success_prob: float = self._channel._coupling_prob * self._channel._lose_prob * self._detector._efficiency * self._interaction_prob * (1 - self._detector._dark_count_prob)
         self._false_prob: float = self._channel._coupling_prob * self._channel._lose_prob * self._detector._efficiency * self._interaction_prob * self._detector._dark_count_prob
         self._total_prob: float = self._success_prob + self._false_prob + (1 - self._state_transfer_fidelity)
@@ -222,7 +225,7 @@ class SenderReceiverConnection:
             _curr_time += self._detector._duration
             
             self._sender_memory.l0_store_qubit(q_1, -1, _curr_time)
-            self._receiver_memory.l1_store_qubit(q_3, -1, _curr_time)
+            self._receiver_memory.l0_store_qubit(q_3, -1, _curr_time)
             packet.update_l1_success(i)
             
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration, self._receiver._node_id))
@@ -309,6 +312,10 @@ class TwoPhotonSourceConnection:
         self._receiver_memory: QuantumMemory = _receiver_memory
         
         self._sim: Simulation = _sim
+        
+        if _model_name == 'perfect':
+            self._sender_channel._lose_prob = 1.0
+            self._receiver_channel._lose_prob = 1.0
         
         _sender_success_prob = self._sender_channel._coupling_prob * self._sender_channel._lose_prob * self._sender_detector._efficiency * self._sender_interaction_prob * (1 - self._sender_detector._dark_count_prob)
         _receiver_success_prob = self._receiver_channel._coupling_prob * self._receiver_channel._lose_prob * self._receiver_detector._efficiency * self._receiver_interaction_prob * (1 - self._receiver_detector._dark_count_prob)
@@ -476,13 +483,17 @@ class BellStateMeasurementConnection:
         
         self._sim: Simulation = _sim
         
-        sender_arrival_prob = self._sender_channel._coupling_prob * self._sender_channel._lose_prob * self._sender_detector._efficiency
-        receiver_arrival_prob = self._receiver_channel._coupling_prob * self._receiver_channel._lose_prob * self._receiver_detector._efficiency
+        if _model_name == 'perfect':
+            self._sender_channel._lose_prob = 1.0
+            self._receiver_channel._lose_prob = 1.0
         
-        self._success_prob: float = 0.5 * sender_arrival_prob * receiver_arrival_prob * self._coin_ph_ph * self._visibility * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
-        self._false_prob_1: float = 0.5 * sender_arrival_prob * receiver_arrival_prob * self._coin_ph_ph * (1 - self._visibility) * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
-        self._false_prob_3: float = (sender_arrival_prob * (1 - receiver_arrival_prob) + (1 - sender_arrival_prob) * receiver_arrival_prob) * self._coin_ph_dc * (self._sender_detector._dark_count_prob * (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob)**2 + self._receiver_detector._dark_count_prob * (1 - self._receiver_detector._dark_count_prob) * (1 - self._sender_detector._dark_count_prob)**2)
-        self._false_prob_4: float = (1 - sender_arrival_prob) * (1 - receiver_arrival_prob) * self._coin_dc_dc * (self._sender_detector._dark_count_prob**2 * (1 - self._receiver_detector._dark_count_prob)**2 + 2 * self._sender_detector._dark_count_prob * self._receiver_detector._dark_count_prob * (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob) + self._receiver_detector._dark_count_prob**2 * (1 - self._sender_detector._dark_count_prob)**2)
+        _sender_arrival_prob = self._sender_channel._coupling_prob * self._sender_channel._lose_prob * self._sender_detector._efficiency
+        _receiver_arrival_prob = self._receiver_channel._coupling_prob * self._receiver_channel._lose_prob * self._receiver_detector._efficiency
+        
+        self._success_prob: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * self._coin_ph_ph * self._visibility * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
+        self._false_prob_1: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * self._coin_ph_ph * (1 - self._visibility) * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
+        self._false_prob_3: float = (_sender_arrival_prob * (1 - _receiver_arrival_prob) + (1 - _sender_arrival_prob) * _receiver_arrival_prob) * self._coin_ph_dc * (self._sender_detector._dark_count_prob * (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob)**2 + self._receiver_detector._dark_count_prob * (1 - self._receiver_detector._dark_count_prob) * (1 - self._sender_detector._dark_count_prob)**2)
+        self._false_prob_4: float = (1 - _sender_arrival_prob) * (1 - _receiver_arrival_prob) * self._coin_dc_dc * (self._sender_detector._dark_count_prob**2 * (1 - self._receiver_detector._dark_count_prob)**2 + 2 * self._sender_detector._dark_count_prob * self._receiver_detector._dark_count_prob * (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob) + self._receiver_detector._dark_count_prob**2 * (1 - self._sender_detector._dark_count_prob)**2)
         
         self._total_prob: float = self._success_prob  + self._false_prob_1 + self._false_prob_3 + self._false_prob_4
         
