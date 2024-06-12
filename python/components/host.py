@@ -142,8 +142,8 @@ class Host:
             print(traceback.format_exc())
     
     def set_sqs_connection(self, host: Host, sender_source: str='perfect', receiver_source: str='perfect',
-                           sender_length: float=0., sender_attenuation: float=-0.016, sender_coupling_prob: float=1., sender_com_errors: List[QuantumError]=None,
-                           receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_coupling_prob: float=1., receiver_com_errors: List[QuantumError]=None) -> None:
+                           sender_length: float=0., sender_attenuation: float=-0.016, sender_coupling_prob: float=1., sender_lose_qubits: bool=False, sender_com_errors: List[QuantumError]=None,
+                           receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_coupling_prob: float=1., receiver_lose_qubits: bool=False, receiver_com_errors: List[QuantumError]=None) -> None:
         
         """
         Sets up a single qubit source connection
@@ -155,10 +155,12 @@ class Host:
             sender_length (float): length from sender to receiver
             sender_attenuation (float): sender attenuation coefficient
             sender_coupling_prob (float): probability of coupling qubit into fiber
+            sender_lose_qubits (bool): whether to lose qubits of sender channel
             sender_com_errors (list): list of errors on sender channel
             receiver_length (float): length from receiver to sender
             receiver_attenuation (float): receiver attenuation coefficient
             receiver_coupling_prob (float): probability of coupling qubit into fiber
+            receiver_lose_qubits (bool): whether to lose qubits of receiver channel
             receiver_com_errors (list): list of errors on receiver channel
             
         Returns:
@@ -176,8 +178,8 @@ class Host:
         for com_error in receiver_com_errors:
             com_error.add_signal_time(sender_length + receiver_length)
         
-        connection_s_r = SingleQubitConnection(self, host, self._sim, sender_source, sender_length + receiver_length, sender_attenuation, sender_coupling_prob, sender_com_errors)
-        connection_r_s = SingleQubitConnection(host, self, self._sim, receiver_source, sender_length + receiver_length, receiver_attenuation, receiver_coupling_prob, sender_com_errors)
+        connection_s_r = SingleQubitConnection(self, host, self._sim, sender_source, sender_length + receiver_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors)
+        connection_r_s = SingleQubitConnection(host, self, self._sim, receiver_source, sender_length + receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, sender_com_errors)
         
         self._connections['sqs'][host._node_id] = {SEND: connection_s_r, RECEIVE: connection_r_s._channel}
         host._connections['sqs'][self._node_id] = {SEND: connection_r_s, RECEIVE: connection_s_r._channel}
@@ -186,8 +188,8 @@ class Host:
                            receiver_type: str='sr', receiver_model: str='perfect',
                            sender_source: str='perfect', receiver_source: str='perfect', 
                            sender_detector: str='perfect', receiver_detector: str='perfect',
-                           sender_length: float=0., sender_attenuation: float=-0.016, sender_coupling_prob: float=1., sender_com_errors: List[QuantumError]=None,
-                           receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_coupling_prob: float=1., receiver_com_errors: List[QuantumError]=None,
+                           sender_length: float=0., sender_attenuation: float=-0.016, sender_coupling_prob: float=1., sender_lose_qubits, sender_com_errors: List[QuantumError]=None,
+                           receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_coupling_prob: float=1., receiver_lose_qubits, receiver_com_errors: List[QuantumError]=None,
                            sender_mem_size: int=-1, sender_efficiency: float=1., sender_mem_errors: List[QuantumError]=None, 
                            receiver_mem_size: int=-1, receiver_efficiency: float=1., receiver_mem_errors: List[QuantumError]=None) -> None:
         
@@ -207,10 +209,12 @@ class Host:
             sender_length (float): length from sender to receiver
             sender_attenuation (float): sender attenuation coefficient
             sender_coupling_prob (float): probability of coupling qubit into fiber
+            sender_lose_qubits (bool): whether to lose qubits of sender channel
             sender_com_errors (list): list of errors on sender channel
             receiver_length (float): length from receiver to sender
             receiver_attenuation (float): receiver attenuation coefficient
             receiver_coupling_prob (float): probability of coupling qubit into fiber
+            receiver_lose_qubits (bool): whether to lose qubits of receiver channel
             receiver_com_errors (list): list of errors on receiver channel
             sender_mem_size (int): size of sender memory
             sender_efficiency (float): efficiency of sender memory
@@ -239,45 +243,45 @@ class Host:
         
         if sender_type == 'sr':
             connection_s_r = SenderReceiverConnection(self, host, self._sim, sender_model, sender_source, receiver_detector, 
-                                                      sender_length + receiver_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
+                                                      sender_length + receiver_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors, 
                                                       sender_memory_send, receiver_memory_receive)
             _sender_length = sender_length + receiver_length
         
         if sender_type == 'tps':
             connection_s_r = TwoPhotonSourceConnection(self, host, self._sim, sender_model, sender_source, 
                                                        sender_detector, receiver_detector, 
-                                                       sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
-                                                       receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
+                                                       sender_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors, 
+                                                       receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, receiver_com_errors, 
                                                        sender_memory_send, receiver_memory_receive)
             _sender_length = sender_length
         
         if sender_type == 'bsm':
             connection_s_r = BellStateMeasurementConnection(self, host, self._sim, sender_model, sender_source, receiver_source, 
                                                             sender_detector, receiver_detector, 
-                                                            sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
-                                                            receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
+                                                            sender_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors, 
+                                                            receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, receiver_com_errors, 
                                                             sender_memory_send, receiver_memory_receive)
             _sender_length = sender_length
         
         if receiver_type == 'sr':
             connection_r_s = SenderReceiverConnection(host, self, self._sim, receiver_model, receiver_source, sender_detector, 
-                                                      sender_length + receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
+                                                      sender_length + receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, receiver_com_errors, 
                                                       receiver_memory_send, sender_memory_receive)
             _receiver_length = sender_length + receiver_length
             
         if receiver_type == 'tps':
             connection_r_s = TwoPhotonSourceConnection(host, self, self._sim, receiver_model, receiver_source,
                                                        receiver_detector, sender_detector, 
-                                                       receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
-                                                       sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
+                                                       receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, receiver_lose_qubits, receiver_com_errors, 
+                                                       sender_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors, 
                                                        receiver_memory_send, sender_memory_receive)
             _receiver_length = receiver_length
         
         if receiver_model == 'bsm':
             connection_r_s = BellStateMeasurementConnection(host, self, self._sim, receiver_model, receiver_source, sender_source, 
                                                             receiver_detector, sender_detector, 
-                                                            receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
-                                                            sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
+                                                            receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, receiver_com_errors, 
+                                                            sender_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors, 
                                                             receiver_memory_send, sender_memory_receive)
             _receiver_length = receiver_length
         
@@ -320,8 +324,8 @@ class Host:
                         sp_sender_source: str='perfect', sp_receiver_source: str='perfect',
                         he_sender_source: str='perfect', he_receiver_source: str='perfect', 
                         sender_detector: str='perfect', receiver_detector: str='perfect',
-                        sender_length: float=0., sender_attenuation: float=-0.016, sender_coupling_prob: float=1., sender_com_errors: List[QuantumError]=None,
-                        receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_coupling_prob: float=1., receiver_com_errors: List[QuantumError]=None,
+                        sender_length: float=0., sender_attenuation: float=-0.016, sender_coupling_prob: float=1., sender_lose_qubits: bool=False, sender_com_errors: List[QuantumError]=None,
+                        receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_coupling_prob: float=1., receiver_lose_qubits: bool=False, receiver_com_errors: List[QuantumError]=None,
                         sender_mem_size: int=-1, sender_efficiency: float=1., sender_mem_errors: List[QuantumError]=None, 
                         receiver_mem_size: int=-1, receiver_efficiency: float=1., receiver_mem_errors: List[QuantumError]=None) -> None:
         
@@ -343,10 +347,12 @@ class Host:
             sender_length (float): length from sender to receiver
             sender_attenuation (float): sender attenuation coefficient
             sender_coupling_prob (float): probability of coupling qubit into fiber
+            sender_lose_qubits (bool): whether to lose qubits of sender channel
             sender_com_errors (list): list of errors on sender channel
             receiver_length (float): length from receiver to sender
             receiver_attenuation (float): receiver attenuation coefficient
             receiver_coupling_prob (float): probability of coupling qubit into fiber
+            receiver_lose_qubits (bool): whether to lose qubits of receiver channel
             receiver_com_errors (list): list of errors on receiver channel
             sender_mem_size (int): size of sender memory
             sender_efficiency (float): efficiency of sender memory
@@ -363,14 +369,14 @@ class Host:
         host._neighbors.add(self._node_id)
         
         self.set_sqs_connection(host, sp_sender_source, sp_receiver_source, 
-                                sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
-                                receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors)
+                                sender_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors, 
+                                receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, receiver_com_errors)
         self.set_eqs_connection(host, sender_type, sender_model, 
                                 receiver_type, receiver_model, 
                                 he_sender_source, he_receiver_source, 
                                 sender_detector, receiver_detector, 
-                                sender_length, sender_attenuation, sender_coupling_prob, sender_com_errors, 
-                                receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_com_errors, 
+                                sender_length, sender_attenuation, sender_coupling_prob, sender_lose_qubits, sender_com_errors, 
+                                receiver_length, receiver_attenuation, receiver_coupling_prob, receiver_lose_qubits, receiver_com_errors, 
                                 sender_mem_size, sender_efficiency, sender_mem_errors, 
                                 receiver_mem_size, receiver_efficiency, receiver_mem_errors)
         self.set_pconnection(host, sender_length + receiver_length)
@@ -1280,7 +1286,7 @@ class Host:
             res (np.array): result of the comparison
         """
         
-        stor_res = self.l2_retrieve_result(_packet.l2_ack, _packet.l2_src)
+        stor_res = self.l2_retrieve_result(_packet.l2_src, _packet.l2_ack)
         return np.logical_not(np.logical_xor(_packet.l2_purification_success, stor_res))
     
     @property

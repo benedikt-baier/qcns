@@ -31,7 +31,7 @@ SENDER_RECEIVER_MODELS = {'perfect': (0., 1., 1.), 'standard': (8.95e-7, 0.04, 0
 TWO_PHOTON_MODELS = {'perfect': (0., 1., 1., 1., 1.), 'standard': (8.95e-7, 0.04, 0.14, 0.04, 0.14)}
 BSM_MODELS = {'perfect': (0., 1., 1., 0., 0.), 'standard': (3e-6, 0.66, 0.313, 0.355, 0.313)}
 
-# use tau as a parameter as detection window depends on it
+# use tau as a parameter as detection window/visibility depends on it
 
 class SingleQubitConnection:
     
@@ -49,7 +49,7 @@ class SingleQubitConnection:
     """
     
     def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, _sender_source: str='perfect', 
-                 _length: float=0., _attenuation_coefficient: float=-0.016, _coupling_prob: float=1., _com_errors: List[QuantumError]=None) -> None:
+                 _length: float=0., _attenuation_coefficient: float=-0.016, _coupling_prob: float=1., _lose_qubits: bool=False, _com_errors: List[QuantumError]=None) -> None:
         
         """
         Initializes a Single Qubit Connection
@@ -62,6 +62,7 @@ class SingleQubitConnection:
             _length (float): length of connection
             _attenuation_coefficient (float): attenuation coefficient of fiber
             _coupling_prob (float): probability of coupling photon into fiber
+            _lose_qubits (float): whether to lose qubits or not
             _com_errors (list): list of errors on the channel
             
         Returns:
@@ -75,7 +76,10 @@ class SingleQubitConnection:
         
         self._sim: Simulation = _sim
         
-        self._success_prob: float = self._channel._coupling_prob * self._channel._lose_prob
+        self._success_prob: float = self._channel._coupling_prob
+        if _lose_qubits:
+            self._success_prob *= self._channel._lose_prob
+        
         self._duration: float = self._channel._sending_time + self._source._duration
         
     def create_qubit(self, _num_needed: int=1) -> None:
@@ -110,7 +114,7 @@ class SenderReceiverConnection:
         _interaction_prob (float): probability of a photon interacting with an atom
         _state_transfer_fidelity (float): fidelity of transfering the state from the photon to the atom
         _source (AtomPhotonSource): sender atom photon source
-        _detector (PhotonSource): Photon Detector at receiver
+        _detector (PhotonDetector): Photon Detector at receiver
         _channel (QChannel): quantum channel of connection
         _sender_memory (QuantumMemory): quantum memory of sender
         _receiver_memory (QuantumMemory): quantum memory of receiver
@@ -124,7 +128,7 @@ class SenderReceiverConnection:
     
     def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, 
                  _model_name: str='perfect', _sender_source: str='perfect', _receiver_detector: str='perfect', 
-                 _length: float=0., _attenuation_coefficient: float=-0.016, _coupling_prob: float=1., _com_errors: List[QuantumError]=None, 
+                 _length: float=0., _attenuation_coefficient: float=-0.016, _coupling_prob: float=1., _lose_qubits: bool=False, _com_errors: List[QuantumError]=None, 
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
         
         """
@@ -140,6 +144,7 @@ class SenderReceiverConnection:
             _length (float): length of connection
             _attenuation_coefficient (float): attenuation coefficient of fiber
             _coupling_prob (float): probability of coupling photon into fiber
+            _lose_qubits (bool): whether to lose qubits
             _com_errors (list): list of errors on connection
             _sender_memory (QuantumMemory): quantum memory of sender
             _receiver_memory (QuantumMemory): quantum memory of receiver
@@ -164,11 +169,13 @@ class SenderReceiverConnection:
         
         self._sim: Simulation = _sim
         
-        if _model_name == 'perfect':
-            self._channel._lose_prob = 1.0
+        self._success_prob: float = self._channel._coupling_prob * self._detector._efficiency * self._interaction_prob * (1 - self._detector._dark_count_prob)
+        self._false_prob: float = self._channel._coupling_prob * self._detector._efficiency * self._interaction_prob * self._detector._dark_count_prob
         
-        self._success_prob: float = self._channel._coupling_prob * self._channel._lose_prob * self._detector._efficiency * self._interaction_prob * (1 - self._detector._dark_count_prob)
-        self._false_prob: float = self._channel._coupling_prob * self._channel._lose_prob * self._detector._efficiency * self._interaction_prob * self._detector._dark_count_prob
+        if _lose_qubits:
+            self._success_prob *= self._channel._lose_prob
+            self._false_prob *= self._channel._lose_prob
+        
         self._total_prob: float = self._success_prob + self._false_prob + (1 - self._state_transfer_fidelity)
         self._inital_state: np.array = np.kron((4 * self._source._fidelity - 1)/3 * B_0 + 4 * (1 - self._source._fidelity)/3 * I_0, M_0)
         
@@ -263,8 +270,8 @@ class TwoPhotonSourceConnection:
     
     def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, 
                  _model_name: str='perfect', _source: str='perfect', _sender_detector: str='perfect', _receiver_detector: str='perfect',
-                 _sender_length: float=0., _sender_attenuation: float=-0.016, _sender_coupling_prob: float=1., _sender_com_errors: List[QuantumError]=None,
-                 _receiver_length: float=0., _receiver_attenuation: float=-0.016, _receiver_coupling_prob: float=1., _receiver_com_errors: List[QuantumError]=None,
+                 _sender_length: float=0., _sender_attenuation: float=-0.016, _sender_coupling_prob: float=1., _sender_lose_qubits: bool=False, _sender_com_errors: List[QuantumError]=None,
+                 _receiver_length: float=0., _receiver_attenuation: float=-0.016, _receiver_coupling_prob: float=1., _receiver_lose_qubits: bool=False, _receiver_com_errors: List[QuantumError]=None,
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
         
         """
@@ -281,10 +288,12 @@ class TwoPhotonSourceConnection:
             _sender_length (float): length of connection from source to sender
             _sender_attenuation (float): attenuation coefficient of fiber from source to sender
             _sender_coupling_prob (float): probability of coupling photon into fiber from source to sender
+            _sender_lose_qubits (bool): whether to lose qubits of sender channel
             _sender_com_errors (list): list of errors on connection from source to sender
             _receiver_length (float): length of connection from source to receiver
             _receiver_attenuation (float): attenuation coefficient of fiber from source to receiver
             _receiver_coupling_prob (float): probability of coupling photon into fiber from source to receiver
+            _receiver_lose_qubits (bool): whether to lose qubits of receiver channel
             _receiver_com_errors (list): list of errors on connection from source to receiver
             _sender_memory (QuantumMemory): quantum memory of sender
             _receiver_memory (QuantumMemory): quantum memory of receiver
@@ -313,17 +322,21 @@ class TwoPhotonSourceConnection:
         
         self._sim: Simulation = _sim
         
-        if _model_name == 'perfect':
-            self._sender_channel._lose_prob = 1.0
-            self._receiver_channel._lose_prob = 1.0
+        _sender_success_prob = self._sender_channel._coupling_prob * self._sender_detector._efficiency * self._sender_interaction_prob * (1 - self._sender_detector._dark_count_prob)
+        _receiver_success_prob = self._receiver_channel._coupling_prob * self._receiver_detector._efficiency * self._receiver_interaction_prob * (1 - self._receiver_detector._dark_count_prob)
+        self._sender_false_prob: float = self._sender_channel._coupling_prob * self._sender_detector._efficiency * self._sender_interaction_prob * self._sender_detector._dark_count_prob
+        self._receiver_false_prob: float = self._receiver_channel._coupling_prob * self._receiver_detector._efficiency * self._receiver_interaction_prob * self._receiver_detector._dark_count_prob
         
-        _sender_success_prob = self._sender_channel._coupling_prob * self._sender_channel._lose_prob * self._sender_detector._efficiency * self._sender_interaction_prob * (1 - self._sender_detector._dark_count_prob)
-        _receiver_success_prob = self._receiver_channel._coupling_prob * self._receiver_channel._lose_prob * self._receiver_detector._efficiency * self._receiver_interaction_prob * (1 - self._receiver_detector._dark_count_prob)
+        if _sender_lose_qubits:
+            _sender_success_prob *= self._sender_channel._lose_prob 
+            self._sender_false_prob *= self._sender_channel._lose_prob 
+
+        if _receiver_lose_qubits:
+            _receiver_success_prob *= self._receiver_channel._lose_prob
+            self._receiver_false_prob *= self._receiver_channel._lose_prob
         
         self._success_prob: float = _sender_success_prob * _receiver_success_prob
         
-        self._sender_false_prob: float = self._sender_channel._coupling_prob * self._sender_channel._lose_prob * self._sender_detector._efficiency * self._sender_interaction_prob * self._sender_detector._dark_count_prob
-        self._receiver_false_prob: float = self._receiver_channel._coupling_prob * self._receiver_channel._lose_prob * self._receiver_detector._efficiency * self._receiver_interaction_prob * self._receiver_detector._dark_count_prob
         self._total_prob: float = self._success_prob + self._sender_false_prob + self._receiver_false_prob + (1 - self._sender_state_transfer_fidelity) + (1 - self._receiver_state_transfer_fidelity)
         
         self._inital_state: np.array = np.kron(M_0, np.kron((4 * self._source._fidelity - 1)/3 * B_0 + 4 * (1 - self._source._fidelity)/3 * I_0, M_0))
@@ -434,8 +447,8 @@ class BellStateMeasurementConnection:
     
     def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, 
                  _model_name: str='perfect', _sender_source: str='perfect', _receiver_source: str='perfect', _sender_detector: str='perfect', _receiver_detector: str='perfect',
-                 _sender_length: float=0., _sender_attenuation_coefficient: float=-0.016, _sender_coupling_prob: float=1., _sender_com_errors: List[QuantumError]=None,
-                 _receiver_length: float=0., _receiver_attenuation_coefficient: float=-0.016, _receiver_coupling_prob: float=1., _receiver_com_errors: List[QuantumError]=None,
+                 _sender_length: float=0., _sender_attenuation_coefficient: float=-0.016, _sender_coupling_prob: float=1., _sender_lose_qubits: bool=False, _sender_com_errors: List[QuantumError]=None,
+                 _receiver_length: float=0., _receiver_attenuation_coefficient: float=-0.016, _receiver_coupling_prob: float=1., _receiver_lose_qubits: bool=False, _receiver_com_errors: List[QuantumError]=None,
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
         
         """
@@ -453,10 +466,12 @@ class BellStateMeasurementConnection:
             _sender_length (float): length of connection from source to sender
             _sender_attenuation_coefficient (float): attenuation coefficient of fiber from source to sender
             _sender_coupling_prob (float): probability of coupling photon into fiber from source to sender
+            _sender_lose_qubits (bool): whether to lose qubits of sender channel
             _sender_com_errors (list): list of errors on connection from source to sender
             _receiver_length (float): length of connection from source to receiver
             _receiver_attenuation_coefficient (float): attenuation coefficient of fiber from source to receiver
             _receiver_coupling_prob (float): probability of coupling photon into fiber from source to receiver
+            _receiver_lose_qubits (bool): whether to lose qubits of receiver channel
             _receiver_com_errors (list): list of errors on connection from source to receiver
             _sender_memory (QuantumMemory): quantum memory of sender
             _receiver_memory (QuantumMemory): quantum memory of receiver
@@ -483,12 +498,14 @@ class BellStateMeasurementConnection:
         
         self._sim: Simulation = _sim
         
-        if _model_name == 'perfect':
-            self._sender_channel._lose_prob = 1.0
-            self._receiver_channel._lose_prob = 1.0
+        _sender_arrival_prob = self._sender_channel._coupling_prob * self._sender_detector._efficiency
+        _receiver_arrival_prob = self._receiver_channel._coupling_prob  * self._receiver_detector._efficiency
         
-        _sender_arrival_prob = self._sender_channel._coupling_prob * self._sender_channel._lose_prob * self._sender_detector._efficiency
-        _receiver_arrival_prob = self._receiver_channel._coupling_prob * self._receiver_channel._lose_prob * self._receiver_detector._efficiency
+        if _sender_lose_qubits:
+            _sender_arrival_prob *= self._sender_channel._lose_prob
+            
+        if _receiver_lose_qubits:
+            _receiver_arrival_prob *= self._receiver_channel._lose_prob
         
         self._success_prob: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * self._coin_ph_ph * self._visibility * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
         self._false_prob_1: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * self._coin_ph_ph * (1 - self._visibility) * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
