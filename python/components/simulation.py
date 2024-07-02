@@ -3,6 +3,7 @@ from heapq import heappop, heappush
 from typing import List
 
 from python.components.event import Event
+from python.components.qubit import QSystem
 
 __all__ = ['Simulation']
 
@@ -35,6 +36,23 @@ class Simulation:
         self._event_queue: List[Event] = []
         self._hosts: List[Host] = []
         self._sim_time: float = 0.
+    
+    @staticmethod
+    def create_qsystem(_num_qubits: int, _fidelity: float=1., _sparse: bool=False) -> QSystem:
+        
+        """
+        Creates a new qsystem at the host
+        
+        Args:
+            _num_qubits (int): number of qubits in the qsystem
+            _fidelity (float): fidelity of quantum system
+            _sparse (float): sparsity of qsystem
+            
+        Returns:
+            qsys (QSystem): new qsystem
+        """
+        
+        return QSystem(_num_qubits, _fidelity, _sparse)
     
     def add_host(self, host: Host) -> None:
         

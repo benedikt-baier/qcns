@@ -39,6 +39,18 @@ BSM_MODELS = {'perfect': (0., 1., 1., 0., 0.), 'standard': (3e-6, 0.66, 0.313, 0
 
 FOCK_STATE_MODELS = {'perfect': (0., 1., 0., 0.), 'standard': (3.8e-6, 0.9, 0., 0.01)}
 
+# sender receiver model:
+#   standard: An elementary quantum network of single atoms in optical cavities
+
+# two photon model:
+#   standard: An elementary quantum network of single atoms in optical cavities
+
+# bsm model:
+#   standard: Entanglement of Trapped-Ion Qubits Separated by 230 Meters
+
+# fock state model:
+#   standard: Realization of a multinode quantum network of remote solidstate qubits
+
 class SingleQubitConnection:
     
     """

@@ -6,9 +6,18 @@ __all__ = ['SinglePhotonSource', 'AtomPhotonSource', 'PhotonPhotonSource', 'Fock
 # fock photon source parameters: duration, bright state, bright state variance, emission prob
 
 SINGLE_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1.), 'standard': None}
-ATOM_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1.), 'standard': (1.25e-3, None, 0.923, 1.), 'sheng_zhi_wang': (5e-2, None, 0.904, 1.)}
-PHOTON_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1., 1.), 'standard': (12e-9, 0.88, 0., 0.65, 0.901), 'klaus_joens': (5e-6, 0.817, None, 1., None)}
-FOCK_PHOTON_SOURCE = {'perfect': (0., 0.5, 0., 1.), 'standard': (1.25e-3, 0.05, 0., 1.)}
+ATOM_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1.), 'standard': (3.5e-4, 0.938, 0.04, 0.75)}
+PHOTON_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1., 1.), 'standard': (126e-6, 0.880, 0.002, 0.65, 0.901)}
+FOCK_PHOTON_SOURCE = {'perfect': (0., 0.5, 0., 1.), 'standard': (3.8e-6, 0.05, 0., 0.939)}
+
+# atom photon source:
+#   standard: Entanglement of trapped-ion qubits separated by 230 meters.
+
+# photon photon source_
+#   standard: A solid-state source of strongly entangled photon pairs with high brightness and indistinguishability
+
+# fock photon source
+#   standard: Realization of a multinode quantum network of remote solid-state qubits
 
 class SinglePhotonSource: 
     

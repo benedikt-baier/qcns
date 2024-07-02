@@ -3,7 +3,10 @@ __all__ = ['PhotonDetector']
 
 # detector parameters: duration, efficiency, dark_count_prob
 
-PHOTON_DETECTOR_MODELS = {'perfect': (0., 1., 0.), 'standard': (5e-6, 0.87, 29e-5)}
+PHOTON_DETECTOR_MODELS = {'perfect': (0., 1., 0.), 'standard': (5.5e-6, 0.87, 1.696e-4)}
+
+# photon detector:
+#   standard: Entanglement of Trapped-Ion Qubits Separated by 230 Meters
 
 class PhotonDetector:
     

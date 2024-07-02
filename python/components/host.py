@@ -426,7 +426,7 @@ class Host:
         
         _num_needed = num_requested
         if estimate:
-            _num_needed = int(np.ceil(_num_needed / (1 - self._connections['sqs'][receiver][SEND]._success_prob)))
+            _num_needed = int(np.ceil(_num_needed / self._connections['sqs'][receiver][SEND]._success_prob))
         
         self._connections['sqs'][receiver][SEND].attempt_qubit(_num_needed)
 
@@ -469,11 +469,9 @@ class Host:
         await self._resume.wait()
         self._resume.clear()
         
-        num_requested = self.remaining_size(receiver, 0)
-        
         _num_needed = num_requested
         if estimate:
-            _num_needed = int(np.ceil(_num_needed / (1 - self._connections['eqs'][receiver]._connection._success_prob)))
+            _num_needed = int(np.ceil(_num_needed / self._connections['eqs'][receiver]._success_prob))
         
         if not self.has_space(receiver, 0, _num_needed):
             _num_needed = self.remaining_size(receiver, 0)
@@ -1110,7 +1108,9 @@ class Host:
         
         _qubit_src, _qubit_dst = self._connections['memory'][host][store].l2_purify(index_src, index_dst, self._sim._sim_time)
         
-        _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, direction, gate, basis, combine=True, remove=True)
+        # _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, direction, gate, basis, combine=True, remove=True)
+        
+        _res = 0
         
         self._connections['memory'][host][store].l2_store_qubit(_qubit_src, -1, self._sim._sim_time)
         
@@ -1332,7 +1332,7 @@ class Host:
             res (np.array): result of the comparison
         """
         
-        stor_res = self.l2_retrieve_result(packet.l2_src, packet.l2_ack)
+        stor_res = self.l2_retrieve_result(packet.l2_src, not packet.l2_ack)
         return np.logical_not(np.logical_xor(packet.l2_purification_success, stor_res))
     
     @property
