@@ -10,7 +10,7 @@ class Qubit:
 
 __all__ = ['GHZ_state', 'W_state', 'graph_state', 'ghz_m', 'get_measure_dict', 'get_normalized_probability_amplitudes', 'load_qasm_2_0_file', 'load_qasm_3_0_file', 'apply_circuit']
 
-def get_w_operator(_p: float, _q: float) -> np.array:
+def get_w_operator(p: float, q: float) -> np.array:
     
     """
     Creates the w_state operator
@@ -20,90 +20,90 @@ def get_w_operator(_p: float, _q: float) -> np.array:
         q (float): second parameter
 
     Returns:
-        _op (np.array): operator to apply to each qubit
+        op (np.array): operator to apply to each qubit
     """
 
-    return 1/np.sqrt(_p + _q) * np.array([[np.sqrt(_p), np.sqrt(_q)], [-np.sqrt(_q), np.sqrt(_p)]])
+    return 1/np.sqrt(p + q) * np.array([[np.sqrt(p), np.sqrt(q)], [-np.sqrt(q), np.sqrt(p)]])
 
-def GHZ_state(_q_l: List[Qubit]) -> None:
+def GHZ_state(q_l: List[Qubit]) -> None:
 
     """
     Brings the qubits into a GHZ state
 
     Args:
-        _q_l (list): list of qubits
+        q_l (list): list of qubits
 
     Returns:
         /
     """
 
-    _q_l[0].H()
-    for i in range(len(_q_l) - 1):
-        _q_l[i].CNOT(_q_l[i + 1])
+    q_l[0].H()
+    for i in range(len(q_l) - 1):
+        q_l[i].CNOT(q_l[i + 1])
 
-def W_state(_q_l: List[Qubit]) -> None:
+def W_state(q_l: List[Qubit]) -> None:
 
     """
     Creates a W state out of the given qubits
 
     Args:
-        _q_l (list): list of qubits
+        q_l (list): list of qubits
 
     Returns:
         /
     """
 
-    op = get_w_operator(1, len(_q_l) - 1)
-    _q_l[0].custom_gate(op)
+    op = get_w_operator(1, len(q_l) - 1)
+    q_l[0].custom_gate(op)
 
-    for i in range(len(_q_l) - 2):
-        _q_l[i].CU(_q_l[i + 1], get_w_operator(1, len(_q_l) - 2 - i))
+    for i in range(len(q_l) - 2):
+        q_l[i].CU(q_l[i + 1], get_w_operator(1, len(q_l) - 2 - i))
 
-    for i in reversed(range(len(_q_l) - 1)):
-        _q_l[i].CNOT(_q_l[i + 1])
+    for i in reversed(range(len(q_l) - 1)):
+        q_l[i].CNOT(q_l[i + 1])
 
-    _q_l[0].X()
+    q_l[0].X()
 
-def graph_state(_q_l: List[Qubit], _graph: List[Tuple[int, int]]) -> None:
+def graph_state(q_l: List[Qubit], graph: List[Tuple[int, int]]) -> None:
     
     """
     Creates a graph state out of a given list of qubits and a graph
     
     Args:
-        _q_l (list): list of qubits
+        q_l (list): list of qubits
         graph (list): list of edges
         
     Returns:
         /
     """
     
-    for q_1, q_2 in it.combinations(_q_l, 2):
+    for q_1, q_2 in it.combinations(q_l, 2):
         if not q_1.qsystem == q_2.qsystem:
             raise ValueError('Qubits need to be in the same qsystem')
         
-    for q in _q_l:
+    for q in q_l:
         q.H()
         
-    for edge in _graph:
-        _q_l[edge[0]].CZ(_q_l[edge[1]])
+    for edge in graph:
+        q_l[edge[0]].CZ(q_l[edge[1]])
     
-def ghz_m(_q_l: List[Qubit]) -> int:
+def ghz_m(q_l: List[Qubit]) -> int:
         
     """
     Measures in which GHZ state the qubits are, generalization of bell state measurement
     
     Args:
-        _q_l (list): list of qubits to measure
+        q_l (list): list of qubits to measure
         
     Returns:
-        _res (int): measurement result
+        res (int): measurement result
     """
     
-    for i in range(len(_q_l) - 1, 0, -1):
-        _q_l[i - 1].CNOT(_q_l[i])
-    _q_l[0].H()
+    for i in range(len(q_l) - 1, 0, -1):
+        q_l[i - 1].CNOT(q_l[i])
+    q_l[0].H()
     
-    meas = [q.measure() for q in _q_l]
+    meas = [q.measure() for q in q_l]
     
     _res = 0
     for m in meas:
@@ -111,7 +111,7 @@ def ghz_m(_q_l: List[Qubit]) -> int:
         
     return _res
    
-def get_measure_dict(_num_qubits: int) -> Dict[str, int]:
+def get_measure_dict(num_qubits: int) -> Dict[str, int]:
     
     """
     Creates a measurement dictionary with the binary states as keys and 0 as values
@@ -123,21 +123,21 @@ def get_measure_dict(_num_qubits: int) -> Dict[str, int]:
         meas_stats (dict): dictonary with str as keys and 0s as values
     """
     
-    return {np.binary_repr(i, width=_num_qubits): 0 for i in range(2 ** _num_qubits)}
+    return {np.binary_repr(i, width=num_qubits): 0 for i in range(2 ** num_qubits)}
 
-def get_normalized_probability_amplitudes(_num_samples: int) -> np.array:
+def get_normalized_probability_amplitudes(num_samples: int) -> np.array:
     
     """
     Generates n normalized probability amplitudes
     
     Args:
-        _num_samples (int): number of samples
+        num_samples (int): number of samples
         
     Returns:
         rand (np.array): normalized probability amplitudes
     """
     
-    rand = np.sqrt(np.random.uniform(0, 1, _num_samples)) * np.exp(1.j * np.random.uniform(0, 2 * np.pi, _num_samples))
+    rand = np.sqrt(np.random.uniform(0, 1, num_samples)) * np.exp(1.j * np.random.uniform(0, 2 * np.pi, num_samples))
     
     norm = np.sqrt(np.sum(np.abs(rand) ** 2))
     

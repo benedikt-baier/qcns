@@ -30,41 +30,37 @@ class Packet:
     Represents a classical packet
     
     Attr:
-        _is_l1 (bool): whether the packet is l1
-        _l1 (Layer1): Layer 1 implementation
-        _is_l2 (bool): whether the packet is l2
-        _l2 (Layer2): Layer 2 implementation
-        _is_l3 (bool): whether the packet is l3
-        _l3 (Layer3): Layer 3 implementation
-        _is_l4 (bool): whether the packet is l4
-        _l4 (Layer4): Layer 4 implementation
-        _is_l7 (bool): whether the packet is l7
-        _l7 (Layer7): Layer 7 implementation
-        _time_stamp (float): timestamp of the packet
-        _upayload (Any): untracked payload of packet
+        _layer_counter (int): counter how many layers are in packet
+        _l1 (Layer1): Layer 1
+        _l2 (Layer2): Layer 2
+        _l3 (Layer3): Layer 3
+        _l4 (Layer4): Layer 4
+        _l7 (Layer7): Layer 7
+        _time_stamp (float): timestamp of packet
+        _upayload (list): untracked payload
     """
     
-    def __init__(self, _l2_src: int, _l2_dst: int, 
+    def __init__(self, l2_src: int, l2_dst: int, 
                  l1_requested: int=0, l1_needed: int=0, 
                  l2_requested: int=0, l2_needed: int=0, 
-                 l3_src: int=None, l3_dst: int=None, mode: int=0, num_channels: int=1, 
+                 l3_src: int=None, l3_dst: int=None, l3_mode: int=0, l3_num_channels: int=1, 
                  l4_src: int=None, l4_dst: int=None, l4_requested: int=0, l4_needed: int=0, 
                  time_stamp: float=0., payload: Any=None, upayload: Any='') -> None:
         
         """
-        Instantiates a classical packet tracked and untracked payload with respect to timing update
+        Instantiates a classical packet with tracked and untracked payload with respect to timing update
         
         Args:
-            _l2_src (int): L2 source address
-            _l2_dst (int): L2 destination address
+            l2_src (int): L2 source address
+            l2_dst (int): L2 destination address
             l1_requested (int): number of requested qubits for L1 transmission
             l1_needed (int): number of needed qubits for L1 transmission
             l2_requested (int): number of requested qubit pairs for L2 purification
             l2_needed (int): number of needed qubit pairs for L2 purification
             l3_src (int): L3 source address
             l3_dst (int): L3 destination address
-            mode (bool): L3 mode of packet, whether to just apply quantum operations or just forward packet
-            num_channels (int): number of channels for L3 protocol
+            l3_mode (bool): L3 mode of packet, whether to just apply quantum operations or just forward packet
+            l3_num_channels (int): number of channels for L3 protocol
             l4_src (int): L4 source port
             l4_dst (int): L4 destination port
             l4_requested (int): number of requested qubits for L4 purification
@@ -81,13 +77,13 @@ class Packet:
 
         self._l1: Layer1 = Layer1(l1_requested, l1_needed)
         
-        self._l2: Layer2 = Layer2(_l2_src, _l2_dst, l2_requested, l2_needed)
+        self._l2: Layer2 = Layer2(l2_src, l2_dst, l2_requested, l2_needed)
         if l2_requested:
             self._layer_counter = 1
             
         self._l3: Layer3 = ''
         if l3_src is not None or l3_dst is not None:
-            self._l3 = Layer3(l3_src, l3_dst, mode, num_channels)
+            self._l3 = Layer3(l3_src, l3_dst, l3_mode, l3_num_channels)
             self._layer_counter = 2
             
         self._l4: Layer4 = ''
@@ -484,16 +480,19 @@ class Packet:
         return self._l2._src
     
     @l2_src.setter
-    def l2_src(self, _l2_src: int) -> None:
+    def l2_src(self, l2_src: int) -> None:
         
         """
         Sets the L2 src address
         
         Args:
-            _l2_src (int): L2 source address
+            l2_src (int): L2 source address
+            
+        Returns:
+            /
         """
         
-        self._l2._src = _l2_src
+        self._l2._src = l2_src
     
     @property
     def l2_dst(self) -> int:
@@ -511,16 +510,19 @@ class Packet:
         return self._l2._dst
     
     @l2_dst.setter
-    def l2_dst(self, _l2_dst: int) -> None:
+    def l2_dst(self, l2_dst: int) -> None:
         
         """
         Sets the L2 dst address
         
         Args:
             _l2_dst (int): L2 destinatioon address
+            
+        Returns:
+            /
         """
     
-        self._l2._dst = _l2_dst
+        self._l2._dst = l2_dst
     
     @property
     def l2_ack(self) -> bool:
@@ -625,6 +627,23 @@ class Packet:
             raise ValueError('No Layer 3 in this packet')
         return self._l3._src
     
+    @l3_src.setter
+    def l3_src(self, l3_src: int) -> None:
+        
+        """
+        Sets the l3 source address
+        
+        Args:
+            l3_src (int): l3 source address
+            
+        Returns:
+            /
+        """
+        
+        if not self.has_l3:
+            raise ValueError('No Layer 3 in this packet')
+        self._l3._src = l3_src
+    
     @property
     def l3_dst(self) -> int:
         
@@ -641,6 +660,23 @@ class Packet:
         if not self.has_l3:
             raise ValueError('No Layer 3 in this packet')
         return self._l3._dst
+    
+    @l3_dst.setter
+    def l3_dst(self, l3_dst: int) -> None:
+        
+        """
+        Sets the l3 destination address
+        
+        Args:
+            l3_dst (int): l3 destination address
+            
+        Returns:
+            /
+        """
+        
+        if not self.has_l3:
+            raise ValueError('No Layer 3 in this packet')
+        self._l3._dst = l3_dst
     
     @property
     def l3_mode(self) -> bool:
@@ -775,7 +811,24 @@ class Packet:
         if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
         return self._l4._src
+    
+    @l4_src.setter
+    def l4_src(self, l4_src: int) -> None:
         
+        """
+        Sets the l4 source port
+        
+        Args:
+            l4_src (int): l4 source port
+            
+        Returns:
+            /
+        """
+        
+        if not self.has_l4:
+            raise ValueError('No Layer 4 in this packet')
+        self._l4._src = l4_src
+    
     @property
     def l4_dst(self) -> int:
         
@@ -793,6 +846,23 @@ class Packet:
             raise ValueError('No Layer 4 in this packet')
         return self._l4._dst
     
+    @l4_dst.setter
+    def l4_dst(self, l4_dst: int) -> None:
+        
+        """
+        Sets the l4 destination port
+        
+        Args:
+            l4_dst (int): l4 destination port
+            
+        Returns:
+            /
+        """
+        
+        if not self.has_l4:
+            raise ValueError('No Layer 4 in this packet')
+        self._l4._dst = l4_dst
+    
     @property
     def l4_num_purification(self) -> int:
         
@@ -808,7 +878,6 @@ class Packet:
 
         if not self.has_l4:
             raise ValueError('No Layer 4 in this packet')
-
         return self._l4._num_purification
     
     @property

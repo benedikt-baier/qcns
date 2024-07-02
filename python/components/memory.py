@@ -27,6 +27,21 @@ class QuantumMemory:
     
     def __init__(self, _size: int=-1, _efficiency: float=1., _errors: List[QuantumError]=None) -> None:
         
+        """
+        Initializes a Quantum Memory
+        
+        Args:
+            _size (int): size of the memory
+            _efficiency (float): probability to extract qubits out of memory
+            _errors (list): list of quantum errors to apply to extracted qubits
+            
+        Returns:
+            / 
+        """
+        
+        if not _size:
+            raise ValueError('Memory size should not be 0')
+        
         self._l0_memory: List[Qubit] = []
         self._l1_memory: List[Qubit] = []
         self._l2_memory: List[Qubit] = []
@@ -49,7 +64,41 @@ class QuantumMemory:
         """
         
         return len(self._l0_memory) + len(self._l1_memory) + len(self._l2_memory) + len(self._l3_memory)
+    
+    def has_space(self, _num_qubits: int=1) -> bool:
         
+        """
+        Check whether the number of qubits can fit into the memory
+        
+        Args:
+            _num_qubits (int): number of qubits to fit into space
+            
+        Returns:
+            _has_space (bool): whether qubits can fit into memory
+        """
+        
+        if not self._size + 1:
+            return True
+        
+        return self.remaining_size() >= _num_qubits
+    
+    def remaining_size(self) -> int:
+        
+        """
+        Returns the remaining size of the memory
+        
+        Args:
+            /
+            
+        Returns:
+            _size (int): the remaining size left in the memory
+        """
+        
+        if not self._size + 1:
+            return 2147483647
+        
+        return self._size - len(self)
+     
     def l0_num_qubits(self) -> int:
         
         """

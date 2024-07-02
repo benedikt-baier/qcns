@@ -5,8 +5,6 @@ from typing import List, Union
 
 __all__ = ['Qubit', 'QSystem', 'tensor_operator', 'dot', 'get_single_operator', 'depolarization_error', 'combine_state', 'remove_qubits']
 
-B_0 = np.array([[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]], dtype=np.complex128)
-
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),
               'P01': np.array([[0, 1], [0, 0]], dtype=np.complex128),
@@ -393,7 +391,7 @@ def combine_state(q_l: List[Qubit]) -> QSystem:
 
         return qsys_n
     
-def ptrace(_q: Qubit) -> None:
+def ptrace_full(_q: Qubit) -> None:
     
     """
     Traces out a qubit from the state, adjusts the QSystem accordingly
@@ -453,6 +451,8 @@ def ptrace_sparse(_q: Qubit) -> None:
     for i in range(_q._qsystem._num_qubits):
         _q._qsystem._qubits[i]._index = i
 
+_PTRACE_DICT = {0: ptrace_full, 1: ptrace_sparse}
+
 def remove_qubits(q_l: List[Qubit]) -> None:
 
     """
@@ -466,10 +466,7 @@ def remove_qubits(q_l: List[Qubit]) -> None:
     """
     
     for qubit in q_l:
-        if qubit._qsystem._sparse:
-            ptrace_sparse(qubit)
-        else:
-            ptrace(qubit)
+        _PTRACE_DICT[qubit._qsystem._sparse](qubit)
 
 class Qubit:
     
@@ -1394,8 +1391,6 @@ class Qubit:
         
         if res:
             self.X()
-            
-        # self.H()
         
         if fidelity < 1.:
             depolarization_error(self, self._qsystem._sparse, fidelity)

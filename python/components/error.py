@@ -11,14 +11,12 @@ __all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'Rando
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),
               'P01': np.array([[0, 1], [0, 0]], dtype=np.complex128),
-              'Z': np.array([[1, 0], [0, -1]], dtype=np.complex128)
-              }
+              'Z': np.array([[1, 0], [0, -1]], dtype=np.complex128)}
 
 sparse_gates = {'P0': sp.csr_matrix([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': sp.csr_matrix([[0, 0], [0, 1]], dtype=np.complex128),
               'P01': sp.csr_matrix([[0, 1], [0, 0]], dtype=np.complex128),
-              'Z': sp.csr_matrix([[1, 0], [0, -1]], dtype=np.complex128)
-              }
+              'Z': sp.csr_matrix([[1, 0], [0, -1]], dtype=np.complex128)}
 
 gates = {0: full_gates, 1: sparse_gates}
                 
@@ -553,19 +551,19 @@ class DepolarizationMemoryError:
         _depolar_time (float): depolarization time
     """
     
-    def __init__(self, _depolar_time: float=1e-3) -> None:
+    def __init__(self, depolar_time: float=1e-3) -> None:
         
         """
         Initializes a Depolarization Error in Memory
         
         Args:
-            _depolar_time (float): depolarization time
+            depolar_time (float): depolarization time
             
         Returns:
             /
         """
         
-        self._depolar_time: float = _depolar_time
+        self._depolar_time: float = depolar_time
 
     def apply(self, _qubit: Qubit, _time: float) -> None:
         
@@ -599,19 +597,19 @@ class DephasingMemoryError:
         _dephase_time (float): dephasing time
     """
     
-    def __init__(self, _dephase_time: float=1e-3) -> None:
+    def __init__(self, dephase_time: float=1e-3) -> None:
         
         """
         Initializes a Depolarization Error in Memory
         
         Args:
-            _dephase_time (float): depolarization time
+            dephase_time (float): depolarization time
             
         Returns:
             /
         """
         
-        self._dephase_time: float = _dephase_time
+        self._dephase_time: float = dephase_time
 
     def apply(self, _qubit: Qubit, _time: float) -> None:
         
@@ -651,8 +649,8 @@ class TimeDependentMemoryError:
         Initializes a Time Dependent Errors in Memories
         
         Args:
-            _depolar_time (float): depolarization time
-            _dephase_time (float): dephasing time
+            depolar_time (float): depolarization time
+            dephase_time (float): dephasing time
             
         Returns:
             /

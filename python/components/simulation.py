@@ -1,11 +1,8 @@
 import asyncio as asc
 from heapq import heappop, heappush
-
 from typing import List
 
 from python.components.event import Event
-from python.components.qubit import QSystem
-
 
 __all__ = ['Simulation']
 
@@ -39,33 +36,19 @@ class Simulation:
         self._hosts: List[Host] = []
         self._sim_time: float = 0.
     
-    def add_host(self, _host: Host) -> None:
+    def add_host(self, host: Host) -> None:
         
         """
         Adds a host to the simulation
         
         Args:
-            _host (Host): host to add to simulation
+            host (Host): host to add to simulation
             
         Returns:
             /
         """
         
-        self._hosts.append(_host)
-    
-    def add_hosts(self, _hosts: List[Host]) -> None:
-        
-        """
-        Adds hosts to the simulation
-        
-        Args:
-            _hosts (list): List of Hosts
-            
-        Returns:
-            /
-        """
-        
-        self._hosts.extend(_hosts)
+        self._hosts.append(host)
     
     def schedule_event(self, _event: Event) -> None:
     
@@ -80,38 +63,6 @@ class Simulation:
         """
     
         heappush(self._event_queue, _event)
-    
-    @staticmethod
-    def create_qsystem(_num_qubits: int, fidelity: float=1., sparse: bool=False) -> QSystem:
-        
-        """
-        Creates qsystem
-        
-        Args:
-            _num_qubits (int): number of qubits in the system
-            _fidelity (float): fidelity of qsystem
-            _sparse (bool): sparsity of qsystem
-            
-        Returns:
-            qsys (QSystem): created Qsystem
-        """
-        
-        return QSystem(_num_qubits, fidelity, sparse)
-    
-    @staticmethod
-    def delete_qsystem(_qsys: QSystem) -> None:
-        
-        """
-        Deletes a qsystem
-        
-        Args:
-            qsys (QSystem): qsystem to delete
-        
-        Returns:
-            /
-        """
-        
-        del _qsys
     
     def stop_simulation(self):
         

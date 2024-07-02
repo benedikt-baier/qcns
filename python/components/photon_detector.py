@@ -1,7 +1,7 @@
 
 __all__ = ['PhotonDetector']
 
-# A Detector has 3 values: duration, efficiency, dark_count_prob
+# detector parameters: duration, efficiency, dark_count_prob
 
 PHOTON_DETECTOR_MODELS = {'perfect': (0., 1., 0.), 'standard': (5e-6, 0.87, 29e-5)}
 
