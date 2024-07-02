@@ -469,9 +469,14 @@ class Host:
         await self._resume.wait()
         self._resume.clear()
         
+        num_requested = self.remaining_size(receiver, 0)
+        
         _num_needed = num_requested
         if estimate:
             _num_needed = int(np.ceil(_num_needed / (1 - self._connections['eqs'][receiver]._connection._success_prob)))
+        
+        if not self.has_space(receiver, 0, _num_needed):
+            _num_needed = self.remaining_size(receiver, 0)
         
         self._connections['eqs'][receiver].attempt_bell_pairs(num_requested, _num_needed)
     
@@ -492,6 +497,8 @@ class Host:
         
         await self._resume.wait()
         self._resume.clear()
+        
+        num_requested = self.remaining_size(receiver, 0)
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
     
