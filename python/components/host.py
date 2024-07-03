@@ -1315,7 +1315,7 @@ class Host:
             res (np.array): result of the comparison
         """
         
-        stor_res = self.l1_retrieve_result(packet.l1_ack, packet.l2_src)
+        stor_res = self.l1_retrieve_result(packet.l2_src, not packet.l1_ack)
         return np.logical_and(packet.l1_entanglement_success, stor_res)
     
     def l2_compare_results(self, packet: Packet) -> np.array:
