@@ -1108,9 +1108,7 @@ class Host:
         
         _qubit_src, _qubit_dst = self._connections['memory'][host][store].l2_purify(index_src, index_dst, self._sim._sim_time)
         
-        # _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, direction, gate, basis, combine=True, remove=True)
-        
-        _res = 0
+        _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, direction, gate, basis, combine=True, remove=True)
         
         self._connections['memory'][host][store].l2_store_qubit(_qubit_src, -1, self._sim._sim_time)
         
