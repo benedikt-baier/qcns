@@ -25,7 +25,7 @@ RECEIVE = 1
 B_0 = np.array([[0.5, 0, 0, 0.5], [0, 0, 0, 0], [0, 0, 0, 0], [0.5, 0, 0, 0.5]], dtype=np.complex128)
 I_0 = np.array([[0.25, 0, 0, 0], [0, 0.25, 0, 0], [0, 0, 0.25, 0], [0, 0, 0, 0.25]], dtype=np.complex128)
 A_0 = np.array([[0.5, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0.5]], dtype=np.complex128)
-B_I_0 = np.array([[0.25, 0., 0., 0.], [0., -0.25, 0., 0.], [0., 0., -0.25, 0.], [0., 0., 0., 0.25]], dtype=np.complex128)
+B_I_0 = np.array([[0.25, 0., 0., 0.5], [0., -0.25, 0., 0.], [0., 0., -0.25, 0.], [0.5, 0., 0., 0.25]], dtype=np.complex128)
 
 # Sender Receiver: duration, interaction probability, state transfer fidelity
 # Two photon source: duration, interaction probability sender, state transfer fidelity sender, interaction probability receiver, state transfer fidelity receiver
@@ -309,7 +309,7 @@ class SenderReceiverConnection:
         """
         
         qsys = Simulation.create_qsystem(2)
-        qsys._state = self._state + self._success_prob * ((4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance)) / 3) * B_I_0
+        qsys._state = self._state + (self._success_prob * ((4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance)) / 3) * B_I_0) / self._total_prob
         q_1, q_2 = qsys.qubits
 
         self._sender_memory.l0_store_qubit(q_1, -1, _curr_time)
@@ -521,7 +521,9 @@ class TwoPhotonSourceConnection:
         self._receiver_duration: float = self._source._duration + self._receiver_channel._sending_time + self._duration + self._receiver_detector._duration
 
         self._state: np.array = (self._success_prob * self._total_depolar_prob * B_0 + 
-                                 (self._success_prob * (1 - self._total_depolar_prob) + self._sender_false_prob + self._receiver_false_prob + (1 - self._sender_state_transfer_fidelity) + (1 - self._receiver_state_transfer_fidelity)) * I_0) / self._total_prob
+                                 (self._success_prob * (1 - self._total_depolar_prob) 
+                                  + self._sender_false_prob + self._receiver_false_prob 
+                                  + (1 - self._sender_state_transfer_fidelity) + (1 - self._receiver_state_transfer_fidelity)) * I_0) / self._total_prob
 
         self.creation_functions = {0: self.failure_creation, 1: self.success_creation}
 
@@ -538,7 +540,7 @@ class TwoPhotonSourceConnection:
         """
         
         qsys = Simulation.create_qsystem(2)
-        qsys._state = self._state + self._success_prob * ((4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance)) / 3) * B_I_0
+        qsys._state = self._state + (self._success_prob * ((4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance)) / 3) * B_I_0) / self._total_prob
     
         q_1, q_2 = qsys.qubits
         
@@ -801,7 +803,7 @@ class BellStateMeasurementConnection:
         _sample = self._sender_depolar * _receiver_sample + self._receiver_depolar * _sender_sample + _sender_sample * _receiver_sample
         
         qsys = Simulation.create_qsystem(2)
-        qsys._state = self._state + _sample * (self._success_prob * B_0 + self._false_prob_1 * A_0 - (self._success_prob + self._false_prob_1) * I_0)
+        qsys._state = self._state + _sample * (self._success_prob * B_0 + self._false_prob_1 * A_0 - (self._success_prob + self._false_prob_1) * I_0) / self._total_prob
         
         q_1, q_2 = qsys.qubits
         
