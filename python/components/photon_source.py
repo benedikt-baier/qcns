@@ -6,14 +6,15 @@ __all__ = ['SinglePhotonSource', 'AtomPhotonSource', 'PhotonPhotonSource', 'Fock
 # fock photon source parameters: duration, bright state, bright state variance, emission prob
 
 SINGLE_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1.), 'standard': None}
-ATOM_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1.), 'standard': (3.5e-4, 0.938, 0.04, 0.75)}
+ATOM_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1.), 'standard': (3e-6, 0.941, 0.0005, 0.8), 'krutyanskiy': (3.5e-4, 0.938, 0.04, 0.75)}
 PHOTON_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 0., 1., 1.), 'standard': (126e-6, 0.880, 0.002, 0.65, 0.901)}
 FOCK_PHOTON_SOURCE = {'perfect': (0., 0.5, 0., 1.), 'standard': (3.8e-6, 0.05, 0., 0.939)}
 
 # atom photon source:
-#   standard: Entanglement of trapped-ion qubits separated by 230 meters.
+#   standard: Entangling single atoms over 33 km telecom fibre
+#   Krutyanskiy: Entanglement of trapped-ion qubits separated by 230 meters.
 
-# photon photon source_
+# photon photon source
 #   standard: A solid-state source of strongly entangled photon pairs with high brightness and indistinguishability
 
 # fock photon source

@@ -206,7 +206,7 @@ class Packet:
     def has_l1(self) -> bool:
         
         """
-        Returns wether L1 is implemented in the packet
+        Returns whether L1 is implemented in the packet
         
         Args:
             /
@@ -463,6 +463,36 @@ class Packet:
         """
         
         self._l1._entanglement_success[index] = True
+    
+    @property
+    def l1_protocol(self) -> int:
+    
+        """
+        Returns the L1 protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l1_protocol (int): L1 protocol
+        """
+        
+        return self._l1._protocol
+    
+    @l1_protocol.setter
+    def l1_protocol(self, protocol: int) -> None:
+        
+        """
+        Sets the L1 protocol
+        
+        Args:
+            protocol (int): L1 protocol
+            
+        Returns:
+            /
+        """
+        
+        self._l1._protocol = protocol
     
     @property
     def l2_src(self) -> int:
@@ -1008,12 +1038,13 @@ class Layer1:
     Attr:
         _num_requested (int): number of requested qubits
         _num_needed (int): number of needed qubits
+        _protocol (int): protocol for the entanglement generation
         _entanglement_success (np.array): entanglement success array
         _ack (bool): acknowledgenment flag
         _ps (bool): photon source flag
     """
     
-    def __init__(self, _num_requested: int, _num_needed: int) -> None:
+    def __init__(self, _num_requested: int, _num_needed: int, _protocol: int=0) -> None:
         
         """
         Instantiates a L1 object
@@ -1021,6 +1052,7 @@ class Layer1:
         Args:
             _num_requested (int): number of requested qubits for L1
             _num_needed (int): number of needed qubits for L1
+            _protocol (int): protocol for the entanglement generation
             
         Retunrs:
             /
@@ -1028,6 +1060,7 @@ class Layer1:
         
         self._num_requested: int = _num_requested
         self._num_needed: int = _num_needed
+        self._protocol: int = _protocol
         self._entanglement_success: np.array = np.zeros(_num_needed, dtype=np.bool_)
         self._ack: bool = 0
         self._ps: bool = 0
@@ -1044,7 +1077,7 @@ class Layer1:
             _len (int): length of Layer 1
         """
         
-        return 98
+        return 100
 
     def __repr__(self) -> str:
         
