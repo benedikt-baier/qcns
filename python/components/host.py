@@ -10,7 +10,7 @@ from python.components.qubit import Qubit, QSystem, combine_state, remove_qubits
 from python.components.channel import PChannel
 from python.components.packet import Packet
 from python.components.memory import QuantumMemory
-from python.components.connection import SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection
+from python.components.connection import SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
 
 __all__ = ['Host']
 
@@ -374,7 +374,32 @@ class Host:
                                 sender_mem_size, sender_efficiency, sender_mem_errors, 
                                 receiver_mem_size, receiver_efficiency, receiver_mem_errors)
         self.set_pconnection(host, sender_length + receiver_length)
-       
+    
+    def set_l3_connection(self, host: Host, length: float=0.,
+                          sender_success_probability: float=1., sender_fidelity: float=1., sender_fidelity_variance: float=0.,
+                          receiver_success_probability: float=1., receiver_fidelity: float=1., receiver_fidelity_variance: float=0.,
+                          sender_mem_size: int=-1, sender_efficiency: float=1., sender_mem_errors: List[QuantumError]=None, 
+                          receiver_mem_size: int=-1, receiver_efficiency: float=1., receiver_mem_errors: List[QuantumError]=None) -> None:
+        
+        self._neighbors.add(host._node_id)
+        host._neighbors.add(self._node_id)
+        
+        sender_memory_send = QuantumMemory(sender_mem_size, sender_efficiency, sender_mem_errors)
+        sender_memory_receive = QuantumMemory(sender_mem_size, sender_efficiency, sender_mem_errors)
+        receiver_memory_send = QuantumMemory(receiver_mem_size, receiver_efficiency, receiver_mem_errors)
+        receiver_memory_receive = QuantumMemory(receiver_mem_size, receiver_efficiency, receiver_mem_errors)
+        
+        connection_s_r = L3Connection(self, host._node_id, self._sim, length, sender_success_probability, sender_fidelity, sender_fidelity_variance, sender_memory_send, receiver_memory_receive)
+        connection_r_s = L3Connection(host, self._node_id, self._sim, length, receiver_success_probability, receiver_fidelity, receiver_fidelity_variance, receiver_memory_send, sender_memory_receive)
+        
+        self._connections['eqs'][host._node_id] = connection_s_r
+        host._connections['eqs'][self._node_id] = connection_r_s
+        
+        self._connections['memory'][host._node_id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
+        host._connections['memory'][self._node_id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
+        
+        self.set_pconnection(host, length)
+    
     def create_qsystem(self, num_qubits: int, fidelity: float=1., sparse: bool=False) -> QSystem:
         
         """

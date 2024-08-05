@@ -11,7 +11,7 @@ from python.components.packet import Packet
 from python.components.event import ReceiveEvent
 from python.components.simulation import Simulation
 
-__all__ = ['SingleQubitConnection', 'SenderReceiverConnection', 'TwoPhotonSourceConnection', 'BellStateMeasurementConnection', 'FockStateConnection']
+__all__ = ['SingleQubitConnection', 'SenderReceiverConnection', 'TwoPhotonSourceConnection', 'BellStateMeasurementConnection', 'FockStateConnection', 'L3Connection']
 
 class Host:
     pass
@@ -227,7 +227,7 @@ class SenderReceiverConnection:
         _state (np.array): precalculated state
     """
     
-    def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, 
+    def __init__(self, _sender: Host, _receiver_id: int, _sim: Simulation, 
                  _model_name: str='perfect', _sender_source: str='perfect', _receiver_detector: str='perfect', _num_sources: int=-1,
                  _length: float=0., _attenuation_coefficient: float=-0.016, _in_coupling_prob: float=1., _out_coupling_prob: float=1., _lose_qubits: bool=False, 
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
@@ -261,41 +261,47 @@ class SenderReceiverConnection:
         model = SENDER_RECEIVER_MODELS[_model_name]
         
         self._sender: Host = _sender
-        self._receiver: Host = _receiver
+        self._receiver_id: int = _receiver_id
         self._num_sources: int = _num_sources
-        self._duration: float = model[0]
-        self._interaction_prob: float = model[1]
+        
+        _duration: float = model[0]
+        _interaction_prob: float = model[1]
         self._state_transfer_fidelity: float = model[2]
         
-        self._source: AtomPhotonSource = AtomPhotonSource(_sender_source)
-        self._detector: PhotonDetector = PhotonDetector(_receiver_detector)
-        self._channel: QChannel = QChannel(_length, _attenuation_coefficient, _in_coupling_prob, _out_coupling_prob)
+        _source = AtomPhotonSource(_sender_source)
+        _detector = PhotonDetector(_receiver_detector)
+        _channel = QChannel(_length, _attenuation_coefficient, _in_coupling_prob, _out_coupling_prob)
+        
+        self._source_duration: float = _source._duration
+        self._source_variance: float = _source._fidelity_variance
         self._sender_memory: QuantumMemory = _sender_memory
         self._receiver_memory: QuantumMemory = _receiver_memory
         
         self._sim: Simulation = _sim
         
-        self._total_depolar_prob: float = (4 * self._source._fidelity - 1) / 3
+        _total_depolar_prob: float = (4 * _source._fidelity - 1) / 3
         
-        self._success_prob: float = self._source._emission_prob * self._channel._in_coupling_prob * self._channel._out_coupling_prob * self._detector._efficiency * self._interaction_prob * (1 - self._detector._dark_count_prob)
-        self._false_prob: float = (1 - self._source._emission_prob * self._channel._in_coupling_prob * self._channel._out_coupling_prob * self._detector._efficiency * self._interaction_prob) * self._detector._dark_count_prob
+        _arrival_prob = _source._emission_prob * _channel._in_coupling_prob * _channel._out_coupling_prob * _detector._efficiency * _interaction_prob
         
         if _lose_qubits:
-            self._success_prob *= self._channel._lose_prob
-            self._false_prob *= self._channel._lose_prob
+            _arrival_prob *= _channel._lose_prob
+        
+        self._success_prob: float = _arrival_prob * (1 - _detector._dark_count_prob)
+        
+        _false_prob = (1 - _false_prob_tmp) * _detector._dark_count_prob
         
         if -np.log10(self._success_prob) >= 6:
             raise ValueError('Too low success probability')
         
-        self._total_prob: float = self._success_prob + self._false_prob
+        self._total_prob: float = self._success_prob + _false_prob
         
-        self._sending_duration: float = self._source._duration + self._channel._sending_time + self._duration + self._detector._duration
+        self._sending_duration: float = self._source_duration + _channel._sending_time + _duration + _detector._duration
 
-        self._state: np.array = (self._success_prob * self._total_depolar_prob * np.sqrt(self._state_transfer_fidelity) * B_0 + 
-                                 (self._success_prob * (1 - self._total_depolar_prob * np.sqrt(self._state_transfer_fidelity)) + self._false_prob) * I_0) / self._total_prob
+        self._state: np.array = (self._success_prob * _total_depolar_prob * np.sqrt(self._state_transfer_fidelity) * B_0 + 
+                                 (self._success_prob * (1 - _total_depolar_prob * np.sqrt(self._state_transfer_fidelity)) + _false_prob) * I_0) / self._total_prob
 
         self.creation_functions = {0: self.failure_creation, 1: self.success_creation}
-
+ 
     def success_creation(self, _curr_time: float) -> None:
         
         """
@@ -309,7 +315,7 @@ class SenderReceiverConnection:
         """
         
         qsys = Simulation.create_qsystem(2)
-        qsys._state = self._state + (self._success_prob * ((4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance)) / 3) * np.sqrt(self._state_transfer_fidelity) * B_I_0) / self._total_prob
+        qsys._state = self._state + (self._success_prob * ((4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source_variance)) / 3) * np.sqrt(self._state_transfer_fidelity) * B_I_0) / self._total_prob
         q_1, q_2 = qsys.qubits
 
         self._sender_memory.l0_store_qubit(q_1, -1, _curr_time)
@@ -345,16 +351,16 @@ class SenderReceiverConnection:
             /
         """
         
-        packet = Packet(self._sender._node_id, self._receiver._node_id, _num_requested, _num_needed)
+        packet = Packet(self._sender._node_id, self._receiver_id, _num_requested, _num_needed)
         
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _num_needed:
             _num_tries = int(np.ceil(_num_needed / self._num_sources))
         
-        _curr_time = self._sim._sim_time + self._source._duration
+        _curr_time = self._sim._sim_time + self._source_duration
         _curr_time_samples = np.zeros(_num_needed) + _curr_time
         if self._num_sources + 1:
-            _curr_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._source._duration
+            _curr_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._source_duration
         
         _success_samples = np.random.uniform(0, 1, _num_needed) < self._success_prob
         
@@ -363,8 +369,8 @@ class SenderReceiverConnection:
         
         packet._l1._entanglement_success = _success_samples
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_num_tries - 1) * self._source._duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][SEND].put(packet)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_num_tries - 1) * self._source_duration, self._receiver_id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
     
     def create_bell_pairs(self, _num_requested: int=1) -> None:
         
@@ -378,9 +384,9 @@ class SenderReceiverConnection:
             /
         """
         
-        packet = Packet(self._sender._node_id, self._receiver._node_id, _num_requested, _num_requested)
+        packet = Packet(self._sender._node_id, self._receiver_id, _num_requested, _num_requested)
         
-        _curr_time = self._sim._sim_time + self._source._duration
+        _curr_time = self._sim._sim_time + self._source_duration
         
         _curr_time_samples = np.zeros(_num_requested + self._num_sources + 1) + _curr_time
         _num_successfull = 0
@@ -389,7 +395,7 @@ class SenderReceiverConnection:
         while _num_successfull < _num_requested and self._num_sources + 1:
             _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
-            _curr_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source._duration
+            _curr_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source_duration
             _num_successfull += _successes
         
         _curr_time_samples = _curr_time_samples[:_num_requested]
@@ -399,8 +405,8 @@ class SenderReceiverConnection:
         
         packet._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_current_try - 1) * self._source._duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][SEND].put(packet)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_current_try - 1) * self._source_duration, self._receiver_id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
         
 class TwoPhotonSourceConnection:
     
@@ -476,54 +482,61 @@ class TwoPhotonSourceConnection:
         
         model = TWO_PHOTON_MODELS[_model_name]
         
-        self._sender: Host = _sender
-        self._receiver: Host = _receiver
-        self._num_sources: int = _num_sources
-        self._duration: float = model[0]
-        self._sender_interaction_prob: float = model[1]
-        self._sender_state_transfer_fidelity: float = model[2]
-        self._receiver_interaction_prob: float = model[3]
-        self._receiver_state_transfer_fidelity: float = model[4]
+        self._sender: Host = _sender # fix
+        self._receiver: int = _receiver # fix
+        self._num_sources: int = _num_sources # fix
         
-        self._source: PhotonPhotonSource = PhotonPhotonSource(_source)
-        self._sender_detector: PhotonDetector = PhotonDetector(_sender_detector)
-        self._receiver_detector: PhotonDetector = PhotonDetector(_receiver_detector)
-        self._sender_channel: QChannel = QChannel(_sender_length, _sender_attenuation, _sender_in_coupling_prob, _sender_out_coupling_prob)
-        self._receiver_channel: QChannel = QChannel(_receiver_length, _receiver_attenuation, _receiver_in_coupling_prob, _receiver_out_coupling_prob)
-        self._sender_memory: QuantumMemory = _sender_memory
-        self._receiver_memory: QuantumMemory = _receiver_memory
+        _duration: float = model[0]
+        _sender_interaction_prob: float = model[1]
+        self._sender_state_transfer_fidelity: float = model[2] # fix
+        _receiver_interaction_prob: float = model[3]
+        self._receiver_state_transfer_fidelity: float = model[4] # fix
         
-        self._sim: Simulation = _sim
+        _source = PhotonPhotonSource(_source)
+        _sender_detector = PhotonDetector(_sender_detector)
+        _receiver_detector = PhotonDetector(_receiver_detector)
+        _sender_channel = QChannel(_sender_length, _sender_attenuation, _sender_in_coupling_prob, _sender_out_coupling_prob)
+        _receiver_channel = QChannel(_receiver_length, _receiver_attenuation, _receiver_in_coupling_prob, _receiver_out_coupling_prob)
         
-        self._sender_success_prob: float = np.sqrt(self._source._visibility) * np.sqrt(self._source._emission_prob) * self._sender_channel._in_coupling_prob * self._sender_channel._out_coupling_prob * self._sender_detector._efficiency * self._sender_interaction_prob * (1 - self._sender_detector._dark_count_prob)
-        self._receiver_success_prob: float = np.sqrt(self._source._visibility) * np.sqrt(self._source._emission_prob) * self._receiver_channel._in_coupling_prob * self._receiver_channel._out_coupling_prob * self._receiver_detector._efficiency * self._receiver_interaction_prob * (1 - self._receiver_detector._dark_count_prob)
-        self._sender_false_prob: float = np.sqrt(1 - self._source._visibility) * np.sqrt(self._source._emission_prob) * self._sender_channel._in_coupling_prob * self._receiver_channel._out_coupling_prob * self._sender_detector._efficiency * self._sender_interaction_prob * self._sender_detector._dark_count_prob
-        self._receiver_false_prob: float = np.sqrt(1 - self._source._visibility) * np.sqrt(self._source._emission_prob) * self._receiver_channel._in_coupling_prob * self._receiver_channel._out_coupling_prob * self._receiver_detector._efficiency * self._receiver_interaction_prob * self._receiver_detector._dark_count_prob
+        self._source_duration: float = _source._duration
+        self._source_fidelity: float = _source._fidelity
+        self._source_variance: float = _source._fidelity_variance
+        
+        self._sender_memory: QuantumMemory = _sender_memory # fix
+        self._receiver_memory: QuantumMemory = _receiver_memory # fix
+        
+        self._sim: Simulation = _sim # fix
+        
+        _sender_arrival_prob = np.sqrt(_source._visibility * _source._emission_prob) * _sender_channel._in_coupling_prob * _sender_channel._out_coupling_prob * _sender_detector._efficiency * _sender_interaction_prob
+        _receiver_arrival_prob = np.sqrt(_source._visibility * _source._emission_prob) * _receiver_channel._in_coupling_prob * _receiver_channel._out_coupling_prob * _receiver_detector._efficiency * _receiver_interaction_prob
         
         if _sender_lose_qubits:
-            self._sender_success_prob *= self._sender_channel._lose_prob 
-            self._sender_false_prob *= self._sender_channel._lose_prob 
+            _sender_arrival_prob *= _sender_channel._lose_prob 
 
         if _receiver_lose_qubits:
-            self._receiver_success_prob *= self._receiver_channel._lose_prob
-            self._receiver_false_prob *= self._receiver_channel._lose_prob
+            _receiver_arrival_prob *= _receiver_channel._lose_prob
         
-        self._total_depolar_prob: float = (4 * self._source._fidelity - 1)**2 / 9
+        self._sender_success_prob: float = _sender_arrival_prob * (1 - _sender_detector._dark_count_prob) # fix
+        self._receiver_success_prob: float = _receiver_arrival_prob * (1 - _receiver_detector._dark_count_prob) # fix
+        _sender_false_prob = (1 - _sender_arrival_prob) * _sender_detector._dark_count_prob
+        _receiver_false_prob = (1 - _receiver_arrival_prob) * _receiver_detector._dark_count_prob
+        
+        _total_depolar_prob: float = (4 * self._source._fidelity - 1)**2 / 9
         
         self._success_prob: float = self._sender_success_prob * self._receiver_success_prob
         
         if -np.log10(self._success_prob) >= 6:
             raise ValueError('Too low success probability')
         
-        self._total_prob: float = self._success_prob + self._sender_false_prob + self._receiver_false_prob
+        self._total_prob: float = self._success_prob + _sender_false_prob + _receiver_false_prob # fix
         
-        self._sender_duration: float = self._source._duration + self._sender_channel._sending_time + self._duration + self._sender_detector._duration
-        self._receiver_duration: float = self._source._duration + self._receiver_channel._sending_time + self._duration + self._receiver_detector._duration
+        self._sender_duration: float = self._source_duration + _sender_channel._sending_time + _duration + _sender_detector._duration # fix
+        self._receiver_duration: float = self._source_duration + _receiver_channel._sending_time + _duration + _receiver_detector._duration # fix
 
-        self._state: np.array = (self._success_prob * self._total_depolar_prob * np.sqrt(self._sender_state_transfer_fidelity * self._receiver_state_transfer_fidelity) * B_0 + 
-                                 (self._success_prob * (1 - self._total_depolar_prob * np.sqrt(self._sender_state_transfer_fidelity * self._receiver_state_transfer_fidelity)) + self._sender_false_prob + self._receiver_false_prob) * I_0) / self._total_prob
+        self._state: np.array = (self._success_prob * _total_depolar_prob * np.sqrt(self._sender_state_transfer_fidelity * self._receiver_state_transfer_fidelity) * B_0 + 
+                                 (self._success_prob * (1 - _total_depolar_prob * np.sqrt(self._sender_state_transfer_fidelity * self._receiver_state_transfer_fidelity)) + _sender_false_prob + _receiver_false_prob) * I_0) / self._total_prob # fix
 
-        self.creation_functions = {0: self.failure_creation, 1: self.success_creation}
+        self.creation_functions = {0: self.failure_creation, 1: self.success_creation} # fix
 
     def success_creation(self, _curr_time: float) -> None:
         
@@ -605,8 +618,8 @@ class TwoPhotonSourceConnection:
         packet_s.l1_protocol = 1
         packet_r.l1_protocol = 1
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._source._duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._source._duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
 
@@ -736,53 +749,59 @@ class BellStateMeasurementConnection:
         self._sender: Host = _sender
         self._receiver: Host = _receiver
         self._num_sources: int = _num_sources
-        self._duration: float = model[0]
-        self._visibility: float = model[1]
-        self._coin_ph_ph: float = model[2]
-        self._coin_ph_dc: float = model[3]
-        self._coin_dc_dc: float = model[4]
         
-        self._sender_source: AtomPhotonSource = AtomPhotonSource(_sender_source)
-        self._receiver_source: AtomPhotonSource = AtomPhotonSource(_receiver_source)
-        self._sender_detector: PhotonDetector = PhotonDetector(_sender_detector)
-        self._receiver_detector: PhotonDetector = PhotonDetector(_receiver_detector)
-        self._sender_channel: QChannel = QChannel(_sender_length, _sender_attenuation_coefficient, _sender_in_coupling_prob, _sender_out_coupling_prob)
-        self._receiver_channel: QChannel = QChannel(_receiver_length, _receiver_attenuation_coefficient, _receiver_in_coupling_prob, _receiver_out_coupling_prob)
+        _duration: float = model[0]
+        _visibility: float = model[1]
+        _coin_ph_ph: float = model[2]
+        _coin_ph_dc: float = model[3]
+        _coin_dc_dc: float = model[4]
+        
+        _sender_source = AtomPhotonSource(_sender_source)
+        _receiver_source = AtomPhotonSource(_receiver_source)
+        _sender_detector = PhotonDetector(_sender_detector)
+        _receiver_detector = PhotonDetector(_receiver_detector)
+        _sender_channel = QChannel(_sender_length, _sender_attenuation_coefficient, _sender_in_coupling_prob, _sender_out_coupling_prob)
+        _receiver_channel = QChannel(_receiver_length, _receiver_attenuation_coefficient, _receiver_in_coupling_prob, _receiver_out_coupling_prob)
+        
+        self._sender_source_duration = _sender_source._duration
+        self._receiver_source_duration = _receiver_source._duration
+        self._sender_source_variance = _sender_source._fidelity_variance
+        self._receiver_source_variance = _receiver_source._fidelity_variance
         self._sender_memory: QuantumMemory = _sender_memory
         self._receiver_memory: QuantumMemory = _receiver_memory
         
         self._sim: Simulation = _sim
         
-        _sender_arrival_prob = self._sender_source._emission_prob * self._sender_channel._in_coupling_prob * self._sender_channel._out_coupling_prob * self._sender_detector._efficiency
-        _receiver_arrival_prob = self._receiver_source._emission_prob * self._receiver_channel._in_coupling_prob * self._receiver_channel._out_coupling_prob * self._receiver_detector._efficiency
+        _sender_arrival_prob = _sender_source._emission_prob * _sender_channel._in_coupling_prob * _sender_channel._out_coupling_prob * _sender_detector._efficiency
+        _receiver_arrival_prob = _receiver_source._emission_prob * _receiver_channel._in_coupling_prob * _receiver_channel._out_coupling_prob * _receiver_detector._efficiency
         
         if _sender_lose_qubits:
-            _sender_arrival_prob *= self._sender_channel._lose_prob
+            _sender_arrival_prob *= _sender_channel._lose_prob
             
         if _receiver_lose_qubits:
-            _receiver_arrival_prob *= self._receiver_channel._lose_prob
+            _receiver_arrival_prob *= _receiver_channel._lose_prob
         
-        self._sender_depolar: float = (4 * self._sender_source._fidelity - 1) / 3
-        self._receiver_depolar: float = (4 * self._receiver_source._fidelity - 1) / 3
-        self._total_depolar_prob: float = self._sender_depolar * self._receiver_depolar
+        self._sender_depolar: float = (4 * _sender_source._fidelity - 1) / 3
+        self._receiver_depolar: float = (4 * _receiver_source._fidelity - 1) / 3
+        _total_depolar_prob: float = self._sender_depolar * self._receiver_depolar
         
-        self._success_prob: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * self._coin_ph_ph * self._visibility * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
+        self._success_prob: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * _coin_ph_ph * _visibility * (1 - _sender_detector._dark_count_prob) ** 2 * (1 - _receiver_detector._dark_count_prob) ** 2
         
         if -np.log10(self._success_prob) >= 6:
             raise ValueError('Too low success probability')
         
-        self._false_prob_1: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * self._coin_ph_ph * (1 - self._visibility) * (1 - self._sender_detector._dark_count_prob) ** 2 * (1 - self._receiver_detector._dark_count_prob) ** 2
-        self._false_prob_3: float = (_sender_arrival_prob * (1 - _receiver_arrival_prob) + (1 - _sender_arrival_prob) * _receiver_arrival_prob) * self._coin_ph_dc * (self._sender_detector._dark_count_prob * (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob)**2 + self._receiver_detector._dark_count_prob * (1 - self._receiver_detector._dark_count_prob) * (1 - self._sender_detector._dark_count_prob)**2)
-        self._false_prob_4: float = (1 - _sender_arrival_prob) * (1 - _receiver_arrival_prob) * self._coin_dc_dc * (self._sender_detector._dark_count_prob**2 * (1 - self._receiver_detector._dark_count_prob)**2 + 2 * self._sender_detector._dark_count_prob * self._receiver_detector._dark_count_prob * (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob) + self._receiver_detector._dark_count_prob**2 * (1 - self._sender_detector._dark_count_prob)**2)
+        self._false_prob_1: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * _coin_ph_ph * (1 - _visibility) * (1 - _sender_detector._dark_count_prob) ** 2 * (1 - ._receiver_detector._dark_count_prob) ** 2
+        _false_prob_3: float = (_sender_arrival_prob * (1 - _receiver_arrival_prob) + (1 - _sender_arrival_prob) * _receiver_arrival_prob) * _coin_ph_dc * (_sender_detector._dark_count_prob * (1 - _sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob)**2 + _receiver_detector._dark_count_prob * (1 - _receiver_detector._dark_count_prob) * (1 - _sender_detector._dark_count_prob)**2)
+        _false_prob_4: float = (1 - _sender_arrival_prob) * (1 - _receiver_arrival_prob) * _coin_dc_dc * (_sender_detector._dark_count_prob**2 * (1 - _receiver_detector._dark_count_prob)**2 + 2 * _sender_detector._dark_count_prob * _receiver_detector._dark_count_prob * (1 - _sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob) + _receiver_detector._dark_count_prob**2 * (1 - _sender_detector._dark_count_prob)**2)
         
-        self._total_prob: float = self._success_prob  + self._false_prob_1 + self._false_prob_3 + self._false_prob_4
+        self._total_prob: float = self._success_prob + self._false_prob_1 + _false_prob_3 + _false_prob_4
         
-        self._sender_duration: float = self._sender_source._duration + self._sender_channel._sending_time + self._duration + self._sender_detector._duration
-        self._receiver_duration: float = self._receiver_source._duration + self._receiver_channel._sending_time + self._duration + self._receiver_detector._duration
+        self._sender_duration: float = self._sender_source_duration + _sender_channel._sending_time + _duration + _sender_detector._duration
+        self._receiver_duration: float = self._receiver_source_duration + _receiver_channel._sending_time + _duration + _receiver_detector._duration
         
-        self._state: np.array = (self._success_prob * self._total_depolar_prob * B_0 + 
-                            self._false_prob_1 * self._total_depolar_prob * A_0 + 
-                            ((self._success_prob + self._false_prob_1) * (1 - self._total_depolar_prob) + self._false_prob_3 + self._false_prob_4) * I_0) / self._total_prob
+        self._state: np.array = (self._success_prob * _total_depolar_prob * B_0 + 
+                            self._false_prob_1 * _total_depolar_prob * A_0 + 
+                            ((self._success_prob + self._false_prob_1) * (1 - _total_depolar_prob) + _false_prob_3 + _false_prob_4) * I_0) / self._total_prob
         
         self.creation_functions = {0: self.failure_creation, 1: self.success_creation}
     
@@ -799,8 +818,8 @@ class BellStateMeasurementConnection:
             /
         """
         
-        _sender_sample = 4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._sender_source._fidelity_variance) / 3
-        _receiver_sample = 4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._receiver_source._fidelity_variance) / 3
+        _sender_sample = 4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._sender_source_variance) / 3
+        _receiver_sample = 4 * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._receiver_source_variance) / 3
         _sample = self._sender_depolar * _receiver_sample + self._receiver_depolar * _sender_sample + _sender_sample * _receiver_sample
         
         qsys = Simulation.create_qsystem(2)
@@ -998,55 +1017,64 @@ class FockStateConnection:
         self._sender: Host = _sender
         self._receiver: Host = _receiver
         self._num_sources: int = _num_sources
+        
         self._duration: float = _model[0]
         self._visibility: float = _model[1]
         self._coherent_phase: float = _model[2]
         self._spin_photon_correlation: float = _model[3]
         
-        self._sender_source: FockPhotonSource = FockPhotonSource(_sender_source)
-        self._receiver_source: FockPhotonSource = FockPhotonSource(_receiver_source)
-        self._sender_detector: PhotonDetector = PhotonDetector(_sender_detector)
-        self._receiver_detector: PhotonDetector = PhotonDetector(_receiver_detector)
-        self._sender_channel: QChannel = QChannel(_sender_length, _sender_attenuation_coefficient, _sender_in_coupling_prob, _sender_out_coupling_prob)
-        self._receiver_channel: QChannel = QChannel(_receiver_length, _receiver_attenuation_coefficient, _receiver_in_coupling_prob, _receiver_out_coupling_prob)
+        _sender_source = FockPhotonSource(_sender_source)
+        _receiver_source = FockPhotonSource(_receiver_source)
+        _sender_detector = PhotonDetector(_sender_detector)
+        _receiver_detector = PhotonDetector(_receiver_detector)
+        _sender_channel = QChannel(_sender_length, _sender_attenuation_coefficient, _sender_in_coupling_prob, _sender_out_coupling_prob)
+        _receiver_channel = QChannel(_receiver_length, _receiver_attenuation_coefficient, _receiver_in_coupling_prob, _receiver_out_coupling_prob)
+        
+        self._sender_source_duration: float = _sender_source._duration
+        self._receiver_source_duration: float = _receiver_source._duration
+        self._sender_source_alpha: float = _sender_source._alpha
+        self._receiver_source_alpha: float = _receiver_source._alpha
+        self._sender_source_variance: float = _sender_source._alpha_variance
+        self._recevier_source_variance: float = _receiver_source._alpha_variance
+        
         self._sender_memory: QuantumMemory = _sender_memory
         self._receiver_memory: QuantumMemory = _receiver_memory
         
         self._sim: Simulation = _sim
     
-        _sender_arrival_prob = self._sender_source._emission_prob * self._sender_channel._in_coupling_prob * self._sender_channel._out_coupling_prob * self._sender_detector._efficiency
-        _receiver_arrival_prob = self._receiver_source._emission_prob * self._receiver_channel._in_coupling_prob * self._receiver_channel._out_coupling_prob * self._receiver_detector._efficiency
+        _sender_arrival_prob = _sender_source._emission_prob * _sender_channel._in_coupling_prob * _sender_channel._out_coupling_prob * _sender_detector._efficiency
+        _receiver_arrival_prob = _receiver_source._emission_prob * _receiver_channel._in_coupling_prob * _receiver_channel._out_coupling_prob * _receiver_detector._efficiency
         
         if _sender_lose_qubits:
-            _sender_arrival_prob *= self._sender_channel._lose_prob
+            _sender_arrival_prob *= _sender_channel._lose_prob
             
         if _receiver_lose_qubits:
-            _receiver_arrival_prob *= self._receiver_channel._lose_prob
+            _receiver_arrival_prob *= _receiver_channel._lose_prob
         
-        self._detector_dark_count_prob: float = self._sender_detector._dark_count_prob + self._receiver_detector._dark_count_prob - 2 * self._sender_detector._dark_count_prob * self._receiver_detector._dark_count_prob
+        self._detector_dark_count_prob: float = _sender_detector._dark_count_prob + _receiver_detector._dark_count_prob - 2 * _sender_detector._dark_count_prob * _receiver_detector._dark_count_prob
         
-        case_up_up_a = (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob) * (_sender_arrival_prob + _receiver_arrival_prob - 2 * _sender_arrival_prob * _receiver_arrival_prob)
+        case_up_up_a = (1 - _sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob) * (_sender_arrival_prob + _receiver_arrival_prob - 2 * _sender_arrival_prob * _receiver_arrival_prob)
         case_up_up_b = (1 - _sender_arrival_prob) * (1 - _receiver_arrival_prob) * self._detector_dark_count_prob
         
-        self._case_up_up: float = case_up_up_a + case_up_up_b
+        self._case_up_up: float = case_up_up_a + case_up_up_b # fix
         
-        up_up_prob = self._sender_source._alpha * self._receiver_source._alpha * self._case_up_up
+        up_up_prob = self._sender_source_alpha * self._receiver_source_alpha * self._case_up_up
         
-        case_up_down_a = (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob) * _sender_arrival_prob
+        case_up_down_a = (1 - self._sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob) * _sender_arrival_prob
         case_up_down_b = (1 - _sender_arrival_prob) * self._detector_dark_count_prob
         
-        self._case_up_down: float = case_up_down_a + case_up_down_b
+        self._case_up_down: float = case_up_down_a + case_up_down_b # fix
         
-        up_down_prob = self._sender_source._alpha * (1 - self._receiver_source._alpha) * self._case_up_down
+        up_down_prob = self._sender_source_alpha * (1 - self._receiver_source_alpha) * self._case_up_down
         
-        case_down_up_a = (1 - self._sender_detector._dark_count_prob) * (1 - self._receiver_detector._dark_count_prob) * _receiver_arrival_prob
+        case_down_up_a = (1 - _sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob) * _receiver_arrival_prob
         case_down_up_b = (1 - _receiver_arrival_prob) * self._detector_dark_count_prob
         
-        self._case_down_up: float = case_down_up_a + case_down_up_b
+        self._case_down_up: float = case_down_up_a + case_down_up_b # fix
         
-        down_up_prob = self._receiver_source._alpha * (1 - self._sender_source._alpha) * self._case_down_up
+        down_up_prob = self._receiver_source_alpha * (1 - self._sender_source_alpha) * self._case_down_up
         
-        down_down_prob = (1 - self._sender_source._alpha) * (1 - self._receiver_source._alpha) * self._detector_dark_count_prob
+        down_down_prob = (1 - self._sender_source_alpha) * (1 - self._receiver_source_alpha) * self._detector_dark_count_prob
     
         self._success_prob: float = up_up_prob + up_down_prob + down_up_prob + down_down_prob
     
@@ -1055,8 +1083,8 @@ class FockStateConnection:
     
         _s = np.sqrt(self._visibility * up_down_prob * down_up_prob)
         
-        self._sender_duration: float = self._sender_source._duration + self._sender_channel._sending_time + self._duration + self._sender_detector._duration
-        self._receiver_duration: float = self._receiver_source._duration + self._receiver_channel._sending_time + self._duration + self._receiver_detector._duration
+        self._sender_duration: float = self._sender_source_duration + _sender_channel._sending_time + _duration + _sender_detector._duration
+        self._receiver_duration: float = self._receiver_source_duration + _receiver_channel._sending_time + _duration + _receiver_detector._duration
     
         self._state: np.array = np.array([[(1 - self._spin_photon_correlation) * up_down_prob, 0., 0., (1 - self._spin_photon_correlation) * np.exp(1j * self._coherent_phase) * _s], 
                                           [0., 0.5 * self._spin_photon_correlation * (up_down_prob + down_up_prob) + up_up_prob, 0., 0.],
@@ -1207,3 +1235,146 @@ class FockStateConnection:
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._receiver_source._duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
+        
+class L3Connection:
+    
+    """
+    Represents a Layer 3 connection
+    
+    Attrs:
+        _sender (Host): sender of connection
+        _receiver (Host): receiver of connection
+        _sim (Simulation): Simulation connection lives in
+        _sending_time (float): sending time of qubits
+        _success_prob (float): probability of sucessfully establishing entanglement
+        _fidelity_variance (float): variance of state fidelity
+        _state (np.array): resulting state
+        _sender_memory (QuantumMemory): sender sided quantum memory
+        _receiver_memory (QuantumMemory): receiver sided quantum memory
+    """
+    
+    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation,
+                 _length: float=0., _success_prob: float=1., _fidelity: float=1., _fidelity_variance: float=0.,
+                 _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
+        
+        """
+        Initializes a L3 connection
+        
+        Args:
+            _sender (Host): sender of connection
+            _receiver (Host): receiver of connection
+            _sim (Simulation): simulation connection lives in
+            _length (float): length of connection
+            _success_prob (float): probability of sucessfully establishing entanglement
+            _fidelity (float): fidelity of resulting state
+            _fidelity_variance (float): variance of fidelity
+            _sender_memory (QuantumMemory): sender sided quantum memory
+            _receiver_memory (QuantumMemory): receiver sided quantum memory
+            
+        Returns:
+            /
+        """
+        
+        if -np.log10(_success_prob) >= 6:
+            raise ValueError('Too low success probability')
+        
+        self._sender: Host = _sender
+        self._receiver_id: int = _receiver
+        self._sim: Simulation = _sim
+        
+        self._sending_time: float = _length * 5e-6
+        self._success_prob: float = _success_prob
+        self._fidelity_variance: float = _fidelity_variance
+        
+        self._state: np.array = (4 * _fidelity - 1) / 3 * B_0 + 4 * (1 - _fidelity) / 3 * I_0
+        
+        self._sender_memory: QuantumMemory = _sender_memory
+        self._receiver_memory: QuantumMemory = _receiver_memory
+        
+        self.creation_functions = {0: self.failure_creation, 1: self.success_creation}
+        
+    def success_creation(self, _time: float) -> None:
+        
+        """
+        Sucessful creation of entanglement
+        
+        Args:
+            _time (float): time at which qubits are created
+            
+        Returns:
+            /
+        """
+        
+        _sample = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._fidelity_variance)
+        
+        qsys = Simulation.create_qsystem(2)
+        qsys._state = self._state + (4 * _sample) / 3 * B_I_0
+        q_1, q_2 = qsys.qubits
+        
+        self._sender_memory.l0_store_qubit(q_1, -1, _time)
+        self._receiver_memory.l0_store_qubit(q_2, -1, _time)
+    
+    def failure_creation(self, _time: float) -> None:
+        
+        """
+        Unsuccessful creation of qubits
+        
+        Args:
+            _time (float): time at which qubits are created
+            
+        Returns:
+            /
+        """
+        
+        q_1 = Simulation.create_qsystem(1).qubits
+        self._receiver_memory.l0_store_qubit(q_1, -1, _time)
+    
+    def attempt_bell_pairs(self, _num_requested: int=1, _num_needed: int=1) -> None:
+        
+        """
+        Attempt the number of bell pairs
+        
+        Args:
+            _num_requested (int): number of requested qubits
+            _num_needed (int): number of needed qubits
+            
+        Returns:
+            /
+        """
+        
+        packet = Packet(self._sender._node_id, self._receiver_id, _num_requested, _num_needed)
+
+        _time_samples = np.zeros(_num_needed) + self._sim._sim_time + self._sending_time
+        _success_samples = np.random.uniform(0, 1, _num_needed) < self._success_prob
+        
+        for success, _time_sample in zip(_success_samples, _time_samples):
+            self.creation_functions[success](_time_sample)
+        
+        packet._l1._entanglement_success = _success_samples
+        
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time, self._receiver_id))
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet)
+    
+    def create_bell_pairs(self, _num_requested: int=1) -> None:
+        
+        """
+        Creates the number of requested qubits
+        
+        Args:
+            _num_requested (int): number of requested qubits
+        
+        Returns:
+            /
+        """
+        
+        packet = Packet(self._sender._node_id, self._receiver_id, _num_requested, _num_requested)
+        
+        _time_samples = np.zeros(_num_needed) + self._sending_time
+        
+        for _time_sample in _time_samples:
+            self.success_creation(_time_sample)
+        
+        packet._l1._entanglement_success = np.ones(_num_needed, dtype=np.bool_)
+        
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time, self._receiver_id))
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet)
