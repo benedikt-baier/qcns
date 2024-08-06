@@ -790,7 +790,7 @@ class BellStateMeasurementConnection:
         if -np.log10(self._success_prob) >= 6:
             raise ValueError('Too low success probability')
         
-        self._false_prob_1: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * _coin_ph_ph * (1 - _visibility) * (1 - _sender_detector._dark_count_prob) ** 2 * (1 - ._receiver_detector._dark_count_prob) ** 2
+        self._false_prob_1: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * _coin_ph_ph * (1 - _visibility) * (1 - _sender_detector._dark_count_prob) ** 2 * (1 - _receiver_detector._dark_count_prob) ** 2
         _false_prob_3: float = (_sender_arrival_prob * (1 - _receiver_arrival_prob) + (1 - _sender_arrival_prob) * _receiver_arrival_prob) * _coin_ph_dc * (_sender_detector._dark_count_prob * (1 - _sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob)**2 + _receiver_detector._dark_count_prob * (1 - _receiver_detector._dark_count_prob) * (1 - _sender_detector._dark_count_prob)**2)
         _false_prob_4: float = (1 - _sender_arrival_prob) * (1 - _receiver_arrival_prob) * _coin_dc_dc * (_sender_detector._dark_count_prob**2 * (1 - _receiver_detector._dark_count_prob)**2 + 2 * _sender_detector._dark_count_prob * _receiver_detector._dark_count_prob * (1 - _sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob) + _receiver_detector._dark_count_prob**2 * (1 - _sender_detector._dark_count_prob)**2)
         
