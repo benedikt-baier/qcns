@@ -227,7 +227,7 @@ class SenderReceiverConnection:
         _state (np.array): precalculated state
     """
     
-    def __init__(self, _sender: Host, _receiver_id: int, _sim: Simulation, 
+    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, 
                  _model_name: str='perfect', _sender_source: str='perfect', _receiver_detector: str='perfect', _num_sources: int=-1,
                  _length: float=0., _attenuation_coefficient: float=-0.016, _in_coupling_prob: float=1., _out_coupling_prob: float=1., _lose_qubits: bool=False, 
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
@@ -261,7 +261,7 @@ class SenderReceiverConnection:
         model = SENDER_RECEIVER_MODELS[_model_name]
         
         self._sender: Host = _sender
-        self._receiver_id: int = _receiver_id
+        self._receiver: Host = _receiver
         self._num_sources: int = _num_sources
         
         _duration: float = model[0]
@@ -288,7 +288,7 @@ class SenderReceiverConnection:
         
         self._success_prob: float = _arrival_prob * (1 - _detector._dark_count_prob)
         
-        _false_prob = (1 - _false_prob_tmp) * _detector._dark_count_prob
+        _false_prob = (1 - _arrival_prob) * _detector._dark_count_prob
         
         if -np.log10(self._success_prob) >= 6:
             raise ValueError('Too low success probability')
@@ -351,7 +351,7 @@ class SenderReceiverConnection:
             /
         """
         
-        packet = Packet(self._sender._node_id, self._receiver_id, _num_requested, _num_needed)
+        packet = Packet(self._sender._node_id, self._receiver._node_id, _num_requested, _num_needed)
         
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _num_needed:
@@ -369,8 +369,8 @@ class SenderReceiverConnection:
         
         packet._l1._entanglement_success = _success_samples
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_num_tries - 1) * self._source_duration, self._receiver_id))
-        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
+        self._sender._connections['packet'][self._receiver._node_id][SEND].put(packet)
     
     def create_bell_pairs(self, _num_requested: int=1) -> None:
         
