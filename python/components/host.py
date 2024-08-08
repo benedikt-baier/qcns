@@ -154,6 +154,9 @@ class Host:
         Returns:
             /
         """
+        
+        self._neighbors.add(host._node_id)
+        host._neighbors.add(self._node_id)
             
         if sender_com_errors is None:
             sender_com_errors = []
@@ -219,6 +222,9 @@ class Host:
         Returns:
             /
         """
+        
+        self._neighbors.add(host._node_id)
+        host._neighbors.add(self._node_id)
         
         if sender_mem_errors is None:
             sender_mem_errors = []
@@ -294,6 +300,9 @@ class Host:
         Returns:
             /
         """
+        
+        self._neighbors.add(host._node_id)
+        host._neighbors.add(self._node_id)
         
         channel_s = PChannel(length)
         channel_r = PChannel(length)
