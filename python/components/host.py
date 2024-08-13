@@ -722,6 +722,22 @@ class Host:
         
         return self._connections['memory'][host][store].remaining_size()
     
+    def change_memory_size(self, host: int, store: int, size: int) -> None:
+        
+        """
+        Changes the size of the specified memory
+        
+        Args:
+            host (int): the host the memory points to 
+            store (int): SEND or RECEIVE store
+            size (int): new size of the memory
+            
+        Returns:
+            /
+        """
+        
+        self._connections['memory'][host][store].change_size(size)
+    
     def l0_num_qubits(self, host: int, store: int) -> int:
         
         """

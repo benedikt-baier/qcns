@@ -98,7 +98,24 @@ class QuantumMemory:
             return 2147483647
         
         return self._size - len(self)
-     
+    
+    def change_size(self, _size: int) -> None:
+        
+        """
+        Changes the size of the memory
+        
+        Args:
+            _size (int): new size of memory
+            
+        Returns:
+            /
+        """
+        
+        if not _size:
+            raise ValueError('Size cannot be zero')
+        
+        self._size = _size
+    
     def l0_num_qubits(self) -> int:
         
         """
