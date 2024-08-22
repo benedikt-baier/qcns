@@ -84,7 +84,7 @@ class QChannel:
             /
         """
         
-        if np.random.uniform(0, 1) < self._in_coupling_prob:
+        if np.random.uniform(0, 1) > self._in_coupling_prob:
             remove_qubits([_qubit])
             self._channel.put(None)
             return
@@ -108,7 +108,7 @@ class QChannel:
         if _qubit is None:
             return _qubit
         
-        if np.random.uniform(0, 1) < self._out_prob:
+        if np.random.uniform(0, 1) > self._out_prob:
             remove_qubits([_qubit])
             return None
         
