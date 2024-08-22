@@ -1,5 +1,6 @@
 import numpy as np
 from queue import Queue
+from qubit import remove_qubits
 
 from typing import List, Union
 

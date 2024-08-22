@@ -8,6 +8,7 @@ from python.components.photon_source import *
 from python.components.photon_detector import *
 from python.components.connection import *
 from python.components.host import *
+from python.components.protocol import *
 from python.components.packet import *
 from python.components.utils import *
 from python.components.simulation import *

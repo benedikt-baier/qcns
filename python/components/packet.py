@@ -408,6 +408,7 @@ class Packet:
         
         self._l1._ps = 0
     
+    @property
     def l1_success(self) -> bool:
         
         """
@@ -422,6 +423,7 @@ class Packet:
         
         return self._l1._num_requested <= self.num_l1_success()
     
+    @property
     def num_l1_success(self) -> int:
         
         """
@@ -436,6 +438,7 @@ class Packet:
         
         return np.count_nonzero(self._l1._entanglement_success)
     
+    @property
     def num_l1_failures(self) -> int:
         
         """
