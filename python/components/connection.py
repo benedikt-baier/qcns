@@ -1257,6 +1257,8 @@ class L3Connection:
                  _length: float=0., _success_prob: float=1., _fidelity: float=1., _fidelity_variance: float=0.,
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
         
+        # TODO add number of sender and receiver sources
+        
         """
         Initializes a L3 connection
         
@@ -1353,7 +1355,7 @@ class L3Connection:
         packet._l1._entanglement_success = _success_samples
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time, self._receiver_id))
-        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet)
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
     
     def create_bell_pairs(self, _num_requested: int=1) -> None:
         
@@ -1369,12 +1371,12 @@ class L3Connection:
         
         packet = Packet(self._sender._node_id, self._receiver_id, _num_requested, _num_requested)
         
-        _time_samples = np.zeros(_num_needed) + self._sending_time
+        _time_samples = np.zeros(_num_requested) + self._sending_time
         
         for _time_sample in _time_samples:
             self.success_creation(_time_sample)
         
-        packet._l1._entanglement_success = np.ones(_num_needed, dtype=np.bool_)
+        packet._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time, self._receiver_id))
-        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet)
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)

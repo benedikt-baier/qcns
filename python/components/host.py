@@ -390,6 +390,8 @@ class Host:
                           sender_mem_size: int=-1, sender_efficiency: float=1., sender_mem_errors: List[QuantumError]=None, 
                           receiver_mem_size: int=-1, receiver_efficiency: float=1., receiver_mem_errors: List[QuantumError]=None) -> None:
         
+        # TODO add number of sender and receiver sources
+        
         self._neighbors.add(host._node_id)
         host._neighbors.add(self._node_id)
         
