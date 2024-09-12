@@ -395,6 +395,11 @@ class Host:
         self._neighbors.add(host._node_id)
         host._neighbors.add(self._node_id)
         
+        if sender_mem_errors is None:
+            sender_mem_errors = []
+        if receiver_mem_errors is None:
+            receiver_mem_errors = []
+        
         sender_memory_send = QuantumMemory(sender_mem_size, sender_efficiency, sender_mem_errors)
         sender_memory_receive = QuantumMemory(sender_mem_size, sender_efficiency, sender_mem_errors)
         receiver_memory_send = QuantumMemory(receiver_mem_size, receiver_efficiency, receiver_mem_errors)
