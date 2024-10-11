@@ -94,6 +94,7 @@ class Simulation:
             /
         """
         
+        self.num_hosts = 0
         for host in self._hosts.values():
             host.stop = True
     
@@ -111,11 +112,11 @@ class Simulation:
         
         tasks = [asc.create_task(host.run()) for host in self._hosts.values()]
         
-        num_hosts = len(tasks) - _num_hosts
+        self.num_hosts = len(tasks) - _num_hosts
         
         while 1:
             
-            if not num_hosts:
+            if self.num_hosts < 1:
                 self.stop_simulation()
                 return
             
@@ -127,7 +128,7 @@ class Simulation:
             event = heappop(self._event_queue)
             
             if not event._id:
-                num_hosts -= 1
+                self.num_hosts -= 1
                 continue
             
             self._sim_time = event._end_time
