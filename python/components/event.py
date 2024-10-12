@@ -87,7 +87,7 @@ class StopEvent(Event):
             _event (str): printable representation of Event
         """
         
-        return f'StopEvent'
+        return f'StopEvent Node: {self._node_id}'
 
 class SendEvent(Event):
     
@@ -129,7 +129,7 @@ class SendEvent(Event):
             _event (str): printable representation of Event
         """
         
-        return f'SendEvent Time: {self._end_time} Receiver: {self._node_id}'
+        return f'Send Event Node: {self._node_id} Time: {self._end_time}'
 
 class ReceiveEvent(Event):
     
@@ -171,7 +171,7 @@ class ReceiveEvent(Event):
             _event (str): printable representation of Event
         """
         
-        return f'ReceiveEvent Time: {self._end_time} Receiver: {self._node_id}'
+        return f'Receive Event Node: {self._node_id} Time: {self._end_time}'
     
 class GateEvent(Event):
     
@@ -213,4 +213,4 @@ class GateEvent(Event):
             _event (str): printable representation of Event
         """
         
-        return f'Gate Event Time: {self._end_time} Node: {self._node_id}'
+        return f'Gate Event: Node: {self._node_id} Time: {self._end_time}'

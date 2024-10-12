@@ -123,7 +123,8 @@ class Host:
             await func()
             self._sim.schedule_event(StopEvent(self._node_id))
         except Exception as e:
-            logging.info(traceback.format_exc())
+            logging.error(f'Host {self.id} has Exception')
+            logging.error(traceback.format_exc())
             self._sim.num_hosts = 0
     
     def set_sqs_connection(self, host: Host, sender_source: str='perfect', receiver_source: str='perfect',
