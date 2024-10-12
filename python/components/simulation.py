@@ -1,3 +1,5 @@
+import os
+import logging
 import asyncio as asc
 from heapq import heappop, heappush
 from typing import List
@@ -21,7 +23,7 @@ class Simulation:
         _sim_time (float): current simulation time
     """
     
-    def __init__(self) -> None:
+    def __init__(self, logging_path: str='') -> None:
         
         """
         Initializes a Simulation object
@@ -36,6 +38,15 @@ class Simulation:
         self._event_queue: List[Event] = []
         self._hosts: List[Host] = []
         self._sim_time: float = 0.
+        self._logging_path: str = logging_path
+        
+        if logging_path and not os.path.exists(os.path.dirname(self._logging_path)):
+            os.makedirs(os.path.dirname(self._logging_path))
+        if self._logging_path and os.path.exists(self._logging_path):
+            with open(self._logging_path, 'w'):
+                pass
+        if self._logging_path:
+            logging.basicConfig(filename=self._logging_path, level=logging.DEBUG)
     
     @staticmethod
     def create_qsystem(_num_qubits: int, _fidelity: float=1., _sparse: bool=False) -> QSystem:
@@ -94,6 +105,8 @@ class Simulation:
             /
         """
         
+        logging.info('Stopping Simulation')
+        
         self.num_hosts = 0
         for host in self._hosts.values():
             host.stop = True
@@ -126,6 +139,8 @@ class Simulation:
                 continue
             
             event = heappop(self._event_queue)
+            
+            logging.info(event)
             
             if not event._id:
                 self.num_hosts -= 1
