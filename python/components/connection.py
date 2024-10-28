@@ -1071,7 +1071,7 @@ class FockStateConnection:
         
         up_up_prob = self._sender_source_alpha * self._receiver_source_alpha * self._case_up_up
         
-        case_up_down_a = (1 - self._sender_detector_dark_count_prob) * (1 - _receiver_detector._dark_count_prob) * _sender_arrival_prob
+        case_up_down_a = (1 - _sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob) * _sender_arrival_prob
         case_up_down_b = (1 - _sender_arrival_prob) * self._detector_dark_count_prob
         
         self._case_up_down: float = case_up_down_a + case_up_down_b # fix
