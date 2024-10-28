@@ -12,6 +12,7 @@ from python.components.channel import PChannel
 from python.components.packet import Packet
 from python.components.memory import QuantumMemory
 from python.components.connection import SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
+from python.components.qprogram import QProgram
 
 __all__ = ['Host']
 
@@ -55,8 +56,8 @@ class Host:
         stop (bool): stop flag for infinitly running hosts  
     """
     
-    def __init__(self, node_id: int, sim: Simulation, gate_duration: Dict[str, float]=_GATE_DURATION, 
-                 gate_parameters: Dict[str, float]=_GATE_PARAMETERS, pulse_duration: float=10 ** -11) -> None:
+    def __init__(self, node_id: int, sim: Simulation, program: QProgram=None, gate_duration: Dict[str, float]=_GATE_DURATION, 
+                 gate_parameters: Dict[str, float]=_GATE_PARAMETERS, pulse_duration: float=10**(-11)) -> None:
         
         """
         Initializes a Host
@@ -87,6 +88,8 @@ class Host:
         self._l2_packets: List[Packet] = []
         self._l3_packets: List[Packet] = []
         
+        self._program: QProgram = program
+        
         self._resume: asc.Event = asc.Event()
         self.stop: bool = False
     
@@ -105,7 +108,8 @@ class Host:
             /
         """
         
-        pass
+        if self._program is not None:
+            await self._program.run(self)
     
     async def log_exceptions(self, func) -> None:
         

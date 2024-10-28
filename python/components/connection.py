@@ -351,7 +351,7 @@ class SenderReceiverConnection:
             /
         """
         
-        packet = Packet(self._sender._node_id, self._receiver._node_id, _num_requested, _num_needed)
+        packet = Packet(self._sender.id, self._receiver.id, _num_requested, _num_needed)
         
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _num_needed:
@@ -367,7 +367,8 @@ class SenderReceiverConnection:
         for success, _curr_time in zip(_success_samples, _curr_time_samples):
             self.creation_functions[success](_curr_time)
         
-        packet._l1._entanglement_success = _success_samples
+        packet.l1_success = _success_samples
+        packet.l1_protocol = 1
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][SEND].put(packet)
@@ -403,7 +404,8 @@ class SenderReceiverConnection:
         for _curr_time in _curr_time_samples:
             self.success_creation(_curr_time)
         
-        packet._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
+        packet.l1_success = np.ones(_num_requested, dtype=np.bool_)
+        packet.l1_protocol = 1
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_current_try - 1) * self._source_duration, self._receiver_id))
         self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
@@ -521,7 +523,7 @@ class TwoPhotonSourceConnection:
         _sender_false_prob = (1 - _sender_arrival_prob) * _sender_detector._dark_count_prob
         _receiver_false_prob = (1 - _receiver_arrival_prob) * _receiver_detector._dark_count_prob
         
-        _total_depolar_prob: float = (4 * self._source._fidelity - 1)**2 / 9
+        _total_depolar_prob: float = (4 * self._source_fidelity - 1)**2 / 9
         
         self._success_prob: float = self._sender_success_prob * self._receiver_success_prob
         
@@ -551,7 +553,7 @@ class TwoPhotonSourceConnection:
         """
         
         qsys = Simulation.create_qsystem(2)
-        depol = 8 * (4 * self._source._fidelity - 1) * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance) / 9
+        depol = 8 * (4 * self._source_fidelity - 1) * sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source_variance) / 9
         qsys._state = self._state + (self._success_prob * depol * np.sqrt(self._sender_state_transfer_fidelity * self._receiver_state_transfer_fidelity) * B_I_0) / self._total_prob
     
         q_1, q_2 = qsys.qubits
@@ -596,16 +598,19 @@ class TwoPhotonSourceConnection:
         if self._num_sources + 1 and self._num_sources < _num_needed:
             _num_tries = int(np.ceil(_num_needed / self._num_sources))
         
-        _curr_time = self._sim._sim_time + self._source._duration    
+        _curr_time = self._sim._sim_time + self._source_duration    
         _curr_time_samples = np.zeros(_num_needed) + _curr_time
         if self._num_sources + 1:
-            _curr_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._source._duration
+            _curr_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._source_duration
         
         _sender_success_samples = np.random.uniform(0, 1, _num_needed) < self._sender_success_prob
         _receiver_success_samples = np.random.uniform(0, 1, _num_needed) < self._receiver_success_prob
         
-        packet_s._l1._entanglement_success = _sender_success_samples
-        packet_r._l1._entanglement_success = _receiver_success_samples
+        packet_s.l1_success = _sender_success_samples
+        packet_r.l1_success = _receiver_success_samples
+        
+        packet_s.l1_protocol = 2
+        packet_r.l1_protocol = 2
         
         _success_samples = np.logical_and(_sender_success_samples, _receiver_success_samples)
         
@@ -638,7 +643,7 @@ class TwoPhotonSourceConnection:
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _num_requested, _num_requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _num_requested, _num_requested)
         
-        _curr_time = self._sim._sim_time + self._source._duration
+        _curr_time = self._sim._sim_time + self._source_duration
         
         _curr_time_samples = np.zeros(_num_requested + self._num_sources + 1) + _curr_time
         _num_successfull = 0
@@ -649,7 +654,7 @@ class TwoPhotonSourceConnection:
             _receiver_successes = np.random.uniform(0, 1, self._num_sources) < self._receiver_success_prob
             _successes = np.count_nonzero(np.logical_and(_sender_successes, _receiver_successes))
             _current_try += 1
-            _curr_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source._duration
+            _curr_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source_duration
             _num_successfull += _successes
         
         _curr_time_samples = _curr_time_samples[:_num_requested]
@@ -661,11 +666,14 @@ class TwoPhotonSourceConnection:
         packet_r.set_l1_ps()
         packet_r.set_l1_ack()
         
-        packet_s._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
-        packet_r._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
+        packet_s.l1_success = np.ones(_num_requested, dtype=np.bool_)
+        packet_r.l1_success = np.ones(_num_requested, dtype=np.bool_)
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._source._duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._source._duration, self._receiver._node_id))
+        packet_s.l1_protocol = 2
+        packet_r.l1_protocol = 2
+        
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
 
@@ -763,10 +771,10 @@ class BellStateMeasurementConnection:
         _sender_channel = QChannel(_sender_length, _sender_attenuation_coefficient, _sender_in_coupling_prob, _sender_out_coupling_prob)
         _receiver_channel = QChannel(_receiver_length, _receiver_attenuation_coefficient, _receiver_in_coupling_prob, _receiver_out_coupling_prob)
         
-        self._sender_source_duration = _sender_source._duration
-        self._receiver_source_duration = _receiver_source._duration
-        self._sender_source_variance = _sender_source._fidelity_variance
-        self._receiver_source_variance = _receiver_source._fidelity_variance
+        self._sender_source_duration: float = _sender_source._duration
+        self._receiver_source_duration: float = _receiver_source._duration
+        self._sender_source_variance: float = _sender_source._fidelity_variance
+        self._receiver_source_variance: float = _receiver_source._fidelity_variance
         self._sender_memory: QuantumMemory = _sender_memory
         self._receiver_memory: QuantumMemory = _receiver_memory
         
@@ -868,30 +876,30 @@ class BellStateMeasurementConnection:
         if self._num_sources + 1 and self._num_sources < _num_needed:
             _num_tries = int(np.ceil(_num_needed / self._num_sources))
 
-        _sender_time = self._sim._sim_time + self._sender_source._duration
-        _receiver_time = self._sim._sim_time + self._receiver_source._duration
+        _sender_time = self._sim._sim_time + self._sender_source_duration
+        _receiver_time = self._sim._sim_time + self._receiver_source_duration
         
         _sender_time_samples = np.zeros(_num_needed) + _sender_time
         _receiver_time_samples = np.zeros(_num_needed) + _receiver_time
         
         if self._num_sources + 1:
-            _sender_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._sender_source._duration
-            _receiver_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._receiver_source._duration
+            _sender_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._sender_source_duration
+            _receiver_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._receiver_source_duration
         
         _success_samples = np.random.uniform(0, 1, _num_needed) < self._success_prob
         
         for success, _sender_time, _receiver_time in zip(_success_samples, _sender_time_samples, _receiver_time_samples):
             self.creation_functions[success](_sender_time, _receiver_time)
         
-        packet_s._l1._entanglement_success = _success_samples
-        packet_r._l1._entanglement_success = _success_samples
+        packet_s.l1_success = _success_samples
+        packet_r.l1_success = _success_samples
         
         packet_r.set_l1_ack()
-        packet_s.l1_protocol = 2
-        packet_r.l1_protocol = 2
+        packet_s.l1_protocol = 3
+        packet_r.l1_protocol = 3
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._sender_source._duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._receiver_source._duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
     
@@ -910,8 +918,8 @@ class BellStateMeasurementConnection:
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _num_requested, _num_requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _num_requested, _num_requested)
         
-        _sender_time = self._sim._sim_time + self._sender_source._duration
-        _receiver_time = self._sim._sim_time + self._receiver_source._duration
+        _sender_time = self._sim._sim_time + self._sender_source_duration
+        _receiver_time = self._sim._sim_time + self._receiver_source_duration
         
         _sender_time_samples = np.zeros(_num_requested + self._num_sources + 1) + _sender_time
         _receiver_time_samples = np.zeros(_num_requested + self._num_sources + 1) + _receiver_time
@@ -922,8 +930,8 @@ class BellStateMeasurementConnection:
         while _num_successfull < _num_requested and self._num_sources + 1:
             _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
-            _sender_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._sender_source._duration
-            _receiver_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._receiver_source._duration
+            _sender_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._sender_source_duration
+            _receiver_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._receiver_source_duration
             _num_successfull += _successes
         
         _sender_time_samples = _sender_time_samples[:_num_requested]
@@ -932,12 +940,15 @@ class BellStateMeasurementConnection:
         for _sender_time, _receiver_time in zip(_sender_time_samples, _receiver_time_samples):
             self.success_creation(_sender_time, _receiver_time)
         
-        packet_s._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
-        packet_r._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
+        packet_s.l1_success = np.ones(_num_requested, dtype=np.bool_)
+        packet_r.l1_success = np.ones(_num_requested, dtype=np.bool_)
         
         packet_r.set_l1_ack()
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._sender_source._duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._receiver_source._duration, self._receiver._node_id))
+        packet_s.l1_protocol = 3
+        packet_r.l1_protocol = 3
+    
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
     
@@ -1060,7 +1071,7 @@ class FockStateConnection:
         
         up_up_prob = self._sender_source_alpha * self._receiver_source_alpha * self._case_up_up
         
-        case_up_down_a = (1 - self._sender_detector._dark_count_prob) * (1 - _receiver_detector._dark_count_prob) * _sender_arrival_prob
+        case_up_down_a = (1 - self._sender_detector_dark_count_prob) * (1 - _receiver_detector._dark_count_prob) * _sender_arrival_prob
         case_up_down_b = (1 - _sender_arrival_prob) * self._detector_dark_count_prob
         
         self._case_up_down: float = case_up_down_a + case_up_down_b # fix
@@ -1106,13 +1117,13 @@ class FockStateConnection:
             /
         """
         
-        _sample_sender = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._sender_source._alpha_variance)
-        _sample_receiver = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._receiver_source._alpha_variance)
+        _sample_sender = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._sender_source_alpha_variance)
+        _sample_receiver = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._receiver_source_alpha_variance)
         
-        _sample_up_up = (self._sender_source._alpha * _sample_receiver + self._receiver_source._alpha * _sample_sender + _sample_sender * _sample_receiver) * self._case_up_up
-        _sample_up_down = (-self._sender_source._alpha * _sample_receiver + (1 - self._receiver_source._alpha) * _sample_sender - _sample_sender * _sample_receiver) * self._case_up_down
-        _sample_down_up = ((1 - self._sender_source._alpha) * _sample_receiver - self._receiver_source._alpha * _sample_sender - _sample_sender * _sample_receiver) * self._case_down_up
-        _sample_down_down = (-(1 - self._sender_source._alpha) * _sample_receiver - (1 - self._receiver_source._alpha) * _sample_sender + _sample_sender * _sample_receiver) * self._detector_dark_count_prob
+        _sample_up_up = (self._sender_source_alpha * _sample_receiver + self._receiver_source_alpha * _sample_sender + _sample_sender * _sample_receiver) * self._case_up_up
+        _sample_up_down = (-self._sender_source_alpha * _sample_receiver + (1 - self._receiver_source_alpha) * _sample_sender - _sample_sender * _sample_receiver) * self._case_up_down
+        _sample_down_up = ((1 - self._sender_source_alpha) * _sample_receiver - self._receiver_source_alpha * _sample_sender - _sample_sender * _sample_receiver) * self._case_down_up
+        _sample_down_down = (-(1 - self._sender_source_alpha) * _sample_receiver - (1 - self._receiver_source_alpha) * _sample_sender + _sample_sender * _sample_receiver) * self._detector_dark_count_prob
         
         qsys = Simulation.create_qsystem(2)
         qsys._state = self._state + np.array([[(1 - self._spin_photon_correlation) * _sample_up_down, 0., 0., (1 - self._spin_photon_correlation) * np.exp(1j * self._coherent_phase) * np.sqrt(self._visibility) * (_sample_up_down * _sample_down_up)],
@@ -1163,27 +1174,30 @@ class FockStateConnection:
         if self._num_sources + 1 and self._num_sources < _num_needed:
             _num_tries = int(np.ceil(_num_needed / self._num_sources))
 
-        _sender_time = self._sim._sim_time + self._sender_source._duration
-        _receiver_time = self._sim._sim_time + self._receiver_source._duration
+        _sender_time = self._sim._sim_time + self._sender_source_duration
+        _receiver_time = self._sim._sim_time + self._receiver_source_duration
         
         _sender_time_samples = np.zeros(_num_needed) + _sender_time
         _receiver_time_samples = np.zeros(_num_needed) + _receiver_time
         
         if self._num_sources + 1:
-            _sender_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._sender_source._duration
-            _receiver_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._receiver_source._duration
+            _sender_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._sender_source_duration
+            _receiver_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_num_needed] * self._receiver_source_duration
         
         _success_samples = np.random.uniform(0, 1, _num_needed) < self._success_prob
         
         for success, _sender_time, _receiver_time in zip(_success_samples, _sender_time_samples, _receiver_time_samples):
             self.creation_functions[success](_sender_time, _receiver_time)
         
-        packet_s._l1._entanglement_success = _success_samples
-        packet_r._l1._entanglement_success = _success_samples
+        packet_s.l1_success = _success_samples
+        packet_r.l1_success = _success_samples
         
         packet_r.set_l1_ack()
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._sender_source._duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._receiver_source._duration, self._receiver._node_id))
+        packet_s.l1_protocol = 4
+        packet_r.l1_protocol = 4
+        
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
 
@@ -1202,8 +1216,8 @@ class FockStateConnection:
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _num_requested, _num_requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _num_requested, _num_requested)
         
-        _sender_time = self._sim._sim_time + self._sender_source._duration
-        _receiver_time = self._sim._sim_time + self._receiver_source._duration
+        _sender_time = self._sim._sim_time + self._sender_source_duration
+        _receiver_time = self._sim._sim_time + self._receiver_source_duration
         
         _sender_time_samples = np.zeros(_num_requested + self._num_sources + 1) + _sender_time
         _receiver_time_samples = np.zeros(_num_requested + self._num_sources + 1) + _receiver_time
@@ -1214,8 +1228,8 @@ class FockStateConnection:
         while _num_successfull < _num_requested and self._num_sources + 1:
             _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
-            _sender_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._sender_source._duration
-            _receiver_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._receiver_source._duration
+            _sender_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._sender_source_duration
+            _receiver_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._receiver_source_duration
             _num_successfull += _successes
         
         _sender_time_samples = _sender_time_samples[:_num_requested]
@@ -1224,15 +1238,15 @@ class FockStateConnection:
         for _sender_time, _receiver_time in zip(_sender_time_samples, _receiver_time_samples):
             self.success_creation(_sender_time, _receiver_time)
         
-        packet_s._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
-        packet_r._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
+        packet_s.l1_success = np.ones(_num_requested, dtype=np.bool_)
+        packet_r.l1_success = np.ones(_num_requested, dtype=np.bool_)
         
         packet_r.set_l1_ack()
-        packet_s.l1_protocol = 3
-        packet_r.l1_protocol = 3
+        packet_s.l1_protocol = 4
+        packet_r.l1_protocol = 4
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._sender_source._duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._receiver_source._duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
         
@@ -1256,8 +1270,6 @@ class L3Connection:
     def __init__(self, _sender: Host, _receiver: int, _sim: Simulation,
                  _length: float=0., _success_prob: float=1., _fidelity: float=1., _fidelity_variance: float=0.,
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
-        
-        # TODO add number of sender and receiver sources
         
         """
         Initializes a L3 connection
@@ -1344,7 +1356,7 @@ class L3Connection:
             /
         """
         
-        packet = Packet(self._sender._node_id, self._receiver_id, _num_requested, _num_needed)
+        packet = Packet(self._sender.id, self._receiver_id, _num_requested, _num_needed)
 
         _time_samples = np.zeros(_num_needed) + self._sim._sim_time + self._sending_time
         _success_samples = np.random.uniform(0, 1, _num_needed) < self._success_prob
@@ -1352,7 +1364,7 @@ class L3Connection:
         for success, _time_sample in zip(_success_samples, _time_samples):
             self.creation_functions[success](_time_sample)
         
-        packet._l1._entanglement_success = _success_samples
+        packet.l1_success = _success_samples
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time, self._receiver_id))
         self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
@@ -1376,7 +1388,7 @@ class L3Connection:
         for _time_sample in _time_samples:
             self.success_creation(_time_sample)
         
-        packet._l1._entanglement_success = np.ones(_num_requested, dtype=np.bool_)
+        packet.l1_success = np.ones(_num_requested, dtype=np.bool_)
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time, self._receiver_id))
         self._sender._connections['packet'][self._receiver_id][SEND].put(packet)

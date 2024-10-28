@@ -170,6 +170,16 @@ def load_qasm_2_0_file(path):
                 thetas_new.append(eval(theta))
             circuit.append(['U', qubit] + thetas_new)
             continue
+        if gate.startswith('u1'):
+            gate = gate.replace('u1', '')
+            thetas, qubit = gate.split(' ')
+            qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
+            thetas = thetas.replace(f'(', '').replace(')', '').strip().split(',')
+            thetas_new = []
+            for theta in thetas:
+                thetas_new.append(eval(theta))
+            circuit.append(['Rz', qubit] + thetas_new)
+            continue
         if gate.startswith('u'):
             gate = gate.replace('u', '')
             thetas, qubit = gate.split(' ')
@@ -179,24 +189,28 @@ def load_qasm_2_0_file(path):
             for theta in thetas:
                 thetas_new.append(eval(theta))
             circuit.append(['U', qubit] + thetas_new)
+            continue
         if gate.startswith('rx'):
             gate = gate.replace('rx', '')
             theta, qubit = gate.split(' ')
             qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
             theta = eval(theta.replace(f'(', '').replace(')', '').strip())
             circuit.append(['Rx', qubit, theta])
+            continue
         if gate.startswith('ry'):
             gate = gate.replace('ry', '')
             theta, qubit = gate.split(' ')
             qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
             theta = eval(theta.replace(f'(', '').replace(')', '').strip())
             circuit.append(['Ry', qubit, theta])
+            continue
         if gate.startswith('rz'):
             gate = gate.replace('rz', '')
             theta, qubit = gate.split(' ')
             qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
             theta = eval(theta.replace(f'(', '').replace(')', '').strip())
             circuit.append(['Rz', qubit, theta])
+            continue
         if gate.startswith('cx'):
             gate = gate.replace('cx ', '')
             qubits = []

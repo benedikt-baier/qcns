@@ -1,104 +1,145 @@
 import numpy as np
-from typing import Any, List
+from typing import List, Tuple, Union, Any
+
+from python.components.protocol import *
 
 __all__ = ['Packet']
 
-class Layer1:
+class Protocol:
     
     pass
-
-class Layer2:
-    
-    pass
-
-class Layer3:
-    
-    pass
-
-class Layer4:
-    
-    pass
-
-class Layer7:
-    
-    pass
-
 
 class Packet:
     
     """
-    Represents a classical packet
+    Represents a packet
     
-    Attr:
-        _layer_counter (int): counter how many layers are in packet
-        _l1 (Layer1): Layer 1
-        _l2 (Layer2): Layer 2
-        _l3 (Layer3): Layer 3
-        _l4 (Layer4): Layer 4
-        _l7 (Layer7): Layer 7
-        _time_stamp (float): timestamp of packet
-        _upayload (list): untracked payload
+    Attrs:
+
+        _layer_counter (int): count which of the layers are present in the packet
+        _layer1 (L1_Protocol): Physical Layer should always be present, as its needed for forwarding the packet
+        _layer2 (L2_Protocol): Link Layer used for resource allocation/access control, only the MAC adresses are always needed
+        _layer3 (L3_Protocol): Network/IP Layer used to forward packets through a network
+        _layer4 (L4_Protocol): Transport Layer used for End-to-End control of packets
+        _layer7 (L7_Protocol): Application Layer used for application specific data, contains the payload of the packet
     """
     
-    def __init__(self, l2_src: int, l2_dst: int, 
-                 l1_requested: int=0, l1_needed: int=0, 
-                 l2_requested: int=0, l2_needed: int=0, 
-                 l3_src: int=None, l3_dst: int=None, l3_mode: int=0, l3_num_channels: int=1, 
-                 l4_src: int=None, l4_dst: int=None, l4_requested: int=0, l4_needed: int=0, 
-                 time_stamp: float=0., payload: Any=None, upayload: Any='') -> None:
+    def __base_init(self, l2_src: int, l2_dst: int,
+                      l1_num_requested: int=1, l1_num_needed: int=1,
+                      l2_num_requested: int=None, l2_num_needed: int=None,
+                      l3_src: int=None, l3_dst: int=None, l3_num_requested: int=None, l3_num_needed: int=None,
+                      l4_src: int=None, l4_dst: int=None, l4_num_requested: int=None, l4_num_needed: int=None,
+                      l7_num_requested: int=None, l7_num_needed: int=None) -> None:
         
         """
-        Instantiates a classical packet with tracked and untracked payload with respect to timing update
+        Initializes the packet with standard inputs such as L2 src and dst
         
         Args:
             l2_src (int): L2 source address
             l2_dst (int): L2 destination address
-            l1_requested (int): number of requested qubits for L1 transmission
-            l1_needed (int): number of needed qubits for L1 transmission
-            l2_requested (int): number of requested qubit pairs for L2 purification
-            l2_needed (int): number of needed qubit pairs for L2 purification
+            l1_num_requested (int): L1 number of requested qubits
+            l1_num_needed (int): L1 number of needed qubits
+            l2_num_requested (int): L2 number of requested qubits
+            l2_num_needed (int): L2 number of needed qubits
             l3_src (int): L3 source address
             l3_dst (int): L3 destination address
-            l3_mode (bool): L3 mode of packet, whether to just apply quantum operations or just forward packet
-            l3_num_channels (int): number of channels for L3 protocol
+            l3_num_requested (int): L3 number of requested qubits
+            l3_num_needed (int): L3 number of needed qubits
             l4_src (int): L4 source port
             l4_dst (int): L4 destination port
-            l4_requested (int): number of requested qubits for L4 purification
-            l4_needed (int): number of needed qubits for L4 purification
-            time_stamp (float): time stamp of packet creation
-            payload (Any): tracked payload of packet, has influence on sending time of packet
-            upayload (Any): untracked payload of packet, has no influence on sending time of packet
+            l4_num_requested (int): L4 number of requested qubits
+            l4_num_needed (int): L4 number of needed qubits
+            l7_num_requested (int): L7 number of requested qubits
+            l7_num_needed (int): L7 number of needed qubits
             
         Returns:
             /
         """
-
-        self._layer_counter: int = 0
-
-        self._l1: Layer1 = Layer1(l1_requested, l1_needed)
         
-        self._l2: Layer2 = Layer2(l2_src, l2_dst, l2_requested, l2_needed)
-        if l2_requested:
+        self._layer1: L1_Protocol = L1_Protocol(l1_num_requested, l1_num_needed)
+        
+        self._layer2: L2_Protocol = L2_Protocol(l2_src, l2_dst, l2_num_requested, l2_num_needed)
+        if self._layer2.num_requested is not None:
+            self._layer1.next_protocol = self._layer2.protocol
+            self._layer_counter = 1
+        
+        self._layer3: L3_Protocol = ''
+        if l3_src is not None:
+            self._layer3: L3_Protocol = L3_Protocol(l3_src, l3_dst, l3_num_requested, l3_num_needed)
+            self._layer2.next_protocol = self._layer3.protocol
+            self._layer_counter = 2
+        
+        self._layer4: L4_Protocol = ''
+        if l4_src is not None:
+            self._layer4: L4_Protocol = L4_Protocol(l4_src, l4_dst, l4_num_requested, l4_num_needed)
+            self._layer3.next_protocol = self._layer4.protocol
+            self._layer_counter = 3
+        
+        self._layer7 : L7_Protocol = ''
+        if l7_num_requested is not None:
+            self._layer7: L7_Protocol = L7_Protocol(l7_num_requested, l7_num_needed)
+            self._layer4.next_protocol = self._layer7.protocol
+            self._layer_counter = 4
+    
+    def __derived_init(self, layer1: L1_Protocol, layer2: L2_Protocol, layer3: L3_Protocol='', 
+                     layer4: L4_Protocol='', layer7: L7_Protocol='') -> None:
+        
+        """
+        Initializes the packet with each layer
+        
+        Args:
+            layer1 (L1_Protocol): base or derived L1_Protocol class, represents the first layer
+            layer2 (L2_Protocol): base or derived L2_Protocol class, represents the second layer
+            layer3 (L3_Protocol): base or derived L3_Protocol class, represents the third layer
+            layer4 (L4_Protocol): base or derived L4_Protocol class, represents the fourth layer
+            layer7 (L7_Protocol): base or derived L7_Protocol class, represents the seventh layer
+            
+        Returns:
+            /
+        """
+        
+        self._layer1: L1_Protocol = layer1
+        
+        self._layer2: L2_Protocol = layer2
+        if self._layer2.num_requested is not None:
+            self._layer1.next_protocol = self._layer2.protocol
             self._layer_counter = 1
             
-        self._l3: Layer3 = ''
-        if l3_src is not None or l3_dst is not None:
-            self._l3 = Layer3(l3_src, l3_dst, l3_mode, l3_num_channels)
+        self._layer3: L3_Protocol = layer3
+        if self._layer3:
+            self._layer2.next_protocol = self._layer3.protocol
             self._layer_counter = 2
-            
-        self._l4: Layer4 = ''
-        if l4_src is not None or l4_dst is not None:
-            self._l4 = Layer4(l4_src, l4_dst, l4_requested, l4_needed)
+        
+        self._layer4: L4_Protocol = layer4
+        if self._layer4:
+            self._layer3.next_protocol = self._layer4.protocol
             self._layer_counter = 3
-            
-        self._l7: Layer7 = ''
-        if payload is not None:
-            self._l7: Layer7 = Layer7(payload)
+        
+        self._layer7: L7_Protocol = layer7
+        if self._layer7:
+            self._layer4.next_protocol = self._layer7.protocol
             self._layer_counter = 4
-
-        self._time_stamp: float = time_stamp   
-        self._upayload: List[Any] = upayload
     
+    def __init__(self, *args: Union[int, Protocol], **kwargs: Union[int, Protocol]) -> None:
+        
+        """
+        Initializes a packet
+        
+        Args:
+            *args (int/Protocol): args matching __base_init or __derived_init
+            **kwargs (int/Protocol): kwargs matching __base_init or __derived_init
+            
+        Returns:
+            /
+        """
+        
+        self._layer_counter: int = 0
+        
+        if isinstance(args[0], L1_Protocol) or list(kwargs.keys())[0] == 'layer1':
+            self.__derived_init(*args, **kwargs)
+        else:
+            self.__base_init(*args, kwargs)
+        
     def __len__(self) -> int:
         
         """
@@ -111,33 +152,19 @@ class Packet:
             length (int): length of packet in bits
         """
         
-        return len(self._l1) + len(self._l2) + len(self._l3) + len(self._l4) + len(self._l7)
-    
-    def __repr__(self) -> str:
-        
-        """
-        Prints the packet
-        
-        Args:
-            /
-            
-        Returns:
-            /
-        """
-        
-        return f'Time Stamp: {self._time_stamp} {self._l1}{self._l2}{self._l3}{self._l4}{self._l7}'
-    
+        return len(self._layer1) + len(self._layer2) + len(self._layer3) + len(self._layer4) + len(self._layer7)
+      
     @property
     def is_l1(self) -> bool:
         
         """
-        Returns if this packet is purely L1
+        Checks whether the packet is purely L1
         
         Args:
             /
             
         Returns:
-            l1 (bool): flag if L1 is implemented
+            is_l1 (bool): whether the packet is purely L1
         """
         
         return self._layer_counter == 0
@@ -146,13 +173,13 @@ class Packet:
     def is_l2(self) -> bool:
         
         """
-        Returns if this packet is purely L2
+        Checks whether the packet is purely L2
         
         Args:
             /
             
         Returns:
-            l2 (bool): flag if l2 is implemented
+            is_l2 (bool): whether the packet is purely L2
         """
         
         return self._layer_counter == 1
@@ -161,13 +188,13 @@ class Packet:
     def is_l3(self) -> bool:
         
         """
-        Returns if this packet is L3
+        Checks whether the packet is purely L3
         
         Args:
             /
             
         Returns:
-            l3 (bool): flag if l3 is implemented
+            is_l3 (bool): whether the packet is purely L3
         """
         
         return self._layer_counter == 2
@@ -176,13 +203,13 @@ class Packet:
     def is_l4(self) -> bool:
         
         """
-        Returns if this packet is purely L4
+        Checks whether the packet is purely L4
         
         Args:
             /
             
         Returns:
-            l4 (bool): flag if l4 is implemented
+            is_l4 (bool): whether the packet is purely L4
         """
         
         return self._layer_counter == 3
@@ -191,13 +218,13 @@ class Packet:
     def is_l7(self) -> bool:
         
         """
-        Returns if this packet is purely L7
+        Checks whether the packet is purely L7
         
         Args:
             /
             
         Returns:
-            _is_l7 (bool): whether L7 is in the packet
+            is_l7 (bool): whether the packet is purely L7
         """
         
         return self._layer_counter == 4
@@ -206,13 +233,13 @@ class Packet:
     def has_l1(self) -> bool:
         
         """
-        Returns whether L1 is implemented in the packet
+        Checks whether the packet has L1
         
         Args:
             /
             
         Returns:
-            _has_l1 (bool): whether L1 is in this packet
+            has_l1 (bool): whether the packet L1
         """
         
         return True
@@ -221,28 +248,28 @@ class Packet:
     def has_l2(self) -> bool:
         
         """
-        Returns wether L2 is implemented in the packet
+        Checks whether the packet has L2
         
         Args:
             /
             
         Returns:
-            _has_l2 (bool): whether L2 is in this packet
+            has_l2 (bool): whether the packet L2
         """
         
         return self._layer_counter > 0
-    
+        
     @property
     def has_l3(self) -> bool:
         
         """
-        Returns wether L3 is implemented in the packet
+        Checks whether the packet has L3
         
         Args:
             /
             
         Returns:
-            _has_l3 (bool): whether L3 is in this packet
+            has_l3 (bool): whether the packet L3
         """
         
         return self._layer_counter > 1
@@ -251,13 +278,13 @@ class Packet:
     def has_l4(self) -> bool:
         
         """
-        Returns wether L4 is implemented in the packet
+        Checks whether the packet has L4
         
         Args:
             /
             
         Returns:
-            _has_l4 (bool): whether L4 is in this packet
+            has_l4 (bool): whether the packet L4
         """
         
         return self._layer_counter > 2
@@ -266,96 +293,98 @@ class Packet:
     def has_l7(self) -> bool:
         
         """
-        Returns wether L7 is implemented in the packet
+        Checks whether the packet has L7
         
         Args:
             /
             
         Returns:
-            _has_l7 (bool): whether L7 is in this packet
+            has_l7 (bool): whether the packet L7
         """
         
         return self._layer_counter > 3
     
-    @property
-    def l1_requested(self) -> int:
-        
-        """
-        Returns the L1 number of requested entanglement
-        
-        Args:
-            /
-            
-        Returns:
-            l1_requested (int): L1 number of requested entanglements 
-        """
-        
-        return self._l1._num_requested
+    # Layer 1
     
     @property
-    def l1_needed(self) -> int:
+    def l1_num_requested(self) -> int:
         
         """
-        Returns the L1 number of needed entanglement
+        Returns the number requested qubits on L1
         
         Args:
             /
             
         Returns:
-            l1_needed (int): L1 number of needed entanglements 
+            l1_num_requested (int): number of requested qubits on L1
         """
         
-        return self._l1._num_needed
+        return self._layer1.num_requested
     
-    @property
-    def l1_ack(self) -> bool:
+    @l1_num_requested.setter
+    def l1_num_requested(self, _num_requested: int) -> None:
         
         """
-        Returns the L1 ACK flag
+        Sets the number of requested qubits on L1
+        
+        Args:
+            _num_requested (int): number of requested qubits to set
+            
+        Returns:
+            /
+        """
+        
+        self._layer1.num_requested = _num_requested
+        
+    @property
+    def l1_num_needed(self) -> int:
+        
+        """
+        Returns the number needed qubits on L1
         
         Args:
             /
             
         Returns:
-            l1_ack (bool): l1 ack flag
+            l1_num_needed (int): number of needed qubits on L1
         """
         
-        return self._l1._ack
+        return self._layer1.num_needed
     
-    @property
-    def l1_ps(self) -> bool:
+    @l1_num_needed.setter
+    def l1_num_needed(self, _num_needed: int) -> None:
         
         """
-        Whether L1 Photon Source flag is set
+        Sets the number of needed qubits on L1, WARNING resets the L1 success array
+        
+        Args:
+            _num_needed (int): number of needed qubits to set
+            
+        Returns:
+            /
+        """
+        
+        self._layer1.num_needed = _num_needed
+        
+    @property
+    def l1_ack(self) -> int:
+        
+        """
+        Checks whether the L1 Ack flag is set
         
         Args:
             /
             
         Returns:
-            l1_ps (bool): l1 ps flag
+            l1_ack (int): L1 Ack flag
         """
         
-        return self._l1._ps
-    
-    @property
-    def l1_entanglement_success(self) -> np.array:
-        
-        """
-        Returns the L1 entanglement success
-        
-        Args:
-            /
-            
-        Returns:
-            l1_entanglement_success (np.array): L1 entanglement success
-        """
-        
-        return self._l1._entanglement_success
+        return self._layer1.ack
     
     def set_l1_ack(self) -> None:
         
         """
-        Sets the L1 ACK flag
+        Sets the L1 Ack flag
         
         Args:
             /
@@ -364,12 +393,12 @@ class Packet:
             /
         """
         
-        self._l1._ack = 1
+        self._layer1.set_ack()
         
     def reset_l1_ack(self) -> None:
         
         """
-        Resets the L1 ACK flag
+        Resets the L1 Ack flag
         
         Args:
             /
@@ -378,12 +407,27 @@ class Packet:
             /
         """
         
-        self._l1._ack = 0
+        self._layer1.reset_ack()
+        
+    @property
+    def l1_ps(self) -> int:
+        
+        """
+        Checks whether the L1 Photon Source flag is set
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        return self._layer1.ps
     
     def set_l1_ps(self) -> None:
         
         """
-        Sets the L1 PS flag
+        Sets the Photon Source flag
         
         Args:
             /
@@ -392,12 +436,12 @@ class Packet:
             /
         """
         
-        self._l1._ps = 1
+        self._layer1.set_ps()
         
     def reset_l1_ps(self) -> None:
         
         """
-        Resets the L1 PS flag
+        Resets the Photon Source flag
         
         Args:
             /
@@ -406,70 +450,69 @@ class Packet:
             /
         """
         
-        self._l1._ps = 0
-    
+        self._layer1.reset_ps()
+        
     @property
-    def l1_success(self) -> bool:
+    def l1_success(self) -> np.array:
         
         """
-        Checks wether all entanglement attempts are successfull
+        Returns the L1 success array
         
         Args:
             /
             
         Returns:
-            l1_success (bool): wether all attempts were successfull
+            l1_success (np.array): L1 success array
         """
         
-        return self._l1._num_requested <= self.num_l1_success()
-    
-    @property
-    def num_l1_success(self) -> int:
+        return self._layer1.success
+
+    @l1_success.setter
+    def l1_success(self, l1_success: np.array) -> None:
         
         """
-        Counts the number of successfull entanglement attempts
+        Sets the L1 success array
         
         Args:
-            /
-            
-        Returns:
-            num_l1_success (int): number of successfull entanglement attempts
-        """
-        
-        return np.count_nonzero(self._l1._entanglement_success)
-    
-    @property
-    def num_l1_failures(self) -> int:
-        
-        """
-        Counts the number of failed entanglement attempts
-        
-        Args:
-            /
-            
-        Returns:
-            num_l1_failures (int): number of failed entanglement attempts
-        """
-        
-        return np.count_nonzero(self._l1._entanglement_success==0)
-    
-    def update_l1_success(self, index: int) -> None:
-        
-        """
-        Updates the value of L1 success array at index
-        
-        Args:
-            index (int): index set to True
+            l1_success (np.array): L1 success array
             
         Returns:
             /
         """
         
-        self._l1._entanglement_success[index] = True
+        self._layer1.success = l1_success
+
+    def set_l1_success(self, index: int) -> None:
+        
+        """
+        Sets the L1 success array the specified index
+        
+        Args:
+            index (int): index to set L1 success array at
+            
+        Returns:
+            /
+        """
+        
+        self._layer1.set_success(index)
+        
+    def reset_l1_success(self, index: int) -> None:
+        
+        """
+        Resets the L1 success array at the index
+        
+        Args:
+            index (int): index to reset L1 success array at
+            
+        Returns:
+            /
+        """
+        
+        self._layer1.reset_success(index)
     
     @property
     def l1_protocol(self) -> int:
-    
+        
         """
         Returns the L1 protocol
         
@@ -480,22 +523,54 @@ class Packet:
             l1_protocol (int): L1 protocol
         """
         
-        return self._l1._protocol
+        return self._layer1.protocol
     
     @l1_protocol.setter
-    def l1_protocol(self, protocol: int) -> None:
+    def l1_protocol(self, l1_protocol: int) -> None:
         
         """
         Sets the L1 protocol
         
         Args:
-            protocol (int): L1 protocol
+            l1_protocol (int): L1 protocol
             
         Returns:
             /
         """
         
-        self._l1._protocol = protocol
+        self._layer1.protocol = l1_protocol
+        
+    @property
+    def l1_next_protocol(self) -> int:
+        
+        """
+        Returns the L1 next protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l1_next_protocol (int): L1 next protocol
+        """
+        
+        return self._layer1.next_protcol
+    
+    @l1_next_protocol.setter
+    def l1_next_protocol(self, l1_next_protocol: int) -> None:
+        
+        """
+        Sets the L1 next protocol
+        
+        Args:
+            l1_next_protocol (int): L1 next protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer1.next_protocol = l1_next_protocol
+    
+    # Layer 2
     
     @property
     def l2_src(self) -> int:
@@ -507,26 +582,26 @@ class Packet:
             /
             
         Returns:
-            l2_src (int): l2 source address
+            l2_src (int): L2 source address
         """
         
-        return self._l2._src
+        return self._layer2.src
     
     @l2_src.setter
     def l2_src(self, l2_src: int) -> None:
         
         """
-        Sets the L2 src address
+        Sets the L2 source address
         
         Args:
-            l2_src (int): L2 source address
+            l2_src (int): L2 source address to set
             
         Returns:
             /
         """
         
-        self._l2._src = l2_src
-    
+        self._layer2.src = l2_src
+        
     @property
     def l2_dst(self) -> int:
         
@@ -537,55 +612,25 @@ class Packet:
             /
             
         Returns:
-            l2_dst (int): l2 destination address
+            l2_dst (int) L2 destination address
         """
         
-        return self._l2._dst
+        return self._layer2.dst
     
     @l2_dst.setter
     def l2_dst(self, l2_dst: int) -> None:
         
         """
-        Sets the L2 dst address
+        Sets the L2 destination address
         
         Args:
-            _l2_dst (int): L2 destinatioon address
+            l2_dst (int): L2 destination address
             
         Returns:
             /
         """
-    
-        self._l2._dst = l2_dst
-    
-    @property
-    def l2_ack(self) -> bool:
         
-        """
-        Returns wether L2 ack flag is set
-        
-        Args:
-            /
-            
-        Returns:
-            l2_ack (bool): L2 ack flag
-        """
-        
-        return self._l2._ack
-    
-    @property
-    def l2_purification_success(self) -> np.array:
-        
-        """
-        Returns the L2 purification success
-        
-        Args:
-            /
-            
-        Returns:
-            l2_purification_success (np.array): L2 purification success
-        """
-        
-        return self._l2._purification_success
+        self._layer2.dst = l2_dst
     
     def switch_l2_src_dst(self) -> None:
         
@@ -599,12 +644,87 @@ class Packet:
             /
         """
         
-        self._l2._src, self._l2._dst = self._l2._dst, self._l2._src
+        self._layer2.switch_src_dst()
+      
+    @property
+    def l2_num_requested(self) -> int:
+        
+        """
+        Returns the L2 number of requested qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l2_num_requested (int): number of L2 requested qubits
+        """
+        
+        return self._layer2.num_requested
+    
+    @l2_num_requested.setter
+    def l2_num_requested(self, _num_requested: int) -> None:
+        
+        """
+        Sets the L2 number of requested qubits
+        
+        Args:
+            _num_requested (int): number of L2 requested qubits to set
+            
+        Returns:
+            /
+        """
+        
+        self._layer2.num_requested = _num_requested
+        
+    @property
+    def l2_num_needed(self) -> int:
+        
+        """
+        Returns the L2 number of needed qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l2_num_needed (int): L2 number of needed qubits
+        """
+        
+        return self._layer2.num_needed
+    
+    @l2_num_needed.setter
+    def l2_num_needed(self, _num_needed: int) -> None:
+        
+        """
+        Sets the L2 number of needed qubits, WARNING resets the L2 success array
+        
+        Args:
+            _num_needed (int): L2 number of needed qubits to set
+            
+        Returns:
+            /
+        """
+        
+        self._layer2.num_needed = _num_needed
+        
+    @property
+    def l2_ack(self) -> int:
+        
+        """
+        Returns whether the L2 Ack is set
+        
+        Args:
+            /
+            
+        Returns:
+            l2_ack (int): L2 ack
+        """
+        
+        return self._layer2.ack
     
     def set_l2_ack(self) -> None:
         
         """
-        Sets the L2 ACK flag
+        Sets the L2 Ack
         
         Args:
             /
@@ -613,12 +733,12 @@ class Packet:
             /
         """
         
-        self._l2._ack = 1
+        self._layer2.set_ack()
         
     def reset_l2_ack(self) -> None:
         
         """
-        Resets the L2 ACK flag
+        Resets the L2 Ack
         
         Args:
             /
@@ -627,21 +747,127 @@ class Packet:
             /
         """
         
-        self._l2._ack = 0
+        self._layer2.reset_ack()
+          
+    @property
+    def l2_success(self) -> np.array:
+        
+        """
+        Returns the L2 success array
+        
+        Args:
+            /
+            
+        Returns:
+            l2_success (np.array): L2 success array
+        """
+        
+        return self._layer2.success
+
+    @l2_success.setter
+    def l2_success(self, l2_success: np.array) -> None:
+        
+        """
+        Sets the L2 success array
+        
+        Args:
+            l2_success (np.array): L2 success array
+
+        Returns:
+            /
+        """
+        
+        self._layer2.success = l2_success
+
+    def set_l2_success(self, index: int) -> None:
+        
+        """
+        Sets the L2 success array the index
+        
+        Args:
+            index (int): index to set L2 array
+            
+        Returns:
+            /
+        """
+        
+        self._layer2.set_success(index)
+        
+    def reset_l2_success(self, index: int) -> None:
+        
+        """
+        Resets the L2 success array at the index
+        
+        Args:
+            index (int): index to reset L2 success array at
+            
+        Returns:
+            /
+        """
+        
+        self._layer2.reset_success(index)
     
-    def update_l2_success(self, index: int) -> None:
+    @property
+    def l2_protocol(self) -> int:
         
         """
-        Updates the value of L2 success array at index
+        Returns the L2 protocol
         
         Args:
-            index (int): index set to True
+            /
+            
+        Returns:
+            l2_protocol (int): L2 protocol
+        """
+        
+        return self._layer2.protocol
+    
+    @l2_protocol.setter
+    def l2_protocol(self, l2_protocol: int) -> None:
+        
+        """
+        Sets the L2 protocol
+        
+        Args:
+            l2_protocol (int): L2 protocol
             
         Returns:
             /
         """
         
-        self._l2._purification_success[index] = 1
+        self._layer2.protocol = l2_protocol
+        
+    @property
+    def l2_next_protocol(self) -> int:
+        
+        """
+        Returns the L2 next protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l2_next_protocol (int): L2 next protocol
+        """
+        
+        return self._layer2.next_protcol
+    
+    @l2_next_protocol.setter
+    def l2_next_protocol(self, l2_next_protocol: int) -> None:
+        
+        """
+        Sets the L2 next protocol
+        
+        Args:
+            l2_next_protocol (int): L2 next protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer2.next_protocol = l2_next_protocol
+        
+    # Layer 3
     
     @property
     def l3_src(self) -> int:
@@ -656,27 +882,23 @@ class Packet:
             l3_src (int): L3 source address
         """
         
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        return self._l3._src
+        return self._layer3.src
     
     @l3_src.setter
     def l3_src(self, l3_src: int) -> None:
         
         """
-        Sets the l3 source address
+        Sets the L3 source address
         
         Args:
-            l3_src (int): l3 source address
+            l3_src (int): L3 source address
             
         Returns:
             /
         """
         
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        self._l3._src = l3_src
-    
+        self._layer3.src = l3_src
+        
     @property
     def l3_dst(self) -> int:
         
@@ -690,99 +912,27 @@ class Packet:
             l3_dst (int): L3 destination address
         """
         
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        return self._l3._dst
+        return self._layer3.dst
     
     @l3_dst.setter
-    def l3_dst(self, l3_dst: int) -> None:
+    def l3_dst(self, l3_dst) -> None:
         
         """
-        Sets the l3 destination address
+        Sets the L3 destination address
         
         Args:
-            l3_dst (int): l3 destination address
+            l3_dst (int): L3 destination address
             
         Returns:
             /
         """
         
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        self._l3._dst = l3_dst
-    
-    @property
-    def l3_mode(self) -> bool:
-        
-        """
-        Returns the L3 mode
-        
-        Args:
-            /
-            
-        Returns:
-            l3_mode (bool): l3 mode
-        """
-        
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        return self._l3._mode
-    
-    @property
-    def l3_num_channels(self) -> int:
-        
-        """
-        Returns the L3 number of channels
-        
-        Args:
-            /
-            
-        Returns:
-            l3_num_channels (int): l3 number of channels
-        """
-        
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        return self._l3._num_channels
-    
-    @property
-    def l3_x_count(self) -> np.array:
-        
-        """
-        Returns the L3 X count
-        
-        Args:
-            /
-            
-        Returns:
-            l3_x_count (np.array): L3 X count
-        """
-        
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        return self._l3._x_count
-    
-    @property
-    def l3_z_count(self) -> np.array:
-        
-        """
-        Returns the L3 Z count
-        
-        Args:
-            /
-            
-        Returns:
-            l3_z_count (np.array): L3 Z count
-        """
-        
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        return self._l3._z_count
+        self._layer3.dst = l3_dst
     
     def switch_l3_src_dst(self) -> None:
         
         """
-        Switches L3 source and destination address
+        Switches the L3 source and destination address
         
         Args:
             /
@@ -791,15 +941,87 @@ class Packet:
             /
         """
         
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        
-        self._l3._src, self._l3._dst = self._l3._dst, self._l3._src
+        self._layer3.switch_src_dst()
     
-    def reset_l3_swapping(self) -> None:
+    @property
+    def l3_num_requested(self) -> int:
         
         """
-        Resets the L3 x count and z count array
+        Returns the L3 number of requested qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l3_num_requested (int): L3 number of requested qubits
+        """
+        
+        return self._layer3.num_requested
+    
+    @l3_num_requested.setter
+    def l3_num_requested(self, _num_requested: int) -> None:
+        
+        """
+        Sets the L3 number of requested qubits
+        
+        Args:
+            l3_num_requested (int): L3 number of requested qubits
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.num_requested = _num_requested
+        
+    @property
+    def l3_num_needed(self) -> int:
+        
+        """
+        Returns the L3 number of needed qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l3_num_needed (int): L3 number of needed qubits
+        """
+        
+        return self._layer3.num_needed
+    
+    @l3_num_needed.setter
+    def l3_num_needed(self, _num_needed: int) -> None:
+        
+        """
+        Sets the L3 number of needed qubits, WARNING resets the L3 success, X and Z array
+        
+        Args:
+            _num_needed (int): L3 number of needed qubits
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.num_needed = _num_needed
+        
+    @property
+    def l3_mode(self) -> int:
+        
+        """
+        Checks whether the L3 mode flag is set
+        
+        Args:
+            /
+            
+        Returns:
+            l3_mode (int): L3 mode
+        """
+        
+        return self._layer3.mode
+    
+    def l3_set_mode(self) -> None:
+        
+        """
+        Sets the L3 mode flag
         
         Args:
             /
@@ -808,25 +1030,142 @@ class Packet:
             /
         """
         
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        self._l3.reset()
+        self._layer3.set_mode()
         
-    def update_l3_swapping(self, res: int, channel: int) -> None:
+    def l3_reset_mode(self) -> None:
         
         """
-        Updates the L3 x count and z count
+        Resets the L3 mode flag
         
         Args:
             /
-        
+            
         Returns:
             /
         """
         
-        if not self.has_l3:
-            raise ValueError('No Layer 3 in this packet')
-        self._l3.update(res, channel)
+        self._layer3.reset_mode()
+    
+    @property
+    def l3_es_result(self) -> Tuple[np.array, np.array]:
+        
+        """
+        Returns both the L3 X and Z array
+        
+        Args:
+            /
+            
+        Returns:
+            es_result (tuple): tuple containing L3 X and Z array
+        """
+        
+        return self._layer3.es_result
+    
+    @l3_es_result.setter
+    def l3_es_result(self, l3_es_result: np.array) -> None:
+        
+        """
+        Sets the X and Z array
+        
+        Args:
+            l3_es_result (np.array): X and Z array
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.es_result = l3_es_result
+    
+    def l3_update_es(self, index: int, result: int) -> None:
+        
+        """
+        Updates the L3 X and Z array at the index with the result
+        
+        Args:
+            index (int): index to update X and Z array
+            result (int): result to update X and Z array with
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.update_es(index, result)
+    
+    def l3_reset_es(self) -> None:
+        
+        """
+        Resets the L3 X and Z array
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.reset_es()
+    
+    @property
+    def l3_protocol(self) -> int:
+        
+        """
+        Returns the L3 protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l3_protocol (int): L3 protocol
+        """
+        
+        return self._layer3.protocol
+    
+    @l3_protocol.setter
+    def l3_protocol(self, l3_protocol: int) -> None:
+        
+        """
+        Sets the L3 protocol
+        
+        Args:
+            l3_protocol (int): L3 protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.protocol = l3_protocol
+        
+    @property
+    def l3_next_protocol(self) -> int:
+        
+        """
+        Returns the L3 next protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l3_next_protocol (int): L3 next protocol
+        """
+        
+        return self._layer3.next_protcol
+    
+    @l3_next_protocol.setter
+    def l3_next_protocol(self, l3_next_protocol: int) -> None:
+        
+        """
+        Sets the L3 next protocol
+        
+        Args:
+            l3_next_protocol (int): L3 next protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.next_protocol = l3_next_protocol
+    
+    # Layer 4
     
     @property
     def l4_src(self) -> int:
@@ -841,27 +1180,23 @@ class Packet:
             l4_src (int): L4 source port
         """
         
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
-        return self._l4._src
+        return self._layer4.src
     
     @l4_src.setter
     def l4_src(self, l4_src: int) -> None:
         
         """
-        Sets the l4 source port
+        Sets the L4 source port
         
         Args:
-            l4_src (int): l4 source port
+            l4_src (int): L4 source port
             
         Returns:
             /
         """
         
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
-        self._l4._src = l4_src
-    
+        self._layer4.src = l4_src
+        
     @property
     def l4_dst(self) -> int:
         
@@ -872,69 +1207,30 @@ class Packet:
             /
             
         Returns:
-            l4_src (int): L4 destination port
+            l4_dst (int): L4 destination port
         """
         
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
-        return self._l4._dst
+        return self._layer4.dst
     
     @l4_dst.setter
     def l4_dst(self, l4_dst: int) -> None:
         
         """
-        Sets the l4 destination port
+        Sets the L4 destination port
         
         Args:
-            l4_dst (int): l4 destination port
+            l4_dst (int): L4 destination port
             
         Returns:
             /
         """
         
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
-        self._l4._dst = l4_dst
-    
-    @property
-    def l4_num_purification(self) -> int:
+        self._layer4.dst = l4_dst
         
-        """
-        Returns the number of L2 purification attempts
-        
-        Args:
-            /
-            
-        Returns:
-            l2_num_purification (int): number of L2 purification
-        """
-
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
-        return self._l4._num_purification
-    
-    @property
-    def l4_ack(self) -> bool:
-        
-        """
-        Returns wether L4 ACK flag is set
-        
-        Args:
-            /
-            
-        Returns:
-            l4_ack (bool): L4 ACK flag
-        """
-        
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
-        
-        return self._l4._ack
-    
     def switch_l4_src_dst(self) -> None:
         
         """
-        Switches L4 source and destination address
+        Switches the L4 source and destination port
         
         Args:
             /
@@ -943,15 +1239,87 @@ class Packet:
             /
         """
         
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
+        self._layer4.switch_src_dst()
         
-        self._l4._src, self._l4._dst = self._l4._dst, self._l4._src
+    @property
+    def l4_num_requested(self) -> int:
+        
+        """
+        Returns the L4 number of requested qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l4_num_requested (int): L4 number of requested qubits
+        """
+        
+        return self._layer4.num_requested
+    
+    @l4_num_requested.setter
+    def l4_num_requested(self, _num_requested: int) -> None:
+        
+        """
+        Sets the L4 number of requested qubits
+        
+        Args:
+            _num_requested (int): L4 number of requested qubits
+            
+        Returns:
+            /
+        """
+        
+        self._layer4.num_requested = _num_requested
+        
+    @property
+    def l4_num_needed(self) -> int:
+        
+        """
+        Returns the L4 number of needed qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l4_num_needed (int): number of needed qubits
+        """
+        
+        return self._layer4.num_needed
+    
+    @l4_num_needed.setter
+    def l4_num_needed(self, _num_needed: int) -> None:
+        
+        """
+        Sets the L4 number of needed qubits, WARNING resets the L4 success array
+        
+        Args:
+            _num_needed (int): L4 number of needed qubits
+            
+        Returns:
+            /
+        """
+        
+        self._layer4.num_needed = _num_needed
+        
+    @property
+    def l4_ack(self) -> int:
+        
+        """
+        Checks whether the L4 Ack flag is set
+        
+        Args:
+            /
+            
+        Returns:
+            l4_ack (int): L4 Ack flag
+        """
+        
+        return self._layer4.ack
     
     def set_l4_ack(self) -> None:
         
         """
-        Sets the L4 ACK flag
+        Sets the L4 Ack flag
         
         Args:
             /
@@ -960,15 +1328,12 @@ class Packet:
             /
         """
         
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
-        
-        self._l4._ack = 1
+        self._layer4.set_ack()
         
     def reset_l4_ack(self) -> None:
         
         """
-        Resets the L4 ACK flag
+        Resets the L4 Ack flag
         
         Args:
             /
@@ -977,404 +1342,272 @@ class Packet:
             /
         """
         
-        if not self.has_l4:
-            raise ValueError('No Layer 4 in this packet')
+        self._layer4.reset_ack()
+    
+    @property
+    def l4_success(self) -> np.array:
         
-        self._l4._ack = 0
+        """
+        Returns the L4 success array
+        
+        Args:
+            /
+            
+        Returns:
+            l4_success (np.array): L4 success array
+        """
+        
+        return self._layer4.success
+
+    def set_l4_success(self, index: int) -> None:
+        
+        """
+        Sets the L4 sccess array at the index
+        
+        Args:
+            index (int): index to set L4 success array at
+            
+        Returns:
+            /
+        """
+        
+        self._layer4.set_success(index)
+        
+    def reset_l4_success(self, index: int) -> None:
+        
+        """
+        Resets the L4 sccess array at the index
+        
+        Args:
+            index (int): index to set L4 success array at
+            
+        Returns:
+            /
+        """
+        
+        self._layer4.reset_success(index)
+     
+    @property
+    def l4_protocol(self) -> int:
+        
+        """
+        Returns the L4 protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l4_protocol (int): L4 protocol
+        """
+        
+        return self._layer4.protocol
+    
+    @l4_protocol.setter
+    def l4_protocol(self, l4_protocol: int) -> None:
+        
+        """
+        Sets the L4 protocol
+        
+        Args:
+            l4_protocol (int): L4 protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer4.protocol = l4_protocol
+        
+    @property
+    def l4_next_protocol(self) -> int:
+        
+        """
+        Returns the L4 next protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l4_next_protocol (int): L4 next protocol
+        """
+        
+        return self._layer4.next_protcol
+    
+    @l4_next_protocol.setter
+    def l4_next_protocol(self, l4_next_protocol: int) -> None:
+        
+        """
+        Sets the L4 next protocol
+        
+        Args:
+            l4_next_protocol (int): L4 next protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer4.next_protocol = l4_next_protocol 
+     
+    # Layer 7
+    
+    @property
+    def l7_num_requested(self) -> int:
+        
+        """
+        Returns the L7 number of requested qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l7_num_requested (int): L7 number of requested qubits
+        """
+        
+        return self._layer7.num_requested
+    
+    @l7_num_requested.setter
+    def l7_num_requested(self, _num_requested: int) -> None:
+        
+        """
+        Sets the L7 number of requested qubits
+        
+        Args:
+            _num_requested (int): L7 number of requested qubits
+            
+        Returns:
+            /
+        """
+        
+        self._layer7.num_requested = _num_requested
+        
+    @property
+    def l7_num_needed(self) -> int:
+        
+        """
+        Returns the L7 number of needed qubits
+        
+        Args:
+            /
+            
+        Returns:
+            l7_num_needed (int): L7 number of needed qubits
+        """
+        
+        return self._layer7.num_needed
+    
+    @l7_num_needed.setter
+    def l7_num_needed(self, _num_needed: int) -> None:
+        
+        """
+        Setst the L7 number of needed qubits, WARNING resets the L7 success array
+        
+        Args:
+            _num_needed (int): L7 number of needed qubits
+            
+        Returns:
+            /
+        """
+        
+        self._layer7.num_needed = _num_needed
+        
+    @property
+    def l7_success(self) -> np.array:
+        
+        """
+        Returns the L7 success arrayk
+        
+        Args:
+            /
+            
+        Returns:
+            l7_success (np.array): L7 success array
+        """
+        
+        return self._layer7.success
+
+    def set_l7_success(self, index: int) -> None:
+        
+        """
+        Sets the L7 success array at the index
+        
+        Args:
+            index (int): index to set L7 success array at
+            
+        Returns:
+            /
+        """
+        
+        self._layer7.set_success(index)
+        
+    def reset_l7_success(self, index: int) -> None:
+        
+        """
+        Resets the L7 success array at the index
+        
+        Args:
+            index (int): index to set L7 success array at
+            
+        Returns:
+            /
+        """
+        
+        self._layer7.reset_success(index)
+    
+    @property
+    def l7_protocol(self) -> int:
+        
+        """
+        Returns the L7 protocol
+        
+        Args:
+            /
+            
+        Returns:
+            l7_protocol (int): L7 protocol
+        """
+        
+        return self._layer7.protocol
+    
+    @l7_protocol.setter
+    def l7_protocol(self, l7_protocol: int) -> None:
+        
+        """
+        Sets the L7 protocol
+        
+        Args:
+            l7_protocol (int): L7 protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer7.protocol = l7_protocol
     
     @property
     def payload(self) -> List[Any]:
         
         """
-        Return the L7 payload
+        Returns the L7 payload
         
         Args:
             /
             
         Returns:
-            l7_payload (list): payload
+            payload (list): L7 payload
         """
         
-        if not self.has_l7:
-            raise ValueError('No Layer 7 in this packet')
-        return self._l7._payload
-    
-    def reset_payload(self):
-        
-        """
-        Resets the payload of the packet
-        
-        Args:
-            /
-            
-        Returns:
-            /
-        """
-        
-        if not self._has_l7:
-            raise ValueError('No Layer 7 in this packet')
-        self._l7._payload = []
+        return self._layer7.payload
     
     def __iter__(self) -> Any:
-    
+        
         """
-        Iterates over the payload
+        Iterator for the L7 payload
         
         Args:
             /
             
         Returns:
-            item (any): item in payload
+            item (any): current item that is in the payload
         """
         
-        if not self._has_l7:
-            raise ValueError('No Layer 7 in this packet')
-        
-        for _ in range(len(self.payload)):
-            yield self.payload.pop(0)
-    
-class Layer1:
-    
-    """
-    Represents the Physical Layer (L1) of a packet
-    
-    Attr:
-        _num_requested (int): number of requested qubits
-        _num_needed (int): number of needed qubits
-        _protocol (int): protocol for the entanglement generation
-        _entanglement_success (np.array): entanglement success array
-        _ack (bool): acknowledgenment flag
-        _ps (bool): photon source flag
-    """
-    
-    def __init__(self, _num_requested: int, _num_needed: int, _protocol: int=0) -> None:
-        
-        """
-        Instantiates a L1 object
-        
-        Args:
-            _num_requested (int): number of requested qubits for L1
-            _num_needed (int): number of needed qubits for L1
-            _protocol (int): protocol for the entanglement generation
-            
-        Retunrs:
-            /
-        """
-        
-        self._num_requested: int = _num_requested
-        self._num_needed: int = _num_needed
-        self._protocol: int = _protocol
-        self._entanglement_success: np.array = np.zeros(_num_needed, dtype=np.bool_)
-        self._ack: bool = 0
-        self._ps: bool = 0
-
-    def __len__(self) -> int:
-        
-        """
-        Returns the length of Layer 1
-        
-        Args:
-            /
-            
-        Returns:
-            _len (int): length of Layer 1
-        """
-        
-        return 100
-
-    def __repr__(self) -> str:
-        
-        """
-        Custom print function
-        
-        Args:
-            /
-            
-        Returns:
-            _repr (str): stringified Layer 1
-        """
-        
-        return f'L1: Num Requested: {self._num_requested}, Num: Needed {self._num_needed}, ACK: {self._ack}, PS: {self._ps}, Success: {self._entanglement_success} | '
-
-class Layer2:
-    
-    """
-    Represents the MAC Layer (L2) of a packet
-    
-    Attr:
-        _src (int): source MAC address
-        _dst (int): destination MAC address
-        _num_requested (int): number of requested qubits
-        _num_needed (int): number of needed qubits
-        _purification_success (np.array): purification success array
-        _ack (bool): acknowledgement flag
-    """
-    
-    def __init__(self, _src: int, _dst: int, _num_requested: int, _num_needed: int) -> None:
-        
-        """
-        Instantiates a L2 object
-        
-        Args:
-            _src (int): L2 source address
-            _dst (int): L2 destination address
-            _num_requested (int): number of requested qubit pairs for purification
-            _num_needed (int): number of needed qubit pairs for purification
-            
-        Returns:
-            /
-        """
-        
-        self._src: int = _src
-        self._dst: int = _dst
-        self._num_requested: int = _num_requested
-        self._num_needed: int = _num_needed
-        self._purification_success: np.array = np.zeros(_num_requested, dtype=np.bool_)
-        self._ack: bool = 0
-    
-    def __len__(self):
-        
-        """
-        Returns the length of Layer 2
-        
-        Args:
-            /
-            
-        Returns:
-            _len (int): length of Layer 2
-        """
-        
-        return 193
-        
-    def __repr__(self):
-        
-        """
-        Custom print function
-        
-        Args:
-            /
-            
-        Returns:
-            _repr (str): stringified Layer 2
-        """
-        
-        return f'L2: Src: {self._src}, Dst: {self._dst}, Num Requested: {self._num_requested}, Num Needed: {self._num_needed}, Success: {self._purification_success}, ACK: {self._ack} | '
-    
-class Layer3:
-    
-    """
-    Represents the Network Layer (L3) of a packet
-    
-    Attr:
-        _src (int): source IP address
-        _dst (int): destination IP address
-        _mode (bool): whether to perform quantum operations or not
-        _num_channels (int): number of channels to swap
-        _swap_success (np.array): swapping success array
-        _x_count (np.array): amplitude flip arraay
-        _z_count (np.array): phase flip array
-    """
-    
-    def __init__(self, _src: int, _dst: int, _mode: bool, _num_channels: int=1) -> None:
-        
-        """
-        Instantiates a Layer 3 object
-        
-        Args:
-            _src (int): L3 source address
-            _dst (int): L3 destintaion address
-            _mode (bool): whether to perform quantum operations or not
-            _num_channels (int): number of channels to swap
-            
-        Returns:
-            /
-        """
-        
-        self._src: int = _src
-        self._dst: int = _dst
-        self._mode: bool = _mode
-        self._num_channels: int = _num_channels
-        self._swap_success: np.array = np.zeros(_num_channels, dtype=np.bool_)
-        self._x_count: np.array = np.zeros(_num_channels, dtype=np.bool_)
-        self._z_count: np.array = np.zeros(_num_channels, dtype=np.bool_)
-
-    def __len__(self):
-        
-        """
-        Returns the length of Layer 3
-        
-        Args:
-            /
-            
-        Returns:
-            _len (int): length of Layer 3
-        """
-        
-        return 385
-    
-    def __repr__(self) -> str:
-        
-        """
-        Custom print function
-        
-        Args:
-            /
-            
-        Returns:
-            _repr (str): stringified Layer 3
-        """
-        
-        return f'L3: Src: {self._src}, Dst: {self._dst}, Mode: {self._mode}, Num: {self._num_channels}, Success: {self._swap_success}, X: {self._x_count}, Z: {self._z_count} | '
-    
-    def reset(self) -> None:
-        
-        """
-        Resets the x_count and z_count arrays
-        
-        Args:
-            /
-            
-        Returns:
-            /
-        """
-        
-        self._x_count = np.zeros(self._num_channels, dtype=np.bool_)
-        self._z_count = np.zeros(self._num_channels, dtype=np.bool_)
-        
-    def update(self, _res: int, _channel: int) -> None:
-        
-        """
-        Updates the x_count and z_count of layer 3 given the result and the channel
-        
-        Args:
-            _res (int): result of the entanglement swapping
-            channel (int): channel of the entanglement swapping
-            
-        Returns:
-            /
-        """
-        
-        if _res == 1:
-            self._x_count[_channel] ^= 1
-        if _res == 2:
-            self._z_count[_channel] ^= 1
-        if _res == 3:
-            self._x_count[_channel] ^= 1
-            self._z_count[_channel] ^= 1
-    
-class Layer4:
-    
-    """
-    Represents the Transport Layer (L4) of a packet
-    
-    Attr:
-        _src (int): source port
-        _dst (int): destination port
-        _num_requested (int): number of requested qubits
-        _num_needed (int): number of needed qubits
-        _purification_success (np.array): purification success array
-        _ack (bool): acknowledgement flag
-    """
-    
-    def __init__(self, _src: int, _dst: int, _num_requested: int, _num_needed: int) -> None:
-        
-        """
-        Instantiates a L4 object
-        
-        Args:
-            _src (int): L4 source port
-            _dst (int): L4 destination port
-            _num_requested (int): number of requested qubits for E2E purification
-            _num_needed (int): number of needed qubits for E2E purification
-            
-        Returns:
-            /
-        """
-        
-        self._src: int = _src
-        self._dst: int = _dst
-        self._num_requested: int = _num_requested
-        self._num_needed: int = _num_needed
-        self._purification_success: np.array = np.zeros(_num_needed, dtype=np.bool_)
-        self._ack: bool = 0
-
-    def __len__(self):
-        
-        """
-        Returns the length of Layer 4
-        
-        Args:
-            /
-            
-        Returns:
-            _len (int): length of Layer 4
-        """
-        
-        return 129
-    
-    def __repr__(self):
-        
-        """
-        Custom print function
-        
-        Args:
-            /
-            
-        Returns:
-            _repr (str): stringified Layer 4
-        """
-        
-        return f'L4: Src: {self._src}, Dst: {self._dst}, Num Requested: {self._num_requested}, Num Needed: {self._num_needed}, Success: {self._purification_success} | '
-    
-class Layer7:
-    
-    """
-    Represents the Application Layer (L7) of a packet
-    
-    Attr:
-        _payload (list): tracked payload of packet
-    """
-    
-    def __init__(self, _payload: List[Any]):
-        
-        """
-        Instantiates a L7 object
-        
-        Args:
-            _payload (list): payload of packet
-            
-        Returns:
-            /
-        """
-        
-        self._payload: List[Any] = _payload
-        if _payload is None:
-            self._payload = []
-        
-    def __len__(self):
-        
-        """
-        Returns the length of Layer 7
-        
-        Args:
-            /
-            
-        Returns:
-            _len (int): length of Layer 7
-        """
-        
-        return len(self._payload)
-    
-    def __repr__(self):
-        
-        """
-        Custom print function
-        
-        Args:
-            /
-            
-        Returns:
-            _repr (str): stringified Layer 7
-        """
-        
-        return f'L7: Payload: {self._payload}'
+        for item in self.payload:
+            yield item
