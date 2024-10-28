@@ -1117,8 +1117,8 @@ class FockStateConnection:
             /
         """
         
-        _sample_sender = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._sender_source_alpha_variance)
-        _sample_receiver = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._receiver_source_alpha_variance)
+        _sample_sender = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._sender_source_variance)
+        _sample_receiver = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._recevier_source_variance)
         
         _sample_up_up = (self._sender_source_alpha * _sample_receiver + self._receiver_source_alpha * _sample_sender + _sample_sender * _sample_receiver) * self._case_up_up
         _sample_up_down = (-self._sender_source_alpha * _sample_receiver + (1 - self._receiver_source_alpha) * _sample_sender - _sample_sender * _sample_receiver) * self._case_up_down
