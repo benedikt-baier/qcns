@@ -135,10 +135,15 @@ class Packet:
         
         self._layer_counter: int = 0
         
-        if isinstance(args[0], L1_Protocol) or list(kwargs.keys())[0] == 'layer1':
+        if args and isinstance(args[0], L1_Protocol):
             self.__derived_init(*args, **kwargs)
-        else:
-            self.__base_init(*args, kwargs)
+            return
+        
+        if kwargs and list(kwargs.keys())[0] == 'layer1':
+            self.__derived_init(*args, **kwargs)
+            return
+        
+        self.__base_init(*args, kwargs)
         
     def __len__(self) -> int:
         
