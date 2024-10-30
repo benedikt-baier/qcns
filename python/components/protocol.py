@@ -319,6 +319,20 @@ class L1_Protocol:
         
         return self._header_length
     
+    def __repr__(self) -> str:
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            layer1 (str): str repr of layer 1
+        """
+        
+        return f'L1: Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Ps {self._ps} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
+    
 class L2_Protocol:
     
     """
@@ -672,6 +686,20 @@ class L2_Protocol:
         """
         
         return self._header_length
+    
+    def __repr__(self) -> str:
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            layer2 (str): str repr of layer 1
+        """
+        
+        return f' | L2: Src {self._src} Dst {self._dst} Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
     
 class L3_Protocol:
     
@@ -1033,6 +1061,20 @@ class L3_Protocol:
         
         return self._header_length
 
+    def __repr__(self) -> str:
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            layer3 (str): str repr of layer 1
+        """
+        
+        return f' | L3: Src {self._src} Dst {self._dst} Req {self._num_requested} Need {self._num_needed} Mode {self._mode} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} X {self._x_count} Z {self._z_count}'
+    
 class L4_Protocol:
     
     """
@@ -1368,7 +1410,21 @@ class L4_Protocol:
         """
         
         return self._header_length
+    
+    def __repr__(self) -> str:
         
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            layer4 (str): str repr of layer 1
+        """
+        
+        return f' | L4: Src {self._src} Dst {self._dst} Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
+     
 class L7_Protocol:
     
     """
@@ -1561,3 +1617,17 @@ class L7_Protocol:
         """
         
         return self._header_length + len(self._payload)
+    
+    def __repr__(self) -> str:
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            layer7 (str): str repr of layer 1
+        """
+        
+        return f' | L7: Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Proto {self._protocol} Len {self._header_length} Success {self._success}'
