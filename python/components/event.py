@@ -214,3 +214,46 @@ class GateEvent(Event):
         """
         
         return f'Gate Event: Node: {self._node_id} Time: {self._end_time}'
+
+
+class WaitEvent(Event):
+    
+    """
+    Represents a Wait Event
+    
+    Attr:
+        _id (int): ID to distinguish events
+        _end_time (float): time when event finishes
+        _node_id (int): ID of Host which scheduled event
+    """
+    
+    def __init__(self, _end_time: float, _node_id: float) -> None:
+        
+        """
+        Initializes a Wait Event
+        
+        Args:
+            _end_time (float): time when event finishes
+            _node_id (int): ID of Host  which scheduled event
+
+        Returns:
+            /
+        """
+        
+        self._id: int = 4
+        self._end_time: float = _end_time
+        self._node_id: int = _node_id
+        
+    def __repr__(self) -> str:
+        
+        """
+        Custom print function for Gate Event
+        
+        Args:
+            /
+            
+        Returns:
+            _event (str): printable representation of Event
+        """
+        
+        return f'Wait Event: Node: {self._node_id} Time: {self._end_time}'
