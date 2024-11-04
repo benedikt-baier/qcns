@@ -643,12 +643,12 @@ class Host:
         """
         
         self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet._l2._dst][SEND]._signal_time, _packet._l2._dst))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst))
         
         await self._resume.wait()
         self._resume.clear()
         
-        self._connections['packet'][_packet._l2._dst][SEND].put(_packet)
+        self._connections['packet'][_packet.l2_dst][SEND].put(_packet)
         
     async def receive_packet(self, sender: int=None, time_out: float=None) -> Union[Packet, None]:
         
@@ -1337,7 +1337,7 @@ class Host:
             /
         """
         
-        self._layer_results[packet.l2_src][store][L1].append(packet._l1._entanglement_success)
+        self._layer_results[packet.l2_src][store][L1].append(packet.l1_success)
         
     def l2_store_result(self, store: int, packet: Packet) -> None:
         
@@ -1352,7 +1352,7 @@ class Host:
             /
         """
         
-        self._layer_results[packet.l2_dst][store][L2].append(packet._l2._purification_success)
+        self._layer_results[packet.l2_dst][store][L2].append(packet.l2_success)
         
     def l1_retrieve_result(self, host: int, store: int) -> np.array:
         

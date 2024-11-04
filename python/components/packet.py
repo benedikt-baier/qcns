@@ -143,7 +143,7 @@ class Packet:
             self.__derived_init(*args, **kwargs)
             return
         
-        self.__base_init(*args, kwargs)
+        self.__base_init(*args, **kwargs)
         
     def __len__(self) -> int:
         
@@ -158,7 +158,21 @@ class Packet:
         """
         
         return len(self._layer1) + len(self._layer2) + len(self._layer3) + len(self._layer4) + len(self._layer7)
-      
+    
+    def __repr__(self) -> str:
+        
+        """
+        Custom print function
+        
+        Args:
+            /
+            
+        Returns:
+            packet (str): packet in str repr
+        """
+        
+        return f'{self._layer1}{self._layer2}{self._layer3}{self._layer4}{self._layer7}'
+     
     @property
     def is_l1(self) -> bool:
         
