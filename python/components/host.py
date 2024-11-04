@@ -1380,7 +1380,7 @@ class Host:
         """
         
         stor_res = self.l1_retrieve_result(packet.l2_src, not packet.l1_ack)
-        return np.logical_and(packet.l1_entanglement_success, stor_res)
+        return np.logical_and(packet.l1_success, stor_res)
     
     def l2_compare_results(self, packet: Packet) -> np.array:
         
@@ -1395,7 +1395,7 @@ class Host:
         """
         
         stor_res = self.l2_retrieve_result(packet.l2_src, not packet.l2_ack)
-        return np.logical_not(np.logical_xor(packet.l2_purification_success, stor_res))
+        return np.logical_not(np.logical_xor(packet.l2_success, stor_res))
     
     @property
     def l1_packets(self) -> List[Packet]:
