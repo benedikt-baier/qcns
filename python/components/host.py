@@ -675,6 +675,23 @@ class Host:
             if not self._connections['packet'][_sender][RECEIVE].empty():
                 return self._connections['packet'][_sender][RECEIVE].get()
     
+    async def wait(self, duration: float) -> None:
+        
+        """
+        Waits the defined seconds
+        
+        Args:
+            duration (float): time to wait
+            
+        Returns:
+            /
+        """
+        
+        self._sim.schedule_event(WaitEvent(self._sim._sim_time + duration, self.id))
+    
+        await self._resume.wait()
+        self._resume.clear()
+    
     @property
     def id(self) -> int:
         
