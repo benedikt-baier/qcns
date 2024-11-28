@@ -551,6 +551,23 @@ class QuantumMemory:
             if index:
                 self.l1_store_qubit(qubit, -1, time)
     
+    def l3_remove_qubits(self, _indices: List[int]) -> None:
+        
+        """
+        Removes qubits given the indices in the L3 memory
+        
+        Args:
+            _indices (list): list of bool whether to remove qubit or not
+            
+        Returns:
+            /
+        """
+        
+        for index in _indices:
+            qubit, time = self._l3_memory.pop(0)
+            if index:
+                self.l3_store_qubit(qubit, -1, time)
+    
     def l0_discard_qubits(self) -> None:
         
         """

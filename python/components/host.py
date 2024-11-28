@@ -397,8 +397,6 @@ class Host:
                           sender_mem_size: int=-1, sender_efficiency: float=1., sender_mem_errors: List[QuantumError]=None, 
                           receiver_mem_size: int=-1, receiver_efficiency: float=1., receiver_mem_errors: List[QuantumError]=None) -> None:
         
-        # TODO add number of sender and receiver sources
-        
         self._neighbors.add(host._node_id)
         host._neighbors.add(self._node_id)
         
@@ -1088,7 +1086,23 @@ class Host:
         """
         
         self._connections['memory'][host][store].l3_move_qubits_l1(indices)
+    
+    def l3_remove_qubits(self, host: int, store: int, indices: List[int]) -> None:
         
+        """
+        Removes qubits in the L3 memory based on the indices
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): entanglement store Send or Receive
+            indices (list): indices to remove
+            
+        Returns:
+            /
+        """
+        
+        self._connections['memory'][host][store].l3_remove_qubits(indices)
+      
     def l0_discard_qubits(self, host: int, store: int) -> None:
         
         """
