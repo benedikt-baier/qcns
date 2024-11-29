@@ -29,7 +29,7 @@ class Packet:
                       l2_num_requested: int=None, l2_num_needed: int=None,
                       l3_src: int=None, l3_dst: int=None, l3_num_requested: int=None, l3_num_needed: int=None,
                       l4_src: int=None, l4_dst: int=None, l4_num_requested: int=None, l4_num_needed: int=None,
-                      l7_num_requested: int=None, l7_num_needed: int=None) -> None:
+                      l7_num_requested: int=None, l7_num_needed: int=None, payload: List[Any]=None) -> None:
         
         """
         Initializes the packet with standard inputs such as L2 src and dst
@@ -57,29 +57,34 @@ class Packet:
         """
         
         self._layer1: L1_Protocol = L1_Protocol(l1_num_requested, l1_num_needed)
-        
         self._layer2: L2_Protocol = L2_Protocol(l2_src, l2_dst, l2_num_requested, l2_num_needed)
-        if self._layer2.num_requested is not None:
-            self._layer1.next_protocol = self._layer2.protocol
+        self._layer3: L3_Protocol = ''
+        self._layer4: L4_Protocol = ''
+        self._layer7: L7_Protocol = ''
+        
+        if l2_num_requested is not None:
             self._layer_counter = 1
         
-        self._layer3: L3_Protocol = ''
-        if l3_src is not None:
-            self._layer3: L3_Protocol = L3_Protocol(l3_src, l3_dst, l3_num_requested, l3_num_needed)
-            self._layer2.next_protocol = self._layer3.protocol
+        if l3_src is not None or l3_dst is not None:
             self._layer_counter = 2
         
-        self._layer4: L4_Protocol = ''
-        if l4_src is not None:
-            self._layer4: L4_Protocol = L4_Protocol(l4_src, l4_dst, l4_num_requested, l4_num_needed)
-            self._layer3.next_protocol = self._layer4.protocol
+        if l4_src is not None or l4_dst is not None:
             self._layer_counter = 3
         
-        self._layer7 : L7_Protocol = ''
-        if l7_num_requested is not None:
-            self._layer7: L7_Protocol = L7_Protocol(l7_num_requested, l7_num_needed)
-            self._layer4.next_protocol = self._layer7.protocol
+        if l7_num_requested is not None or payload is not None:
             self._layer_counter = 4
+        
+        if self._layer_counter > 1:
+            self._layer3 = L3_Protocol(l3_src, l3_dst, l3_num_requested, l3_num_needed)
+            self._layer2.next_protcol = self._layer3.protocol
+            
+        if self._layer_counter > 2:
+            self._layer4: L4_Protocol = L4_Protocol(l4_src, l4_dst, l4_num_requested, l4_num_needed)
+            self._layer3.next_protocol = self._layer4.protocol
+        
+        if self._layer_counter > 3:
+            self._layer7: L7_Protocol = L7_Protocol(l7_num_requested, l7_num_needed, payload)
+            self._layer4.next_protocol = self._layer7.protocol
     
     def __derived_init(self, layer1: L1_Protocol, layer2: L2_Protocol, layer3: L3_Protocol='', 
                      layer4: L4_Protocol='', layer7: L7_Protocol='') -> None:
