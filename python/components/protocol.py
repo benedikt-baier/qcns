@@ -377,13 +377,9 @@ class L2_Protocol:
         if self._num_requested is None:
             self._num_requested = 1
         self._num_needed: int = num_needed # 1byte
-<<<<<<< HEAD
-        self._success: np.array = np.zeros(self._num_requested, dtype=np.bool_) # 32 byte
-=======
         if self._num_needed is None:
             self._num_needed = 1
-        self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
->>>>>>> 4052d906b860961b9e3ea9794f53d660c2d6ba41
+        self._success: np.array = np.zeros(self._num_requested, dtype=np.bool_) # 32 byte
         self._ack: int = 0 # 1 bit
         
         self._protocol: int = 0 # 1byte
