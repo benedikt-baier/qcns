@@ -1325,8 +1325,8 @@ class L3Connection:
         qsys._state = self._state + (4 * _sample) / 3 * B_I_0
         q_1, q_2 = qsys.qubits
         
-        self._sender_memory.l0_store_qubit(q_1, -1, _time)
-        self._receiver_memory.l0_store_qubit(q_2, -1, _time)
+        self._sender_memory.l3_store_qubit(q_1, -1, _time)
+        self._receiver_memory.l3_store_qubit(q_2, -1, _time)
     
     def failure_creation(self, _time: float) -> None:
         
@@ -1341,7 +1341,7 @@ class L3Connection:
         """
         
         q_1 = Simulation.create_qsystem(1).qubits
-        self._receiver_memory.l0_store_qubit(q_1, -1, _time)
+        self._receiver_memory.l3_store_qubit(q_1, -1, _time)
     
     def attempt_bell_pairs(self, _num_requested: int=1, _num_needed: int=1) -> None:
         

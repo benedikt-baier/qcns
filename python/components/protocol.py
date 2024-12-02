@@ -20,7 +20,7 @@ class L1_Protocol:
         _header_length (int): header length in bits
     """
     
-    def __init__(self, num_requested: int=1, num_needed: int=1) -> None:
+    def __init__(self, num_requested: int, num_needed: int) -> None:
         
         """
         Initializes a L1 Protocol Header
@@ -31,7 +31,12 @@ class L1_Protocol:
         """
         
         self._num_requested: int = num_requested # 1byte
+        if self._num_requested is None:
+            self._num_requested = 1
         self._num_needed: int = num_needed # 1byte
+        if self._num_needed is None:
+            self._num_needed = 1
+        
         self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 2^8 bits = 32 byte
         self._ack: int = 0 # 1 bit
         self._ps: int = 0 # 1 bit
@@ -350,7 +355,7 @@ class L2_Protocol:
         _header_length (int): length of the header
     """
     
-    def __init__(self, src: int, dst: int, num_requested: int=None, num_needed: int=None) -> None:
+    def __init__(self, src: int, dst: int, num_requested: int, num_needed: int) -> None:
         
         """
         Initializes a L2 protocol header
@@ -369,8 +374,16 @@ class L2_Protocol:
         self._dst: int = dst # 6byte
         
         self._num_requested: int = num_requested # 1byte
+        if self._num_requested is None:
+            self._num_requested = 1
         self._num_needed: int = num_needed # 1byte
+<<<<<<< HEAD
         self._success: np.array = np.zeros(self._num_requested, dtype=np.bool_) # 32 byte
+=======
+        if self._num_needed is None:
+            self._num_needed = 1
+        self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
+>>>>>>> 4052d906b860961b9e3ea9794f53d660c2d6ba41
         self._ack: int = 0 # 1 bit
         
         self._protocol: int = 0 # 1byte
@@ -720,7 +733,7 @@ class L3_Protocol:
         _header_length (int): header length
     """
     
-    def __init__(self, src: int, dst: int, num_requested: int=1, num_needed: int=1) -> None:
+    def __init__(self, src: int, dst: int, num_requested: int, num_needed: int) -> None:
         
         """
         Initializes the L3 Protocol Header
@@ -737,7 +750,11 @@ class L3_Protocol:
         self._dst: int = dst # 16 byte
         
         self._num_requested: int = num_requested # 1byte
+        if self._num_requested is None:
+            self._num_requested = 1
         self._num_needed: int = num_needed # 1byte
+        if self._num_needed is None:
+            self._num_needed = 1
         self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
         self._x_count: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
         self._z_count: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
@@ -1092,7 +1109,7 @@ class L4_Protocol:
         _header_length (int): header length
     """
     
-    def __init__(self, src: int, dst: int, num_requested: int=1, num_needed: int=1) -> None:
+    def __init__(self, src: int, dst: int, num_requested: int, num_needed: int) -> None:
         
         """
         Initializes a L4 Protocol Header
@@ -1108,7 +1125,11 @@ class L4_Protocol:
         self._dst: int = dst # 2byte
 
         self._num_requested: int = num_requested # 1byte
+        if self._num_requested is None:
+            self._num_requested = 1
         self._num_needed: int = num_needed # 1byte
+        if self._num_needed is None:
+            self._num_needed = 1
         self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32byte
         self._ack: int = 0
         
@@ -1439,7 +1460,7 @@ class L7_Protocol:
         _payload (list): payload of the packet
     """
     
-    def __init__(self, num_requested: int=1, num_needed: int=1) -> None:
+    def __init__(self, num_requested: int, num_needed: int, payload: List[Any]) -> None:
         
         """
         Initializes a L7 Protocol Header
@@ -1453,13 +1474,19 @@ class L7_Protocol:
         """
         
         self._num_requested: int = num_requested # 1 byte
+        if self._num_requested is None:
+            self._num_requested = 1
         self._num_needed: int = num_needed # 1byte
+        if self._num_needed is None:
+            self._num_needed = 1
         self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32byte
         
         self._protocol: int = 0 # 1byte
         self._header_length: int = 280
         
-        self._payload: List[Any] = []
+        self._payload: List[Any] = payload
+        if payload is None:
+            self._payload: List[Any] = []
     
     @property
     def num_requested(self) -> int:
