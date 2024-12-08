@@ -11,7 +11,9 @@
 				"${file}",
 				"-o",
 				"${fileDirname}/../bin/${fileBasenameNoExtension}",
-				"-I/usr/include/eigen3"
+				"-I/usr/include/eigen3",
+				"-I${workspaceFolder}/cpp/components/qcns_cpp/include"
+				// -I/mounted_data/code/qcns/cpp/components/qcns_cpp/include
 			],
 			"options": {
 				"cwd": "${fileDirname}"

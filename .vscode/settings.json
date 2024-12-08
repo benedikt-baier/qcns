@@ -65,6 +65,9 @@
         "thread": "cpp",
         "typeinfo": "cpp",
         "core": "cpp",
-        "variant": "cpp"
-    }
+        "variant": "cpp",
+        "kroneckerproduct": "cpp",
+        "any": "cpp"
+    },
+    "cmake.sourceDirectory": "/mounted_data/code/qcns/cpp/components/qcns_cpp"
 }

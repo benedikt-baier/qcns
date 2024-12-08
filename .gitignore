@@ -1,3 +1,5 @@
 **/__pycache__/**
 bin/*
 !bin/.gitkeep
+build
+cpp/components/qcns_cpp/build
