@@ -46,7 +46,7 @@ class QuantumMemory:
         self._l1_memory: List[Qubit] = []
         self._l2_memory: List[Qubit] = []
         self._l3_memory: List[Qubit] = []
-        
+
         self._size: int = _size
         self._efficiency: float = _efficiency
         self._errors: List[QuantumError] = _errors
