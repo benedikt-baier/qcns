@@ -31,7 +31,7 @@ class L3_CRP(QProgram):
             qubit_src = host.l3_retrieve_qubit(packet.l2_src, 1)
             qubit_dst = host.l3_retrieve_qubit(packet.l2_dst, 0)
             
-            res = host.apply_gate('prob_bsm', qubit_src, qubit_dst, combine=True, remove=True)
+            res = await host.apply_gate('prob_bsm', qubit_src, qubit_dst, combine=True, remove=True)
             
             packet.l3_update_es(index, res)  
     
@@ -47,6 +47,6 @@ class L3_FRP(QProgram):
             qubit_src = host.l3_retrieve_qubit(packet.l2_src, 1)
             qubit_dst = host.l3_retrieve_qubit(packet.l2_dst, 0)
             
-            res = host.apply_gate('prob_bsm', qubit_src, qubit_dst, combine=True, remove=True)
+            res = await host.apply_gate('prob_bsm', qubit_src, qubit_dst, combine=True, remove=True)
             
             packet.l3_update_es(index, res)

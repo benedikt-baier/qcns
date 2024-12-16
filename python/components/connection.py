@@ -609,9 +609,6 @@ class TwoPhotonSourceConnection:
         packet_s.l1_success = _sender_success_samples
         packet_r.l1_success = _receiver_success_samples
         
-        packet_s.l1_protocol = 2
-        packet_r.l1_protocol = 2
-        
         _success_samples = np.logical_and(_sender_success_samples, _receiver_success_samples)
         
         for _success, _curr_time in zip(_success_samples, _curr_time_samples):
@@ -620,8 +617,8 @@ class TwoPhotonSourceConnection:
         packet_s.set_l1_ps()
         packet_r.set_l1_ps()
         packet_r.set_l1_ack()
-        packet_s.l1_protocol = 1
-        packet_r.l1_protocol = 1
+        packet_s.l1_protocol = 2
+        packet_r.l1_protocol = 2
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._source_duration, self._sender._node_id))
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
@@ -662,13 +659,12 @@ class TwoPhotonSourceConnection:
         for _curr_time in _curr_time_samples:
             self.success_creation(_curr_time)
         
-        packet_s.set_l1_ps()
-        packet_r.set_l1_ps()
-        packet_r.set_l1_ack()
-        
         packet_s.l1_success = np.ones(_num_requested, dtype=np.bool_)
         packet_r.l1_success = np.ones(_num_requested, dtype=np.bool_)
         
+        packet_s.set_l1_ps()
+        packet_r.set_l1_ps()
+        packet_r.set_l1_ack()
         packet_s.l1_protocol = 2
         packet_r.l1_protocol = 2
         
