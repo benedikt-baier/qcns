@@ -1361,6 +1361,7 @@ class L3Connection:
             self.creation_functions[success](_time_sample)
         
         packet.l1_success = _success_samples
+        # packet.set_l1_ack()
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time, self._receiver_id))
         self._sender._connections['packet'][self._receiver_id][SEND].put(packet)

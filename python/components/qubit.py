@@ -182,22 +182,26 @@ def get_single_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _i
         _op (np.array): resulting tensor for the single qubit
     """
     
+    if _num_qubits < 2:
+        return _gate
+    
+    if _num_qubits < 3:
+        operator_l = np.array([gates[_sparse]['I']] * _num_qubits)  
+        operator_l[_index] = _gate
+        
+        return tensor_operator(_sparse, operator_l)
+
     if _index == 0:
         return _KRON_DICT[_sparse](_gate, identity_gates[_sparse](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128))
         
     if _index == _num_qubits - 1:
         return _KRON_DICT[_sparse](identity_gates[_sparse](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128), _gate)
     
-    left_identity = identity_gates[_sparse](2**_index, 2**_index, dtype=np.complex128)
-    right_identity = identity_gates[_sparse](2**(_num_qubits - _index - 1), 2**(_num_qubits - _index - 1), dtype=np.complex128)
+    left_array = identity_gates[_sparse](2**_index, 2**_index, dtype=np.complex128)
+    right_array = identity_gates[_sparse](2**(_num_qubits - _index - 1), 2**(_num_qubits - _index - 1), dtype=np.complex128)
     
-    return _KRON_DICT[_sparse](left_identity, _KRON_DICT[_sparse](_gate, right_identity))
+    return _KRON_DICT[_sparse](left_array, _KRON_DICT[_sparse](_gate, right_array))
 
-    # operator_l = np.array([gates[_sparse]['I']] * _num_qubits)  
-    # operator_l[_index] = _gate
-    
-    # return tensor_operator(_sparse, operator_l)
-    
 @cache
 def get_double_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _c_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
     
@@ -217,30 +221,24 @@ def get_double_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _c
     
     key = f'{_sparse}_s_m0_{1}_{1}_{_t_num_qubits}_{_c_index}'
     proj0 = get_single_operator(key, _sparse, gates[_sparse]['P0'], _c_index, _t_num_qubits)
-    
-    # gate_dict = {_c_index: gates[_sparse]['P1'], _t_index: _gate}
-    # index_1, index_2 = sorted([_c_index, _t_index])
-    
-    # left_index = index_1
-    # middle_index = index_2 - index_1 - 1
-    # right_index = _t_num_qubits - index_2 - 1
-    
-    # proj1 = gate_dict[index_1]
-    # if left_index:
-    #     proj1 = _KRON_DICT[_sparse](identity_gates[_sparse](2**left_index, 2**left_index, dtype=np.complex128), proj1)
-    # if middle_index:
-    #     proj1 = _KRON_DICT[_sparse](proj1, identity_gates[_sparse](2**middle_index, 2**middle_index, dtype=np.complex128))
-    # proj1 = _KRON_DICT[_sparse](proj1, gate_dict[index_2])
-    # if right_index:
-    #     proj1 = _KRON_DICT[_sparse](proj1, identity_gates[_sparse](2**right_index, 2**right_index, dtype=np.complex128))
-    
-    # return proj0 + proj1
 
-    proj1 = np.array([gates[_sparse]['I']] * _t_num_qubits)
-    proj1[_c_index] = gates[_sparse]['P1']
-    proj1[_t_index] = _gate
-
-    return proj0 + tensor_operator(_sparse, proj1)
+    gate_dict = {_c_index: gates[_sparse]['P1'], _t_index: _gate}
+    index_1, index_2 = sorted([_c_index, _t_index])
+    
+    left_index = index_1
+    middle_index = index_2 - index_1 - 1
+    right_index = _t_num_qubits - index_2 - 1
+    
+    proj1 = gate_dict[index_1]
+    if left_index:
+        proj1 = _KRON_DICT[_sparse](identity_gates[_sparse](2**left_index, 2**left_index, dtype=np.complex128), proj1)
+    if middle_index:
+        proj1 = _KRON_DICT[_sparse](proj1, identity_gates[_sparse](2**middle_index, 2**middle_index, dtype=np.complex128))
+    proj1 = _KRON_DICT[_sparse](proj1, gate_dict[index_2])
+    if right_index:
+        proj1 = _KRON_DICT[_sparse](proj1, identity_gates[_sparse](2**right_index, 2**right_index, dtype=np.complex128))
+    
+    return proj0 + proj1
 
 @cache
 def get_triple_operator(_sparse: bool, _gate_l: Union[np.array, sp.csr_matrix], _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
@@ -260,75 +258,21 @@ def get_triple_operator(_sparse: bool, _gate_l: Union[np.array, sp.csr_matrix], 
         _op (np.array): resulting tensor for the controlled controlled qubit gate
     """
     
-    # gate_dict = {_c1_index: [gates[_sparse]['P0'], gates[_sparse]['P0'], gates[_sparse]['P1'], gates[_sparse]['P1']],
-    #               _c2_index: [gates[_sparse]['P0'], gates[_sparse]['P1'], gates[_sparse]['P0'], gates[_sparse]['P1']],
-    #               _t_index: _gate_l}
+    gate_dict = {_c1_index: [gates[_sparse]['P0'], gates[_sparse]['P0'], gates[_sparse]['P1'], gates[_sparse]['P1']],
+                  _c2_index: [gates[_sparse]['P0'], gates[_sparse]['P1'], gates[_sparse]['P0'], gates[_sparse]['P1']],
+                  _t_index: _gate_l}
     
-    # index_1, index_2, index_3 = sorted([_c1_index, _c2_index, _t_index])
+    index_1, index_2, index_3 = sorted([_c1_index, _c2_index, _t_index])
+    indices = [index_1, index_2 - index_1 - 1, index_3 - index_2 - 1, _t_num_qubits - index_3 - 1]
     
-    # left_index = index_1
-    # middel_1_index = index_2 - index_1 - 1
-    # middel_2_index = index_3 - index_2 - 1
-    # right_index = _t_num_qubits - index_3 - 1
+    gate_list = [[0] * 7 for _ in range(4)]
     
-    # gates_list = [[] * 4]
+    for i in range(4):
+        gate_list[i][::2] = [identity_gates[_sparse](2**(index), 2**(index), dtype=np.complex128) if index else None for index in indices]
+        gate_list[i][1::2] = [gate_dict[index_1][i], gate_dict[index_2][i], gate_dict[index_3][i]]
+        gate_list[i] = [gate for gate in gate_list[i] if gate is not None]
     
-    # if left_index:
-    #     gates_list[0].append(identity_gates[_sparse](2**(left_index), 2**(left_index), dtype=np.complex128))
-    #     gates_list[1].append(identity_gates[_sparse](2**(left_index), 2**(left_index), dtype=np.complex128))
-    #     gates_list[2].append(identity_gates[_sparse](2**(left_index), 2**(left_index), dtype=np.complex128))
-    #     gates_list[3].append(identity_gates[_sparse](2**(left_index), 2**(left_index), dtype=np.complex128))
-        
-    # gates_list[0].append(gate_dict[index_1][0])
-    # gates_list[1].append(gate_dict[index_1][1])
-    # gates_list[2].append(gate_dict[index_1][2])
-    # gates_list[3].append(gate_dict[index_1][3])
-    
-    # if middel_1_index:
-    #     gates_list[0].append(identity_gates[_sparse](2**(middel_1_index), 2**(middel_1_index), dtype=np.complex128))
-    #     gates_list[1].append(identity_gates[_sparse](2**(middel_1_index), 2**(middel_1_index), dtype=np.complex128))
-    #     gates_list[2].append(identity_gates[_sparse](2**(middel_1_index), 2**(middel_1_index), dtype=np.complex128))
-    #     gates_list[3].append(identity_gates[_sparse](2**(middel_1_index), 2**(middel_1_index), dtype=np.complex128))
-        
-    # gates_list[0].append(gate_dict[index_2][0])
-    # gates_list[1].append(gate_dict[index_2][1])
-    # gates_list[2].append(gate_dict[index_2][2])
-    # gates_list[3].append(gate_dict[index_2][3])
-    
-    # if middel_2_index:
-    #     gates_list[0].append(identity_gates[_sparse](2**(middel_2_index), 2**(middel_2_index), dtype=np.complex128))
-    #     gates_list[1].append(identity_gates[_sparse](2**(middel_2_index), 2**(middel_2_index), dtype=np.complex128))
-    #     gates_list[2].append(identity_gates[_sparse](2**(middel_2_index), 2**(middel_2_index), dtype=np.complex128))
-    #     gates_list[3].append(identity_gates[_sparse](2**(middel_2_index), 2**(middel_2_index), dtype=np.complex128))
-        
-    # gates_list[0].append(gate_dict[index_3][0])
-    # gates_list[1].append(gate_dict[index_3][1])
-    # gates_list[2].append(gate_dict[index_3][2])
-    # gates_list[3].append(gate_dict[index_3][3])
-    
-    # if right_index:
-    #     gates_list[0].append(identity_gates[_sparse](2**(right_index), 2**(right_index), dtype=np.complex128))
-    #     gates_list[1].append(identity_gates[_sparse](2**(right_index), 2**(right_index), dtype=np.complex128))
-    #     gates_list[2].append(identity_gates[_sparse](2**(right_index), 2**(right_index), dtype=np.complex128))
-    #     gates_list[3].append(identity_gates[_sparse](2**(right_index), 2**(right_index), dtype=np.complex128))
-    
-    # return tensor_operator(_sparse, gates_list[0]) + tensor_operator(_sparse, gates_list[1]) + tensor_operator(_sparse, gates_list[2]) + tensor_operator(_sparse, gates_list[3])
-    
-    c1, c2 = sorted([_c1_index, _c2_index])
-    
-    gates_list = [[gates[_sparse]['P0'], gates[_sparse]['P0'], _gate_l[0]], 
-                  [gates[_sparse]['P0'], gates[_sparse]['P1'], _gate_l[1]], 
-                  [gates[_sparse]['P1'], gates[_sparse]['P0'], _gate_l[2]], 
-                  [gates[_sparse]['P1'], gates[_sparse]['P1'], _gate_l[3]]]
-    ops = np.array([gates[_sparse]['I']] * _t_num_qubits)
-        
-    CNOTijk = 0
-    for gates in gates_list:
-        ops[c1] = gates[0]
-        ops[c2] = gates[1]
-        ops[_t_index] = gates[2]
-        CNOTijk += tensor_operator(_sparse, ops)
-    return CNOTijk
+    return tensor_operator(_sparse, gate_list[0]) + tensor_operator(_sparse, gate_list[1]) + tensor_operator(_sparse, gate_list[2]) + tensor_operator(_sparse, gate_list[3])
 
 @cache
 def get_bell_operator(_sparse: bool, _bell_state: int, _c_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
