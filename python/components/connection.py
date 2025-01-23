@@ -3,12 +3,12 @@ import numpy as np
 import scipy as sp
 from typing import List
 
-from python.components.hardware.photon_source import SinglePhotonSource, AtomPhotonSource, PhotonPhotonSource, FockPhotonSource
-from python.components.hardware.photon_detector import PhotonDetector
-from python.components.connection.channel import QChannel
-from python.components.hardware.memory import QuantumMemory
+from python.components.photon_source import SinglePhotonSource, AtomPhotonSource, PhotonPhotonSource, FockPhotonSource
+from python.components.photon_detector import PhotonDetector
+from python.components.channel import QChannel
+from python.components.memory import QuantumMemory
 from python.components.packet import Packet
-from python.components.simulation.event import ReceiveEvent
+from python.components.event import ReceiveEvent
 from python.components.simulation import Simulation
 
 __all__ = ['SingleQubitConnection', 'SenderReceiverConnection', 'TwoPhotonSourceConnection', 'BellStateMeasurementConnection', 'FockStateConnection', 'L3Connection']
