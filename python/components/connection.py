@@ -1296,8 +1296,9 @@ class L3Connection:
         _receiver_memory (QuantumMemory): receiver sided quantum memory
     """
     
-    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _num_sources: int=-1, _source_duration: float=0.,
-                 _length: float=0., _success_prob: float=1., _fidelity: float=1., _fidelity_variance: float=0.,
+    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation,_length: float=0.,
+                 _num_sources: int=-1, _source_duration: float=0.,
+                 _success_prob: float=1., _fidelity: float=1., _fidelity_variance: float=0.,
                  _sender_memory: QuantumMemory=None, _receiver_memory: QuantumMemory=None) -> None:
         
         """
