@@ -226,7 +226,7 @@ class QuantumMemory:
             raise ValueError('No Qubit in memory')
         
         if _index is None:
-            _index = self._indices[self._mode] # + or - offset[_offset_index] depending on the mode
+            _index = self._transform[self._mode](0) # + or - offset[_offset_index] depending on the mode
         
         _qubit, _ = self._memory[_store][_index]
         
@@ -282,9 +282,9 @@ class QuantumMemory:
             raise ValueError('Purification needs at most 2 qubits')
         
         if _index_src is None:
-            _index_src = self._indices[self._mode]
+            _index_src = self._transform[self._mode](0)
         if _index_dst is None:
-            _index_dst = self._indices[self._mode]
+            _index_dst = self._transform[self._mode](0)
         
         return self.retrieve_qubit(L1, _index_src, _time), self.retrieve_qubit(L1, _index_dst, _time)
     
