@@ -60,7 +60,7 @@ class DepolarizationError:
         depolar_prob = np.exp(-(_length * (5e-6)) / self._depolar_time)
         
         self._gate_e0: Dict[int, Union[np.array, sp.csr_matrix]] = {0: full_gates['P0'] + np.sqrt(1 - depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(1 - depolar_prob) * sparse_gates['P1']}
-        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(1 - depolar_prob) * sparse_gates['P01']}
+        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(depolar_prob) * sparse_gates['P01']}
         
     def apply(self, _qubit: Qubit) -> None:
         
