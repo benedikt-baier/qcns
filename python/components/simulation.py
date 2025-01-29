@@ -107,7 +107,7 @@ class Simulation:
         
         logging.info('Stopping Simulation')
         
-        self.num_hosts = 0
+        self._num_hosts = 0
         for host in self._hosts.values():
             host.stop = True
     
@@ -125,13 +125,9 @@ class Simulation:
         
         tasks = [asc.create_task(host.run()) for host in self._hosts.values()]
         
-        self.num_hosts = len(tasks) - _num_hosts
+        self._num_hosts = len(tasks) - _num_hosts
         
-        while 1:
-            
-            if self.num_hosts < 1:
-                self.stop_simulation()
-                return
+        while self._num_hosts > 0:
             
             await asc.sleep(0)
             
@@ -148,6 +144,8 @@ class Simulation:
             
             self._sim_time = event._end_time
             self._hosts[event._node_id]._resume.set()
+            
+        self.stop_simulation()
     
     def run(self, num_hosts: int=0) -> None:
         
