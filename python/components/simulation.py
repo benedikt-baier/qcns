@@ -139,7 +139,7 @@ class Simulation:
             logging.info(event)
             
             if not event._id:
-                self.num_hosts -= 1
+                self._num_hosts -= 1
                 continue
             
             self._sim_time = event._end_time
