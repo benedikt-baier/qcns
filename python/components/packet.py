@@ -76,7 +76,7 @@ class Packet:
         
         if self._layer_counter > 1:
             self._layer3 = L3_Protocol(l3_src, l3_dst, l3_num_requested, l3_num_needed)
-            self._layer2.next_protcol = self._layer3.protocol
+            self._layer2.next_protocol = self._layer3.protocol
             
         if self._layer_counter > 2:
             self._layer4: L4_Protocol = L4_Protocol(l4_src, l4_dst, l4_num_requested, l4_num_needed)
@@ -577,7 +577,7 @@ class Packet:
             l1_next_protocol (int): L1 next protocol
         """
         
-        return self._layer1.next_protcol
+        return self._layer1.next_protocol
     
     @l1_next_protocol.setter
     def l1_next_protocol(self, l1_next_protocol: int) -> None:
@@ -874,7 +874,7 @@ class Packet:
             l2_next_protocol (int): L2 next protocol
         """
         
-        return self._layer2.next_protcol
+        return self._layer2.next_protocol
     
     @l2_next_protocol.setter
     def l2_next_protocol(self, l2_next_protocol: int) -> None:
@@ -1172,7 +1172,7 @@ class Packet:
             l3_next_protocol (int): L3 next protocol
         """
         
-        return self._layer3.next_protcol
+        return self._layer3.next_protocol
     
     @l3_next_protocol.setter
     def l3_next_protocol(self, l3_next_protocol: int) -> None:
@@ -1454,7 +1454,7 @@ class Packet:
             l4_next_protocol (int): L4 next protocol
         """
         
-        return self._layer4.next_protcol
+        return self._layer4.next_protocol
     
     @l4_next_protocol.setter
     def l4_next_protocol(self, l4_next_protocol: int) -> None:
