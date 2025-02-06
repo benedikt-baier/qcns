@@ -405,7 +405,7 @@ class Packet:
         
         return self._layer1.ack
     
-    def set_l1_ack(self) -> None:
+    def l1_set_ack(self) -> None:
         
         """
         Sets the L1 Ack flag
@@ -419,7 +419,7 @@ class Packet:
         
         self._layer1.set_ack()
         
-    def reset_l1_ack(self) -> None:
+    def l1_reset_ack(self) -> None:
         
         """
         Resets the L1 Ack flag
@@ -448,7 +448,7 @@ class Packet:
         
         return self._layer1.ps
     
-    def set_l1_ps(self) -> None:
+    def l1_set_ps(self) -> None:
         
         """
         Sets the Photon Source flag
@@ -462,7 +462,7 @@ class Packet:
         
         self._layer1.set_ps()
         
-    def reset_l1_ps(self) -> None:
+    def l1_reset_ps(self) -> None:
         
         """
         Resets the Photon Source flag
@@ -506,7 +506,7 @@ class Packet:
         
         self._layer1.success = l1_success
 
-    def set_l1_success(self, index: int) -> None:
+    def l1_set_success(self, index: int) -> None:
         
         """
         Sets the L1 success array the specified index
@@ -520,7 +520,7 @@ class Packet:
         
         self._layer1.set_success(index)
         
-    def reset_l1_success(self, index: int) -> None:
+    def l1_reset_success(self, index: int) -> None:
         
         """
         Resets the L1 success array at the index
@@ -656,7 +656,7 @@ class Packet:
         
         self._layer2.dst = l2_dst
     
-    def switch_l2_src_dst(self) -> None:
+    def l2_switch_src_dst(self) -> None:
         
         """
         Switches the L2 source and destination address
@@ -745,7 +745,7 @@ class Packet:
         
         return self._layer2.ack
     
-    def set_l2_ack(self) -> None:
+    def l2_set_ack(self) -> None:
         
         """
         Sets the L2 Ack
@@ -759,7 +759,7 @@ class Packet:
         
         self._layer2.set_ack()
         
-    def reset_l2_ack(self) -> None:
+    def l2_reset_ack(self) -> None:
         
         """
         Resets the L2 Ack
@@ -803,7 +803,7 @@ class Packet:
         
         self._layer2.success = l2_success
 
-    def set_l2_success(self, index: int) -> None:
+    def l2_set_success(self, index: int) -> None:
         
         """
         Sets the L2 success array the index
@@ -817,7 +817,7 @@ class Packet:
         
         self._layer2.set_success(index)
         
-    def reset_l2_success(self, index: int) -> None:
+    def l2_reset_success(self, index: int) -> None:
         
         """
         Resets the L2 success array at the index
@@ -953,7 +953,7 @@ class Packet:
         
         self._layer3.dst = l3_dst
     
-    def switch_l3_src_dst(self) -> None:
+    def l3_switch_src_dst(self) -> None:
         
         """
         Switches the L3 source and destination address
@@ -1251,7 +1251,7 @@ class Packet:
         
         self._layer4.dst = l4_dst
         
-    def switch_l4_src_dst(self) -> None:
+    def l4_switch_src_dst(self) -> None:
         
         """
         Switches the L4 source and destination port
@@ -1340,7 +1340,7 @@ class Packet:
         
         return self._layer4.ack
     
-    def set_l4_ack(self) -> None:
+    def l4_set_ack(self) -> None:
         
         """
         Sets the L4 Ack flag
@@ -1354,7 +1354,7 @@ class Packet:
         
         self._layer4.set_ack()
         
-    def reset_l4_ack(self) -> None:
+    def l4_reset_ack(self) -> None:
         
         """
         Resets the L4 Ack flag
@@ -1383,7 +1383,7 @@ class Packet:
         
         return self._layer4.success
 
-    def set_l4_success(self, index: int) -> None:
+    def l4_set_success(self, index: int) -> None:
         
         """
         Sets the L4 sccess array at the index
@@ -1397,7 +1397,7 @@ class Packet:
         
         self._layer4.set_success(index)
         
-    def reset_l4_success(self, index: int) -> None:
+    def l4_reset_success(self, index: int) -> None:
         
         """
         Resets the L4 sccess array at the index
@@ -1548,7 +1548,7 @@ class Packet:
         
         return self._layer7.success
 
-    def set_l7_success(self, index: int) -> None:
+    def l7_set_success(self, index: int) -> None:
         
         """
         Sets the L7 success array at the index
@@ -1562,7 +1562,7 @@ class Packet:
         
         self._layer7.set_success(index)
         
-    def reset_l7_success(self, index: int) -> None:
+    def l7_reset_success(self, index: int) -> None:
         
         """
         Resets the L7 success array at the index
