@@ -74,8 +74,8 @@ class DepolarizationError:
             /
         """
 
-        gate_e0 = get_single_operator('', _qubit._qsystem._sparse, self.gate_e0[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
-        gate_e1 = get_single_operator('', _qubit._qsystem._sparse, self.gate_e1[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
+        gate_e0 = get_single_operator('', _qubit._qsystem._sparse, self._gate_e0[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
+        gate_e1 = get_single_operator('', _qubit._qsystem._sparse, self._gate_e1[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
         _qubit._qsystem._state = dot(_qubit._qsystem._state, gate_e0) + dot(_qubit._qsystem._state, gate_e1)
         
         return _qubit
