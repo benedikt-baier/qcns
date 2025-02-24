@@ -692,7 +692,6 @@ class TwoPhotonSourceConnection:
         packet_s.l1_success = np.ones(_requested, dtype=np.bool_)
         packet_r.l1_success = np.ones(_requested, dtype=np.bool_)
         
-        
         packet_s.l1_set_ps()
         packet_r.l1_set_ps()
         packet_r.l1_set_ack()
