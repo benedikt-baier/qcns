@@ -25,6 +25,7 @@ _GATE_PARAMETERS = {'prob_bsm_p': 0.57, 'prob_bsm_a': 0.57}
 
 SEND = 0
 RECEIVE = 1
+GATE = 2
 
 L0 = 0
 L1 = 1
