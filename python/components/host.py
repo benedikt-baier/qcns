@@ -510,8 +510,8 @@ class Host:
         
         self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
         
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[SEND].wait()
+        self._resume[SEND].clear()
         
         _num_needed = num_requested
         if estimate:
@@ -534,8 +534,8 @@ class Host:
         
         self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
         
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[SEND].wait()
+        self._resume[SEND].clear()
         
         self._connections['sqs'][receiver][SEND].create_qubit(num_requested)
     
@@ -555,8 +555,8 @@ class Host:
         
         self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
         
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[SEND].wait()
+        self._resume[SEND].clear()
         
         _num_needed = num_requested
         if estimate:
@@ -588,8 +588,8 @@ class Host:
         
         self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
         
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[SEND].wait()
+        self._resume[SEND].clear()
         
         if not self.has_space(receiver, 0, num_requested):
             num_requested = self.remaining_space(receiver, 0)
@@ -599,7 +599,7 @@ class Host:
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
     
-    async def apply_gate(self, gate: str, *args: str, combine: bool=False, remove: bool=False) -> Union[int, None]:
+    async def apply_gate(self, gate: str, *args: List[Any], combine: bool=False, remove: bool=False) -> Union[int, None]:
         
         """
         Applys a gate to qubits
@@ -616,8 +616,8 @@ class Host:
         
         self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(gate, 5e-6), self._node_id))
         
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[GATE].wait()
+        self._resume[GATE].clear()
         
         if combine and gate in ['CNOT', 'CY', 'CZ', 'CH', 'CPHASE', 'CU', 'SWAP', 'bell_state', 'bsm', 'prob_bsm', 'purification']:
             combine_state(args[:2])
@@ -651,8 +651,8 @@ class Host:
         self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver))
         
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[SEND].wait()
+        self._resume[SEND].clear()
         
         self._connections['sqs'][receiver][SEND]._channel.put(qubit)
     
@@ -669,8 +669,8 @@ class Host:
         """
         
         try:
-            await asc.wait_for(self._resume.wait(), timeout=time_out)
-            self._resume.clear()
+            await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
+            self._resume[RECEIVE].clear()
         except asc.TimeoutError:
             return None
         
@@ -693,11 +693,11 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time + len(_packet) * self._pulse_duration, self._node_id))
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst))
         
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[SEND].wait()
+        self._resume[SEND].clear()
         
         self._connections['packet'][_packet.l2_dst][SEND].put(_packet)
         
@@ -714,8 +714,8 @@ class Host:
         """
         
         try:
-            await asc.wait_for(self._resume.wait(), timeout=time_out)
-            self._resume.clear()
+            await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
+            self._resume[RECEIVE].clear()
         except asc.TimeoutError:
             return None
         
@@ -740,8 +740,8 @@ class Host:
         
         self._sim.schedule_event(WaitEvent(self._sim._sim_time + duration, self.id))
     
-        await self._resume.wait()
-        self._resume.clear()
+        await self._resume[GATE].wait()
+        self._resume[GATE].clear()
     
     @property
     def id(self) -> int:

@@ -2,10 +2,9 @@ import os
 import logging
 import asyncio as asc
 from heapq import heappop, heappush
-from typing import List
+from typing import List, Awaitable
 
 from python.components.event import Event
-from python.components.qubit import QSystem
 
 __all__ = ['Simulation']
 
@@ -23,7 +22,7 @@ class Simulation:
         _sim_time (float): current simulation time
     """
     
-    def __init__(self, logging_path: str='') -> None:
+    def __init__(self, end_time: float=None, logging_path: str='') -> None:
         
         """
         Initializes a Simulation object
@@ -37,8 +36,14 @@ class Simulation:
         
         self._event_queue: List[Event] = []
         self._hosts: List[Host] = []
+        self._num_hosts: int = 0
         self._sim_time: float = 0.
+        self._sim_end_time: float = end_time
+        self._resume: asc.Event = asc.Event()
         self._logging_path: str = logging_path
+        
+        _handle_events = {0: self._handle_event, 1: self._handle_event_end_time}
+        self._handle_events: Awaitable = _handle_events[self._sim_end_time is not None]
         
         if logging_path and not os.path.exists(os.path.dirname(self._logging_path)):
             os.makedirs(os.path.dirname(self._logging_path))
@@ -47,23 +52,6 @@ class Simulation:
                 pass
         if self._logging_path:
             logging.basicConfig(filename=self._logging_path, level=logging.DEBUG)
-    
-    @staticmethod
-    def create_qsystem(_num_qubits: int, _fidelity: float=1., _sparse: bool=False) -> QSystem:
-        
-        """
-        Creates a new qsystem at the host
-        
-        Args:
-            _num_qubits (int): number of qubits in the qsystem
-            _fidelity (float): fidelity of quantum system
-            _sparse (float): sparsity of qsystem
-            
-        Returns:
-            qsys (QSystem): new qsystem
-        """
-        
-        return QSystem(_num_qubits, _fidelity, _sparse)
     
     def add_host(self, host: Host) -> None:
         
@@ -78,6 +66,12 @@ class Simulation:
         """
         
         self._hosts.append(host)
+    
+    def set_end_time(self, end_time: float) -> None:
+        
+        self._sim_end_time = end_time
+        
+        self._handle_events = self._handle_event_end_time
     
     def schedule_event(self, _event: Event) -> None:
     
@@ -111,7 +105,11 @@ class Simulation:
         for host in self._hosts.values():
             host.stop = True
     
-    async def handle_event(self, _num_hosts: int) -> None:
+    async def _handle_events(self, _num_hosts: int) -> None:
+        
+        pass
+    
+    async def _handle_event(self, _num_hosts: int) -> None:
         
         """
         Handles Events in the event queue
@@ -138,16 +136,45 @@ class Simulation:
             
             logging.info(event)
             
-            if not event._id:
+            if not (event._id + 1):
                 self._num_hosts -= 1
                 continue
             
             self._sim_time = event._end_time
-            self._hosts[event._node_id]._resume.set()
+            self._hosts[event._node_id]._resume[event._id].set() 
             
         self.stop_simulation()
     
-    def run(self, num_hosts: int=0) -> None:
+    async def _handle_event_end_time(self, _num_hosts: int) -> None:
+        
+        tasks = [asc.create_task(host.run()) for host in self._hosts.values()]
+        
+        self._num_hosts = len(tasks) - _num_hosts
+        
+        while self._num_hosts > 0:
+            
+            await asc.sleep(0)
+            
+            if not self._event_queue:
+                continue
+            
+            event = heappop(self._event_queue)
+            
+            if not (event._id + 1):
+                self._num_hosts -= 1
+                continue
+            
+            if event._end_time > self._sim_end_time:
+                continue
+            
+            logging.info(event)
+            
+            self._sim_time = event._end_time
+            self._hosts[event._node_id]._resume[event._id].set()
+            
+        self.stop_simulation()
+    
+    def run(self, num_hosts: int=0, end_time: float=None) -> None:
         
         """
         Runs the simulation by handling all Events in the event queue
@@ -161,4 +188,8 @@ class Simulation:
         
         self._hosts = {host._node_id: host for host in self._hosts}
         
-        asc.run(self.handle_event(num_hosts))
+        if end_time is not None:
+            self.set_end_time(end_time)
+        
+        asc.run(self._handle_events(num_hosts))
+   
