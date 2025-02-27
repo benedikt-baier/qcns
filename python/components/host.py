@@ -89,7 +89,7 @@ class Host:
         
         self._packets: Dict[int, Dict[int, Dict[int, List[Packet]]]] = {}
         
-        self._resume: asc.Event = asc.Event()
+        self._resume: Dict[int, asc.Event] = {0: asc.Event(), 1: asc.Event(), 2: asc.Event()}
         self.stop: bool = False
     
         self.run = partial(self.log_exceptions, self.run)
