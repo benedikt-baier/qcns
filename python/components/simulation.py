@@ -5,6 +5,7 @@ from heapq import heappop, heappush
 from typing import List, Awaitable
 
 from python.components.event import Event
+from python.components.qubit import QSystem
 
 __all__ = ['Simulation']
 
@@ -66,6 +67,23 @@ class Simulation:
         """
         
         self._hosts.append(host)
+    
+    @staticmethod
+    def create_qsystem(num_qubits: int=1, fidelity: float=1., sparse: bool=0) -> QSystem:
+    
+        """
+        Creates a QSystem with the given properties
+        
+        Args:
+            num_qubits (int): number of qubits in the Qsystem
+            fidelity (float): initial fidelity of the QSystem
+            sparse (float): whether the QSystem should be sparsely represented
+            
+        Returns:
+            _qsystem (QSystem): QSystem with the given properties
+        """
+        
+        return QSystem(num_qubits, fidelity, sparse)
     
     def set_end_time(self, end_time: float) -> None:
         

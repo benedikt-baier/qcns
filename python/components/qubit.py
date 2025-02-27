@@ -536,6 +536,65 @@ class Qubit:
         
         return str(self._qsystem._state)
     
+    @property
+    def state(self) -> np.array:
+        
+        """
+        Returns the full state of the qubit
+        
+        Args:
+            /
+            
+        Returns:
+            _state (np.array): full state of the qubit
+        """
+        
+        return self._qsystem._state
+    
+    @state.setter
+    def state(self, state: np.array) -> None:
+        
+        """
+        Sets the state of QSystem
+        
+        Args:
+            state (np.array): new state of the qsystem
+            
+        Returns:
+            /
+        """
+        
+        self._qsystem._state = state
+    
+    def qubit_id(self) -> int:
+        
+        """
+        Returns the ID of the qubit
+        
+        Args:
+            /
+            
+        Returns:
+            _id (int): id of qubit
+        """
+        
+        return id(self)
+    
+    def qsystem_id(self) -> int:
+        
+        """
+        Returns the ID of the qsystem the qubit is in
+        
+        Args:
+            /
+            
+        Returns:
+            _id (int): id of the qsystem the qubit is in
+        """
+        
+        return id(self._qsystem)
+    
+    
     def X(self, fidelity: float=1.) -> None:
 
         """
