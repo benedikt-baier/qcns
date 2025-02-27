@@ -305,7 +305,7 @@ class QuantumMemory:
             return 1
         
         if _index is None:
-            _index = self._indices[self._mode]
+            _index = self._transform[self._mode](0)
         
         _, _store_time = self._memory[_store][_index]
 
