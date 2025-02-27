@@ -20,7 +20,7 @@ class L1_Protocol:
         _header_length (int): header length in bits
     """
     
-    def __init__(self, num_requested: int, num_needed: int) -> None:
+    def __init__(self, requested: int, needed: int) -> None:
         
         """
         Initializes a L1 Protocol Header
@@ -30,14 +30,16 @@ class L1_Protocol:
             num_needed (int): number of needed qubits
         """
         
-        self._num_requested: int = num_requested # 1byte
-        if self._num_requested is None:
-            self._num_requested = 1
-        self._num_needed: int = num_needed # 1byte
-        if self._num_needed is None:
-            self._num_needed = 1
+        self._requested: int = requested # 1byte
+        self._needed: int = needed # 1byte
         
-        self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 2^8 bits = 32 byte
+        if not self._requested and self._needed > 0:
+            self._requested = self._needed
+            
+        if self._requested > 0 and not self._needed:
+            self._needed = self._requested
+        
+        self._success: np.array = np.zeros(self._needed, dtype=np.bool_) # 2^8 bits = 32 byte
         self._ack: int = 0 # 1 bit
         self._ps: int = 0 # 1 bit
         
@@ -46,7 +48,7 @@ class L1_Protocol:
         self._header_length: int = 290
     
     @property
-    def num_requested(self) -> int:
+    def requested(self) -> int:
         
         """
         Returns the number of requested qubits
@@ -58,10 +60,10 @@ class L1_Protocol:
             num_requested (int): number of requested qubits
         """
         
-        return self._num_requested
+        return self._requested
     
-    @num_requested.setter
-    def num_requested(self, _num_requested: int) -> None:
+    @requested.setter
+    def requested(self, _requested: int) -> None:
         
         """
         Sets the number of requested qubits
@@ -73,10 +75,10 @@ class L1_Protocol:
             /
         """
         
-        self._num_requested = _num_requested
+        self._requested = _requested
     
     @property
-    def num_needed(self) -> int:
+    def needed(self) -> int:
         
         """
         Returns the number of needed qubits
@@ -88,10 +90,10 @@ class L1_Protocol:
             num_needed (int): number of needed qubits
         """
         
-        return self._num_needed
+        return self._needed
     
-    @num_needed.setter
-    def num_needed(self, _num_needed: int) -> None:
+    @needed.setter
+    def needed(self, _needed: int) -> None:
         
         """
         Sets the number of needed qubits, WARNING resets the success array
@@ -103,8 +105,8 @@ class L1_Protocol:
             /
         """
         
-        self._num_needed = _num_needed
-        self._success = np.zeros(self._num_needed, dtype=np.bool_)
+        self._needed = _needed
+        self._success = np.zeros(self._needed, dtype=np.bool_)
     
     @property
     def ack(self) -> int:
@@ -221,6 +223,7 @@ class L1_Protocol:
         """
         
         self._success = success
+        self._needed = len(success)
     
     def set_success(self, _idx: int) -> None:
         
@@ -336,7 +339,7 @@ class L1_Protocol:
             layer1 (str): str repr of layer 1
         """
         
-        return f'L1: Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Ps {self._ps} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
+        return f'L1: Req {self._requested} Need {self._needed} Ack {self._ack} Ps {self._ps} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
     
 class L2_Protocol:
     
@@ -355,7 +358,7 @@ class L2_Protocol:
         _header_length (int): length of the header
     """
     
-    def __init__(self, src: int, dst: int, num_requested: int, num_needed: int) -> None:
+    def __init__(self, src: int, dst: int, requested: int, needed: int) -> None:
         
         """
         Initializes a L2 protocol header
@@ -373,13 +376,16 @@ class L2_Protocol:
         self._src: int = src # 6byte
         self._dst: int = dst # 6byte
         
-        self._num_requested: int = num_requested # 1byte
-        if self._num_requested is None:
-            self._num_requested = 1
-        self._num_needed: int = num_needed # 1byte
-        if self._num_needed is None:
-            self._num_needed = 1
-        self._success: np.array = np.zeros(int(np.floor(self._num_needed/2)), dtype=np.bool_) # 32 byte
+        self._requested: int = requested # 1byte
+        self._needed: int = needed # 1byte
+        
+        if not self._requested and self._needed > 0:
+            self._requested = self._needed
+        
+        if self._requested > 0 and not self._needed:
+            self._needed = self._requested
+        
+        self._success: np.array = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32 byte
         self._ack: int = 0 # 1 bit
         
         self._protocol: int = 0 # 1byte
@@ -461,7 +467,7 @@ class L2_Protocol:
         self._src, self._dst = self._dst, self._src
     
     @property
-    def num_requested(self) -> int:
+    def requested(self) -> int:
         
         """
         Returns the number of requested qubits
@@ -473,10 +479,10 @@ class L2_Protocol:
             num_requested (int): number of requested qubits
         """
         
-        return self._num_requested
+        return self._requested
     
-    @num_requested.setter
-    def num_requested(self, _num_requested: int) -> None:
+    @requested.setter
+    def requested(self, _requested: int) -> None:
         
         """
         Sets the number of requested qubits
@@ -488,10 +494,10 @@ class L2_Protocol:
             /
         """
         
-        self._num_requested = _num_requested
+        self._requested = _requested
     
     @property
-    def num_needed(self) -> int:
+    def needed(self) -> int:
         
         """
         Returns the number of needed qubits
@@ -503,10 +509,10 @@ class L2_Protocol:
             num_needed (int): number of needed qubits
         """
         
-        return self._num_needed
+        return self._needed
     
-    @num_needed.setter
-    def num_needed(self, _num_needed: int) -> None:
+    @needed.setter
+    def needed(self, _needed: int) -> None:
         
         """
         Sets the number of needed qubits, WARNING resets the success array
@@ -518,8 +524,8 @@ class L2_Protocol:
             /
         """
         
-        self._num_needed = _num_needed
-        self._success = np.zeros(self._num_needed, dtype=np.bool_)
+        self._needed = _needed
+        self._success = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_)
     
     @property
     def ack(self) -> int:
@@ -708,7 +714,7 @@ class L2_Protocol:
             layer2 (str): str repr of layer 1
         """
         
-        return f' | L2: Src {self._src} Dst {self._dst} Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
+        return f' | L2: Src {self._src} Dst {self._dst} Req {self._requested} Need {self._needed} Ack {self._ack} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
     
 class L3_Protocol:
     
@@ -729,7 +735,7 @@ class L3_Protocol:
         _header_length (int): header length
     """
     
-    def __init__(self, src: int, dst: int, num_requested: int, num_needed: int) -> None:
+    def __init__(self, src: int, dst: int, requested: int, needed: int) -> None:
         
         """
         Initializes the L3 Protocol Header
@@ -745,21 +751,24 @@ class L3_Protocol:
         self._src: int = src # 16 byte
         self._dst: int = dst # 16 byte
         
-        self._num_requested: int = num_requested # 1byte
-        if self._num_requested is None:
-            self._num_requested = 1
-        self._num_needed: int = num_needed # 1byte
-        if self._num_needed is None:
-            self._num_needed = 1
-        self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
-        self._x_count: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
-        self._z_count: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32 byte
+        self._requested: int = requested # 1byte
+        self._needed: int = needed # 1byte
         
-        self._mode: int = 0 # 1 bit
+        if not self._requested and self._needed > 0:
+            self._requested =  self._needed
+        
+        if self._requested > 0 and not self._needed:
+            self._needed = self._requested
+         
+        self._success: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
+        self._x_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
+        self._z_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
+        
+        self._mode: int = 1 # 2 bit
         
         self._protocol: int = 0 # 1byte
         self._next_protocol: int = 0 # 1byte
-        self._header_length: int = 1057
+        self._header_length: int = 1058
         
     @property
     def src(self) -> int:
@@ -836,7 +845,7 @@ class L3_Protocol:
         self._src, self._dst = self._dst, self._src
      
     @property
-    def num_requested(self) -> int:
+    def requested(self) -> int:
         
         """
         Returns the number of requested qubits
@@ -848,10 +857,10 @@ class L3_Protocol:
             num_requested (int): number of requested qubits
         """
         
-        return self._num_requested
+        return self._requested
     
-    @num_requested.setter
-    def num_requested(self, _num_requested: int) -> None:
+    @requested.setter
+    def requested(self, _requested: int) -> None:
         
         """
         Sets the number of requested qubits
@@ -863,10 +872,10 @@ class L3_Protocol:
             /
         """
         
-        self._num_requested = _num_requested
+        self._requested = _requested
     
     @property
-    def num_needed(self) -> int:
+    def needed(self) -> int:
         
         """
         Returns the number of needed qubits
@@ -878,10 +887,10 @@ class L3_Protocol:
             num_needed (int): number of needed qubits
         """
         
-        return self._num_needed
+        return self._needed
     
-    @num_needed.setter
-    def num_needed(self, _num_needed: int) -> None:
+    @needed.setter
+    def needed(self, _needed: int) -> None:
         
         """
         Sets the number of needed qubits, WARNING resets the succes, X and Z array
@@ -893,30 +902,35 @@ class L3_Protocol:
             /
         """
         
-        self._num_needed = _num_needed
-        self._success = np.zeros(self._num_needed, dtype=np.bool_)
-        self._x_count = np.zeros(self._num_needed, dtype=np.bool_)
-        self._z_count = np.zeros(self._num_needed, dtype=np.bool_)
+        self._needed = _needed
+        self._success = np.zeros(self._needed, dtype=np.bool_)
+        self._x_count = np.zeros(self._needed, dtype=np.bool_)
+        self._z_count = np.zeros(self._needed, dtype=np.bool_)
      
     @property
     def mode(self) -> int:
         
         """
-        Returns the mode
+        Returns the mode of the packet
+        
+        00: classical forwarding
+        01: no reject mode
+        10: partial reject mode
+        11: complete reject mode
         
         Args:
             /
             
         Returns:
-            mode (int): mode of the header
+            mode (int): quantum data plane mode of the header
         """
         
         return self._mode
     
-    def set_mode(self) -> None:
+    def set_cf(self) -> None:
         
         """
-        Sets the mode of the header
+        Sets the mode of the header to classical forwarding
         
         Args:
             /
@@ -925,12 +939,12 @@ class L3_Protocol:
             /
         """
         
-        self._mode = 1
+        self._mode: int = 0
     
-    def reset_mode(self) -> None:
+    def set_nr(self) -> None:
         
         """
-        Resets the mode of the header
+        Sets the mode of the header to no reject mode
         
         Args:
             /
@@ -939,7 +953,35 @@ class L3_Protocol:
             /
         """
         
-        self._mode = 0
+        self._mode: int = 1
+    
+    def set_pr(self) -> None:
+        
+        """
+        Sets the mode of the header to partial reject mode
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._mode: int = 2
+        
+    def set_cr(self) -> None:
+        
+        """
+        Sets the mode of the header to complete reject mode
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._mode: int = 3
     
     @property
     def es_result(self) -> Tuple[np.array, np.array]:
@@ -986,7 +1028,7 @@ class L3_Protocol:
         if _res & 1:
             self._x_count[_idx] ^= 1
     
-    def reset_es(self) -> None:
+    def reset_es(self, idx: int) -> None:
         
         """
         Resets the X and Z array
@@ -998,7 +1040,12 @@ class L3_Protocol:
             /
         """
         
-        self._x_count, self._z_count = np.zeros(self._num_needed, dtype=np.bool_), np.zeros(self._num_needed, dtype=np.bool_)
+        if idx is None:
+            self._x_count, self._z_count = np.zeros(self._num_needed, dtype=np.bool_), np.zeros(self._num_needed, dtype=np.bool_)
+            return
+        
+        self._x_count[idx] = 0
+        self._z_count[idx] = 0
     
     @property
     def protocol(self) -> int:
@@ -1086,7 +1133,7 @@ class L3_Protocol:
             layer3 (str): str repr of layer 1
         """
         
-        return f' | L3: Src {self._src} Dst {self._dst} Req {self._num_requested} Need {self._num_needed} Mode {self._mode} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} X {self._x_count} Z {self._z_count}'
+        return f' | L3: Src {self._src} Dst {self._dst} Req {self._requested} Need {self._needed} Mode {self._mode} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} X {self._x_count} Z {self._z_count}'
     
 class L4_Protocol:
     
@@ -1105,7 +1152,7 @@ class L4_Protocol:
         _header_length (int): header length
     """
     
-    def __init__(self, src: int, dst: int, num_requested: int, num_needed: int) -> None:
+    def __init__(self, src: int, dst: int, requested: int, needed: int) -> None:
         
         """
         Initializes a L4 Protocol Header
@@ -1120,13 +1167,16 @@ class L4_Protocol:
         self._src: int = src # 2byte
         self._dst: int = dst # 2byte
 
-        self._num_requested: int = num_requested # 1byte
-        if self._num_requested is None:
-            self._num_requested = 1
-        self._num_needed: int = num_needed # 1byte
-        if self._num_needed is None:
-            self._num_needed = 1
-        self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32byte
+        self._requested: int = requested # 1byte
+        self._needed: int = needed # 1byte
+        
+        if not self._requested and self._needed > 0:
+            self._requested = self._needed
+            
+        if self._requested > 0 and not self._needed:
+            self._needed = self._requested
+        
+        self._success: np.array = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32byte
         self._ack: int = 0
         
         self._protocol: int = 0 # 1byte
@@ -1208,7 +1258,7 @@ class L4_Protocol:
         self._src, self._dst = self._dst, self._src 
       
     @property
-    def num_requested(self) -> int:
+    def requested(self) -> int:
         
         """
         Returns the number of requested qubits
@@ -1220,10 +1270,10 @@ class L4_Protocol:
             num_requested (int): number of requested qubits
         """
         
-        return self._num_requested
+        return self._requested
     
-    @num_requested.setter
-    def num_requested(self, _num_requested: int) -> None:
+    @requested.setter
+    def requested(self, _requested: int) -> None:
         
         """
         Sets the number of requested qubits:
@@ -1235,10 +1285,10 @@ class L4_Protocol:
             /
         """
         
-        self._num_requested = _num_requested
+        self._requested = _requested
     
     @property
-    def num_needed(self) -> int:
+    def needed(self) -> int:
         
         """
         Returns the number of needed qubits
@@ -1250,10 +1300,10 @@ class L4_Protocol:
             num_needed (int): number of needed qubits
         """
         
-        return self._num_needed
+        return self._needed
     
-    @num_needed.setter
-    def num_needed(self, _num_needed: int) -> None:
+    @needed.setter
+    def needed(self, _needed: int) -> None:
         
         """
         Sets the number of needed qubits, WARNING resets the success array
@@ -1265,8 +1315,8 @@ class L4_Protocol:
             /
         """
         
-        self._num_needed = _num_needed
-        self._success = np.zeros(self._num_needed, dtype=np.bool_)  
+        self._needed = _needed
+        self._success = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_)  
       
     @property
     def ack(self) -> int:
@@ -1440,7 +1490,7 @@ class L4_Protocol:
             layer4 (str): str repr of layer 1
         """
         
-        return f' | L4: Src {self._src} Dst {self._dst} Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
+        return f' | L4: Src {self._src} Dst {self._dst} Req {self._requested} Need {self._needed} Ack {self._ack} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} Success {self._success}'
      
 class L7_Protocol:
     
@@ -1456,7 +1506,7 @@ class L7_Protocol:
         _payload (list): payload of the packet
     """
     
-    def __init__(self, num_requested: int, num_needed: int, payload: List[Any]) -> None:
+    def __init__(self, requested: int, payload: List[Any]) -> None:
         
         """
         Initializes a L7 Protocol Header
@@ -1469,13 +1519,9 @@ class L7_Protocol:
             /
         """
         
-        self._num_requested: int = num_requested # 1 byte
-        if self._num_requested is None:
-            self._num_requested = 1
-        self._num_needed: int = num_needed # 1byte
-        if self._num_needed is None:
-            self._num_needed = 1
-        self._success: np.array = np.zeros(self._num_needed, dtype=np.bool_) # 32byte
+        self._requested: int = requested # 1 byte
+        
+        self._success: np.array = np.zeros(self._requested, dtype=np.bool_) # 32byte
         
         self._protocol: int = 0 # 1byte
         self._header_length: int = 280
@@ -1483,9 +1529,11 @@ class L7_Protocol:
         self._payload: List[Any] = payload
         if payload is None:
             self._payload: List[Any] = []
+        if not isinstance(payload, list):
+            self._payload: List[Any] = [payload]
     
     @property
-    def num_requested(self) -> int:
+    def requested(self) -> int:
         
         """
         Returns the number of requested qubits
@@ -1497,10 +1545,10 @@ class L7_Protocol:
             num_requested (int): number of requested qubits
         """
         
-        return self._num_requested
+        return self._requested
     
-    @num_requested.setter
-    def num_requested(self, _num_requested: int) -> None:
+    @requested.setter
+    def requested(self, _requested: int) -> None:
         
         """
         Sets the number of requested qubits
@@ -1512,38 +1560,7 @@ class L7_Protocol:
             /
         """
         
-        self._num_requested = _num_requested
-    
-    @property
-    def num_needed(self) -> int:
-        
-        """
-        Returns the number of needed qubits
-        
-        Args:
-            /
-            
-        Returns:
-            num_needed (int): number of needed qubits
-        """
-        
-        return self._num_needed
-    
-    @num_needed.setter
-    def num_needed(self, _num_needed: int) -> None:
-        
-        """
-        Sets the number of needed qubits, WARNING resets the success array
-        
-        Args:
-            _num_needed (int): number of needed qubits
-            
-        Returns:
-            /
-        """
-        
-        self._num_needed = _num_needed
-        self._success = np.zeros(self._num_needed, dtype=np.bool_)
+        self._requested = _requested
     
     @property
     def success(self) -> np.array:
@@ -1653,4 +1670,4 @@ class L7_Protocol:
             layer7 (str): str repr of layer 1
         """
         
-        return f' | L7: Req {self._num_requested} Need {self._num_needed} Ack {self._ack} Proto {self._protocol} Len {self._header_length} Success {self._success}'
+        return f' | L7: Req {self._requested} Proto {self._protocol} Len {self._header_length} Success {self._success}'
