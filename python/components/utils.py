@@ -143,23 +143,33 @@ def get_normalized_probability_amplitudes(num_samples: int) -> np.array:
     
     return rand / norm
 
-def load_qasm_2_0_file(path):
+def load_qasm_2_0_file(path, parse_comments=False):
     
     circuit = []
     num_qubits = 1
     circuit_str = []
     circuit_start = -1
+    comments = []
     
     with open(path, 'r') as f:
         for line_num, line in enumerate(f):
             if line.startswith('qreg'):
                 num_qubits = list(map(int, findall(r'\d+', line)))[0]
                 circuit_start = line_num
+                continue
+            if line.startswith('creg'):
+                circuit_start = line_num
+                continue
             if circuit_start == -1:
                 continue
-            circuit_str.append(line.replace('\n', '').replace(';', ''))
+        
+            line, comment = line.split(';')
+            circuit_str.append(line)
+            
+            if parse_comments:
+                comments.append(comment.replace('\n', ''))
     
-    for gate in circuit_str[1:]:
+    for gate in circuit_str:
         if gate.startswith('u3'):
             gate = gate.replace('u3', '')
             thetas, qubit = gate.split(' ')
@@ -224,7 +234,22 @@ def load_qasm_2_0_file(path):
             qubit = int(gate.replace(f'q[', '').replace(']', '').strip())
             circuit.append(['h', qubit])
             continue
+    
+    if parse_comments:
         
+        for gate, comment in zip(circuit, comments):
+            if not comment:
+                gate.append(None)
+                continue
+            comment = comment.replace(' // ', '')
+            
+            if not (comment.startswith('Encoding') or comment.startswith('Variational')):
+                gate.append(comment)
+                continue
+            
+            gate[-1] = None
+            gate.append(comment)
+     
     return circuit, num_qubits
     
 def load_qasm_3_0_file(path):

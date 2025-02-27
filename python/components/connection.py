@@ -359,6 +359,9 @@ class SenderReceiverConnection:
         if not _needed:
             return
         
+        if self._receiver_memory.remaining_space() < _needed:
+            _needed = self._receiver_memory.remaining_space()
+        
         packet = Packet(self._sender.id, self._receiver.id, _requested, _needed)
         
         _num_tries = 1
@@ -395,6 +398,9 @@ class SenderReceiverConnection:
         
         if not _requested:
             return
+        
+        if self._receiver_memory.remaining_space() < _requested:
+            _needed = self._receiver_memory.remaining_space()
         
         packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
         
@@ -545,6 +551,7 @@ class TwoPhotonSourceConnection:
         
         self._sender_duration: float = self._source_duration + _sender_channel._sending_time + _duration + _sender_detector._duration # fix
         self._receiver_duration: float = self._source_duration + _receiver_channel._sending_time + _duration + _receiver_detector._duration # fix
+        self._total_duration: float = 2 * (_sender_channel._sending_time + _receiver_channel._sending_time)
 
         self._state: np.array = (self._success_prob * _total_depolar_prob * np.sqrt(self._sender_state_transfer_fidelity * self._receiver_state_transfer_fidelity) * B_0 + 
                                  (self._success_prob * (1 - _total_depolar_prob * np.sqrt(self._sender_state_transfer_fidelity * self._receiver_state_transfer_fidelity)) + _sender_false_prob + _receiver_false_prob) * I_0) / self._total_prob # fix
@@ -605,6 +612,9 @@ class TwoPhotonSourceConnection:
         if not _needed:
             return
         
+        if self._receiver_memory.remaining_space() < _needed:
+            _needed = self._receiver_memory.remaining_space()
+        
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
         
@@ -623,9 +633,6 @@ class TwoPhotonSourceConnection:
         packet_s.l1_success = _sender_success_samples
         packet_r.l1_success = _receiver_success_samples
         
-        packet_s.l1_protocol = 2
-        packet_r.l1_protocol = 2
-        
         _success_samples = np.logical_and(_sender_success_samples, _receiver_success_samples)
         
         for _success, _curr_time in zip(_success_samples, _curr_time_samples):
@@ -634,11 +641,11 @@ class TwoPhotonSourceConnection:
         packet_s.l1_set_ps()
         packet_r.l1_set_ps()
         packet_r.l1_set_ack()
-        packet_s.l1_protocol = 1
-        packet_r.l1_protocol = 1
+        packet_s.l1_protocol = 2
+        packet_r.l1_protocol = 2
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
 
@@ -656,6 +663,9 @@ class TwoPhotonSourceConnection:
         
         if not _requested:
             return
+        
+        if self._receiver_memory.remaining_space() < _requested:
+            _requested = self._receiver_memory.remaining_space()
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -679,18 +689,17 @@ class TwoPhotonSourceConnection:
         for _curr_time in _curr_time_samples:
             self.success_creation(_curr_time)
         
-        packet_s.l1_set_ps()
-        packet_r.l1_set_ps()
-        packet_r.l1_set_ack()
-        
         packet_s.l1_success = np.ones(_requested, dtype=np.bool_)
         packet_r.l1_success = np.ones(_requested, dtype=np.bool_)
         
+        packet_s.l1_set_ps()
+        packet_r.l1_set_ps()
+        packet_r.l1_set_ack()
         packet_s.l1_protocol = 2
         packet_r.l1_protocol = 2
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._source_duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
 
@@ -823,6 +832,7 @@ class BellStateMeasurementConnection:
         
         self._sender_duration: float = self._sender_source_duration + _sender_channel._sending_time + _duration + _sender_detector._duration
         self._receiver_duration: float = self._receiver_source_duration + _receiver_channel._sending_time + _duration + _receiver_detector._duration
+        self._total_duration: float = 2 * (_sender_channel._sending_time + _receiver_channel._sending_time)
         
         self._state: np.array = (self._success_prob * _total_depolar_prob * B_0 + 
                             self._false_prob_1 * _total_depolar_prob * A_0 + 
@@ -889,6 +899,9 @@ class BellStateMeasurementConnection:
         if not _needed:
             return
         
+        if self._receiver_memory.remaining_space() < _needed:
+            _needed = self._receiver_memory.remaining_space()
+        
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
 
@@ -918,8 +931,8 @@ class BellStateMeasurementConnection:
         packet_s.l1_protocol = 3
         packet_r.l1_protocol = 3
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
     
@@ -937,6 +950,9 @@ class BellStateMeasurementConnection:
         
         if not _requested:
             return
+        
+        if self._receiver_memory.remaining_space() < _requested:
+            _requested = self._receiver_memory.remaining_space()
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -970,8 +986,8 @@ class BellStateMeasurementConnection:
         packet_s.l1_protocol = 3
         packet_r.l1_protocol = 3
     
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
     
@@ -1119,6 +1135,7 @@ class FockStateConnection:
         
         self._sender_duration: float = self._sender_source_duration + _sender_channel._sending_time + self._duration + _sender_detector._duration
         self._receiver_duration: float = self._receiver_source_duration + _receiver_channel._sending_time + self._duration + _receiver_detector._duration
+        self._total_duration: float = 2 * (_sender_channel._sending_time + _receiver_channel._sending_time)
     
         self._state: np.array = np.array([[(1 - self._spin_photon_correlation) * up_down_prob, 0., 0., (1 - self._spin_photon_correlation) * np.exp(1j * self._coherent_phase) * _s], 
                                           [0., 0.5 * self._spin_photon_correlation * (up_down_prob + down_up_prob) + up_up_prob, 0., 0.],
@@ -1193,6 +1210,9 @@ class FockStateConnection:
         if not _needed:
             return
         
+        if self._receiver_memory.remaining_space() < _needed:
+            _needed = self._receiver_memory.remaining_space()
+        
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
 
@@ -1222,8 +1242,8 @@ class FockStateConnection:
         packet_s.l1_protocol = 4
         packet_r.l1_protocol = 4
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
 
@@ -1241,6 +1261,9 @@ class FockStateConnection:
         
         if not _requested:
             return
+        
+        if self._receiver_memory.remaining_space() < _requested:
+            _requested = self._receiver_memory.remaining_space()
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -1274,8 +1297,8 @@ class FockStateConnection:
         packet_s.l1_protocol = 4
         packet_r.l1_protocol = 4
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
         self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
         self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
         
@@ -1391,6 +1414,9 @@ class L3Connection:
         if not _needed:
             return
         
+        if self._receiver_memory.remaining_space() < _needed:
+            _needed = self._receiver_memory.remaining_space()
+        
         packet = Packet(self._sender.id, self._receiver_id, _requested, _needed)
 
         _num_tries = 1
@@ -1425,6 +1451,9 @@ class L3Connection:
         
         if not _requested:
             return
+        
+        if self._receiver_memory.remaining_space() < _requested:
+            _requested = self._receiver_memory.remaining_space()
         
         packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
         
