@@ -620,7 +620,7 @@ class Host:
         await self._resume[GATE].wait()
         self._resume[GATE].clear()
         
-        if combine and gate in ['CNOT', 'CY', 'CZ', 'CH', 'CPHASE', 'CU', 'SWAP', 'bell_state', 'bsm', 'prob_bsm', 'purification']:
+        if combine and gate in ['CNOT', 'CY', 'CZ', 'CH', 'CPHASE', 'CU', 'SWAP', 'bell_state', 'bsm', 'prob_bsm']:
             combine_state(args[:2])
         if combine and gate in ['TOFFOLI', 'CCU', 'CSWAP']:
             combine_state(args[:3])
@@ -631,10 +631,45 @@ class Host:
             remove_qubits(args[:1])
         if remove and gate in ['bsm', 'prob_bsm']:
             remove_qubits(args[:2])
-        if remove and gate in ['purification']:
-            remove_qubits(args[1:2])
         
         return res
+    
+    async def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
+        
+        """
+        Purifies the two qubits in the store given the indices
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): send or receive entanglement store
+            direction (int): whether to apply src->dst or dst->src
+            gate (str): gate to apply
+            basis (str): in which basis to measure the target qubit
+            index_src (int): index of source qubit
+            index_dst (int): index of dest qubit
+            
+        Returns:
+            res (int): measurement result
+        """
+        
+        self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(gate, 5e-6), self.id))
+        
+        await self._resume[GATE].wait()
+        self._resume[GATE].clear()
+        
+        _qubit_src, _qubit_dst = self._connections['memory'][host][store].purify(index_src, index_dst, self._sim._sim_time)
+        
+        combine_state([_qubit_src, _qubit_dst])
+        
+        _res = self._gates['purification'](_qubit_src, _qubit_dst, direction, gate, basis)
+        
+        # _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, direction, gate, basis, combine=True, remove=True)
+        
+        remove_qubits([_qubit_dst])
+        
+        self._connections['memory'][host][store].store_qubit(L2, _qubit_src, -1, self._sim._sim_time)
+        
+        return _res
     
     async def send_qubit(self, receiver: int, qubit: Qubit) -> None:
         
@@ -1246,32 +1281,6 @@ class Host:
         """
         
         return int(np.floor(self.l1_num_qubits(host, store) / 2))
-    
-    async def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
-        
-        """
-        Purifies the two qubits in the store given the indices
-        
-        Args:
-            host (int): the host the memory points to
-            store (int): send or receive entanglement store
-            direction (int): whether to apply src->dst or dst->src
-            gate (str): gate to apply
-            basis (str): in which basis to measure the target qubit
-            index_src (int): index of source qubit
-            index_dst (int): index of dest qubit
-            
-        Returns:
-            res (int): measurement result
-        """
-        
-        _qubit_src, _qubit_dst = self._connections['memory'][host][store].purify(index_src, index_dst, self._sim._sim_time)
-        
-        _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, direction, gate, basis, combine=True, remove=True)
-        
-        self._connections['memory'][host][store].store_qubit(L2, _qubit_src, -1, self._sim._sim_time)
-        
-        return _res
     
     def l0_estimate_fidelity(self, host: int, store: int, index: int=None) -> float:
         
