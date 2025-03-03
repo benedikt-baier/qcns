@@ -1102,7 +1102,7 @@ class Packet:
         
         self._layer3.es_result = l3_es_result
     
-    def l3_update_es(self, index: int, result: int) -> None:
+    def l3_update_es(self, result: int, index: int=0) -> None:
         
         """
         Updates the L3 X and Z array at the index with the result
@@ -1115,7 +1115,7 @@ class Packet:
             /
         """
         
-        self._layer3.update_es(index, result)
+        self._layer3.update_es(result, index)
     
     def l3_reset_es(self, index: int=None) -> None:
         

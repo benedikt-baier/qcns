@@ -1013,7 +1013,7 @@ class L3_Protocol:
         
         self._x_count, self._z_count = es_result
     
-    def update_es(self, _idx: int, _res: int) -> None:
+    def update_es(self, _res: int, _idx: int) -> None:
         
         """
         Updates the X and Z array at the index with the result
@@ -1021,6 +1021,9 @@ class L3_Protocol:
         Args:
             _idx (int): index to update X and Z array
             _res (int): result to update X and Z array
+            
+        Returns:
+            /
         """
         
         if _res >> 1:
