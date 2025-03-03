@@ -8,7 +8,7 @@ from typing import List, Tuple, Dict
 class Qubit:
     pass
 
-__all__ = ['GHZ_state', 'W_state', 'graph_state', 'ghz_m', 'get_measure_dict', 'get_normalized_probability_amplitudes', 'load_qasm_2_0_file', 'load_qasm_3_0_file', 'apply_circuit']
+__all__ = ['GHZ_state', 'W_state', 'graph_state', 'ghz_m', 'get_measure_dict', 'get_normalized_probability_amplitudes', 'load_qasm_2_0_file', 'load_qasm_3_0_file', 'apply_circuit', 'dqc_apply_circuit']
 
 def get_w_operator(p: float, q: float) -> np.array:
     
@@ -333,7 +333,42 @@ def load_qasm_3_0_file(path):
     
     return circuit, num_qubits, classical_bits
 
-async def apply_circuit(host, circuit, qubits):
+def apply_circuit(circuit, qubits, classical_bits=None):
+    
+    for circuit_p in circuit:
+        
+        if circuit_p[0] == 'U':
+            qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4])
+            continue
+        if circuit_p[0] == 'CNOT':
+            qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]])
+            continue
+        if circuit_p[0] == 'Rx':
+            qubits[circuit_p[1]].Rx(circuit_p[2])
+            continue
+        if circuit_p[0] == 'Ry':
+            qubits[circuit_p[1]].Ry(circuit_p[2])
+            continue
+        if circuit_p[0] == 'Rz':
+            qubits[circuit_p[1]].Rz(circuit_p[2])
+            continue
+        if circuit_p[0] == 'measure':
+            classical_bits[circuit_p[2]] = qubits[circuit_p[1]].measure()
+            continue
+        if circuit_p[0] == 'x':
+            qubits[circuit_p[1]].X()
+            continue
+        if circuit_p[0] == 'y':
+            qubits[circuit_p[1]].Y()
+            continue
+        if circuit_p[0] == 'z':
+            qubits[circuit_p[1]].Z()
+            continue
+        if circuit_p[0] == 'h':
+            qubits[circuit_p[1]].H()
+            continue
+
+async def dqc_apply_circuit(host, circuit, qubits):
     
     for circuit_p in circuit:
         
@@ -359,7 +394,7 @@ async def apply_circuit(host, circuit, qubits):
             await host.apply_gate('X', qubits[circuit_p[1]])
             continue
         if circuit_p[0] == 'y':
-            await ost.apply_gate('Y', qubits[circuit_p[1]])
+            await host.apply_gate('Y', qubits[circuit_p[1]])
             continue
         if circuit_p[0] == 'z':
             await host.apply_gate('Z', qubits[circuit_p[1]])
