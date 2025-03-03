@@ -1024,9 +1024,9 @@ class L3_Protocol:
         """
         
         if _res >> 1:
-            self._z_count[_idx] ^= 1
+            self._z_count[_idx] = np.logical_not(self._z_count[_idx])
         if _res & 1:
-            self._x_count[_idx] ^= 1
+            self._x_count[_idx] = np.logical_not(self._x_count[_idx])
     
     def reset_es(self, idx: int) -> None:
         
