@@ -127,7 +127,7 @@ class Host:
         except Exception as e:
             logging.error(f'Host {self.id} has Exception')
             logging.error(traceback.format_exc())
-            self._sim.num_hosts = 0
+            self._sim.stop_simulation()
     
     def set_sqs_connection(self, host: Host, sender_source: str='perfect', receiver_source: str='perfect',
                            sender_num_sources: int=-1, receiver_num_sources: int=-1,
