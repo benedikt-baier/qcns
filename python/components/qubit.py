@@ -392,32 +392,32 @@ def depolarization_error(_sparse: bool, _qubit: Qubit, _fidelity: float) -> None
 
 def combine_state(q_l: List[Qubit]) -> QSystem:
         
-        """
-        Combines multiple qsystems into one qsystem
+    """
+    Combines multiple qsystems into one qsystem
+    
+    Args:
+        q_l (list): List of qsystems
         
-        Args:
-            q_l (list): List of qsystems
-            
-        Returns:
-            qsys_n (QSystem): new qsystem
-        """
-        
-        if len(set([id(qubit._qsystem) for qubit in q_l])) == 1:
-            return q_l[0]._qsystem
-        
-        qsys_n = q_l[0]._qsystem
-        qsys_l = [q._qsystem for n, q in enumerate(q_l) if q not in q_l[:n]]
-        num_qubits_n = sum([qsys._num_qubits for qsys in qsys_l])
-        
-        qsys_n._qubits = [q for qsys in qsys_l for q in qsys._qubits]
-        qsys_n._num_qubits = num_qubits_n
-        qsys_n._state = tensor_operator(q_l[0]._qsystem._sparse, np.array([qsys._state for qsys in qsys_l], dtype=object))
-        qsys_n._state = qsys_n._state.astype(np.complex128)
-        for i in range(num_qubits_n):
-            qsys_n._qubits[i]._index = i
-            qsys_n._qubits[i]._qsystem = qsys_n
+    Returns:
+        qsys_n (QSystem): new qsystem
+    """
+    
+    if len(set([id(qubit._qsystem) for qubit in q_l])) == 1:
+        return q_l[0]._qsystem
+    
+    qsys_n = q_l[0]._qsystem
+    qsys_l = [q._qsystem for n, q in enumerate(q_l) if q not in q_l[:n]]
+    num_qubits_n = sum([qsys._num_qubits for qsys in qsys_l])
+    
+    qsys_n._qubits = [q for qsys in qsys_l for q in qsys._qubits]
+    qsys_n._num_qubits = num_qubits_n
+    qsys_n._state = tensor_operator(q_l[0]._qsystem._sparse, np.array([qsys._state for qsys in qsys_l], dtype=object))
+    qsys_n._state = qsys_n._state.astype(np.complex128)
+    for i in range(num_qubits_n):
+        qsys_n._qubits[i]._index = i
+        qsys_n._qubits[i]._qsystem = qsys_n
 
-        return qsys_n
+    return qsys_n
     
 def ptrace_full(_q: Qubit) -> None:
     
@@ -593,7 +593,6 @@ class Qubit:
         """
         
         return id(self._qsystem)
-    
     
     def X(self, fidelity: float=1.) -> None:
 
