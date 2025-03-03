@@ -1041,7 +1041,7 @@ class L3_Protocol:
         """
         
         if idx is None:
-            self._x_count, self._z_count = np.zeros(self._num_needed, dtype=np.bool_), np.zeros(self._num_needed, dtype=np.bool_)
+            self._x_count, self._z_count = np.zeros(self._needed, dtype=np.bool_), np.zeros(self._needed, dtype=np.bool_)
             return
         
         self._x_count[idx] = 0

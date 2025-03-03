@@ -1117,7 +1117,7 @@ class Packet:
         
         self._layer3.update_es(index, result)
     
-    def l3_reset_es(self) -> None:
+    def l3_reset_es(self, index: int=None) -> None:
         
         """
         Resets the L3 X and Z array
@@ -1129,7 +1129,7 @@ class Packet:
             /
         """
         
-        self._layer3.reset_es()
+        self._layer3.reset_es(index)
     
     @property
     def l3_protocol(self) -> int:
