@@ -425,7 +425,7 @@ class SenderReceiverConnection:
         packet.l1_protocol = 1
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_current_try - 1) * self._source_duration, self._receiver_id))
-        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
+        self._sender._connections['packet'][self._receiver._node_id][SEND].put(packet)
         
 class TwoPhotonSourceConnection:
     
