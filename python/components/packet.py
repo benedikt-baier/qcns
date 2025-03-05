@@ -1042,10 +1042,10 @@ class Packet:
         
         return self._layer3.mode
     
-    def l3_set_mode(self) -> None:
+    def l3_set_cf(self) -> None:
         
         """
-        Sets the L3 mode flag
+        Sets the L3 cf flag
         
         Args:
             /
@@ -1055,7 +1055,49 @@ class Packet:
         """
         
         self._layer3.set_cf()
+    
+    def l3_set_nr(self) -> None:
         
+        """
+        Sets the L3 nr flag
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.set_nr()
+     
+    def l3_set_pr(self) -> None:
+        
+        """
+        Sets the L3 pr flag
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.set_pr()
+        
+    def l3_set_cr(self) -> None:
+        
+        """
+        Sets the L3 cr flag
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.set_cr()
+    
     def l3_reset_mode(self) -> None:
         
         """
