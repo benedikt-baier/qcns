@@ -1098,22 +1098,6 @@ class Packet:
         
         self._layer3.set_cr()
     
-    def l3_reset_mode(self) -> None:
-        
-        """
-        Resets the L3 mode flag
-        
-        Args:
-            /
-            
-        Returns:
-            /
-        """
-        
-        pass
-        
-        # self._layer3.reset_mode()
-    
     @property
     def l3_es_result(self) -> Tuple[np.array, np.array]:
         

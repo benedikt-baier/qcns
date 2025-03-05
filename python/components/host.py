@@ -121,9 +121,10 @@ class Host:
             /
         """
         
+        self._sim.schedule_event(StopEvent(self._node_id))
+        
         try:
             await func()
-            self._sim.schedule_event(StopEvent(self._node_id))
         except Exception as e:
             logging.error(f'Host {self.id} has Exception')
             logging.error(traceback.format_exc())
