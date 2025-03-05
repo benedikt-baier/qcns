@@ -356,12 +356,6 @@ class SenderReceiverConnection:
             /
         """
         
-        if not _needed:
-            return
-        
-        if self._receiver_memory.remaining_space() < _needed:
-            _needed = self._receiver_memory.remaining_space()
-        
         packet = Packet(self._sender.id, self._receiver.id, _requested, _needed)
         
         _num_tries = 1
@@ -395,12 +389,6 @@ class SenderReceiverConnection:
         Returns:
             /
         """
-        
-        if not _requested:
-            return
-        
-        if self._receiver_memory.remaining_space() < _requested:
-            _needed = self._receiver_memory.remaining_space()
         
         packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
         
@@ -609,12 +597,6 @@ class TwoPhotonSourceConnection:
             /
         """
         
-        if not _needed:
-            return
-        
-        if self._receiver_memory.remaining_space() < _needed:
-            _needed = self._receiver_memory.remaining_space()
-        
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
         
@@ -661,11 +643,11 @@ class TwoPhotonSourceConnection:
             /
         """
         
-        if not _requested:
-            return
+        # if self._receiver_memory.remaining_space() < _requested:
+        #     _requested = self._receiver_memory.remaining_space()
         
-        if self._receiver_memory.remaining_space() < _requested:
-            _requested = self._receiver_memory.remaining_space()
+        # if not _requested:
+        #     return
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -896,12 +878,6 @@ class BellStateMeasurementConnection:
             /
         """
         
-        if not _needed:
-            return
-        
-        if self._receiver_memory.remaining_space() < _needed:
-            _needed = self._receiver_memory.remaining_space()
-        
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
 
@@ -947,12 +923,6 @@ class BellStateMeasurementConnection:
         Returns:
             /
         """
-        
-        if not _requested:
-            return
-        
-        if self._receiver_memory.remaining_space() < _requested:
-            _requested = self._receiver_memory.remaining_space()
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -1207,12 +1177,6 @@ class FockStateConnection:
             /
         """
         
-        if not _needed:
-            return
-        
-        if self._receiver_memory.remaining_space() < _needed:
-            _needed = self._receiver_memory.remaining_space()
-        
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
 
@@ -1258,12 +1222,6 @@ class FockStateConnection:
         Returns:
             /
         """
-        
-        if not _requested:
-            return
-        
-        if self._receiver_memory.remaining_space() < _requested:
-            _requested = self._receiver_memory.remaining_space()
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -1411,12 +1369,6 @@ class L3Connection:
             /
         """
         
-        if not _needed:
-            return
-        
-        if self._receiver_memory.remaining_space() < _needed:
-            _needed = self._receiver_memory.remaining_space()
-        
         packet = Packet(self._sender.id, self._receiver_id, _requested, _needed)
 
         _num_tries = 1
@@ -1448,12 +1400,6 @@ class L3Connection:
         Returns:
             /
         """
-        
-        if not _requested:
-            return
-        
-        if self._receiver_memory.remaining_space() < _requested:
-            _requested = self._receiver_memory.remaining_space()
         
         packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
         

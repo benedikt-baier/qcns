@@ -249,9 +249,9 @@ class Host:
             receiver_mem_errors = [receiver_mem_errors]
         
         sender_memory_send = QuantumMemory(sender_mem_mode, sender_mem_size, sender_efficiency, sender_mem_errors)
-        sender_memory_receive = QuantumMemory(receiver_mem_mode, sender_mem_size, sender_efficiency, sender_mem_errors)
+        sender_memory_receive = QuantumMemory(receiver_mem_mode, -1, sender_efficiency, sender_mem_errors)
         receiver_memory_send = QuantumMemory(receiver_mem_mode, receiver_mem_size, receiver_efficiency, receiver_mem_errors)
-        receiver_memory_receive = QuantumMemory(sender_mem_mode, receiver_mem_size, receiver_efficiency, receiver_mem_errors)
+        receiver_memory_receive = QuantumMemory(sender_mem_mode, -1, receiver_efficiency, receiver_mem_errors)
         
         if sender_type == 'sr':
             connection_s_r = SenderReceiverConnection(self, host, self._sim, sender_model, sender_source, receiver_detector, sender_num_sources,
@@ -662,8 +662,6 @@ class Host:
         combine_state([_qubit_src, _qubit_dst])
         
         _res = self._gates['purification'](_qubit_src, _qubit_dst, direction, gate, basis)
-        
-        # _res = await self.apply_gate('purification', _qubit_src, _qubit_dst, direction, gate, basis, combine=True, remove=True)
         
         remove_qubits([_qubit_dst])
         
