@@ -1,8 +1,9 @@
 import numpy as np
 from queue import Queue
-from python.components.qubit import remove_qubits
 
 from typing import List, Union
+
+from qcns.python.components.qubit.qubit import remove_qubits
 
 __all__ = ['QChannel', 'PChannel']
 

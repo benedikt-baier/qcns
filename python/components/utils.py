@@ -1,116 +1,18 @@
-import numpy as np
-from numpy import pi, e
-import scipy.sparse as sp
-import itertools as it
 from re import sub, findall
+import itertools as it
+import json as js
+
+import numpy as np
+import networkx as nx
+import scipy.sparse as sp
+
 from typing import List, Tuple, Dict
 
 class Qubit:
     pass
 
-__all__ = ['GHZ_state', 'W_state', 'graph_state', 'ghz_m', 'get_measure_dict', 'get_normalized_probability_amplitudes', 'load_qasm_2_0_file', 'load_qasm_3_0_file', 'apply_circuit']
-
-def get_w_operator(p: float, q: float) -> np.array:
-    
-    """
-    Creates the w_state operator
-
-    Args:
-        p (float): first parameter
-        q (float): second parameter
-
-    Returns:
-        op (np.array): operator to apply to each qubit
-    """
-
-    return 1/np.sqrt(p + q) * np.array([[np.sqrt(p), np.sqrt(q)], [-np.sqrt(q), np.sqrt(p)]])
-
-def GHZ_state(q_l: List[Qubit]) -> None:
-
-    """
-    Brings the qubits into a GHZ state
-
-    Args:
-        q_l (list): list of qubits
-
-    Returns:
-        /
-    """
-
-    q_l[0].H()
-    for i in range(len(q_l) - 1):
-        q_l[i].CNOT(q_l[i + 1])
-
-def W_state(q_l: List[Qubit]) -> None:
-
-    """
-    Creates a W state out of the given qubits
-
-    Args:
-        q_l (list): list of qubits
-
-    Returns:
-        /
-    """
-
-    op = get_w_operator(1, len(q_l) - 1)
-    q_l[0].custom_gate(op)
-
-    for i in range(len(q_l) - 2):
-        q_l[i].CU(q_l[i + 1], get_w_operator(1, len(q_l) - 2 - i))
-
-    for i in reversed(range(len(q_l) - 1)):
-        q_l[i].CNOT(q_l[i + 1])
-
-    q_l[0].X()
-
-def graph_state(q_l: List[Qubit], graph: List[Tuple[int, int]]) -> None:
-    
-    """
-    Creates a graph state out of a given list of qubits and a graph
-    
-    Args:
-        q_l (list): list of qubits
-        graph (list): list of edges
-        
-    Returns:
-        /
-    """
-    
-    for q_1, q_2 in it.combinations(q_l, 2):
-        if not q_1.qsystem == q_2.qsystem:
-            raise ValueError('Qubits need to be in the same qsystem')
-        
-    for q in q_l:
-        q.H()
-        
-    for edge in graph:
-        q_l[edge[0]].CZ(q_l[edge[1]])
-    
-def ghz_m(q_l: List[Qubit]) -> int:
-        
-    """
-    Measures in which GHZ state the qubits are, generalization of bell state measurement
-    
-    Args:
-        q_l (list): list of qubits to measure
-        
-    Returns:
-        res (int): measurement result
-    """
-    
-    for i in range(len(q_l) - 1, 0, -1):
-        q_l[i - 1].CNOT(q_l[i])
-    q_l[0].H()
-    
-    meas = [q.measure() for q in q_l]
-    
-    _res = 0
-    for m in meas:
-        _res = (_res << 1) | m
-        
-    return _res
-   
+__all__ = ['get_measure_dict', 'load_qasm_2_0_file', 'load_qasm_3_0_file', 'apply_circuit', 'dqc_apply_circuit']
+  
 def get_measure_dict(num_qubits: int) -> Dict[str, int]:
     
     """
@@ -125,41 +27,33 @@ def get_measure_dict(num_qubits: int) -> Dict[str, int]:
     
     return {np.binary_repr(i, width=num_qubits): 0 for i in range(2 ** num_qubits)}
 
-def get_normalized_probability_amplitudes(num_samples: int) -> np.array:
-    
-    """
-    Generates n normalized probability amplitudes
-    
-    Args:
-        num_samples (int): number of samples
-        
-    Returns:
-        rand (np.array): normalized probability amplitudes
-    """
-    
-    rand = np.sqrt(np.random.uniform(0, 1, num_samples)) * np.exp(1.j * np.random.uniform(0, 2 * np.pi, num_samples))
-    
-    norm = np.sqrt(np.sum(np.abs(rand) ** 2))
-    
-    return rand / norm
-
-def load_qasm_2_0_file(path):
+def load_qasm_2_0_file(path: str, parse_comments: bool=False):
     
     circuit = []
     num_qubits = 1
     circuit_str = []
     circuit_start = -1
+    comments = []
     
     with open(path, 'r') as f:
         for line_num, line in enumerate(f):
             if line.startswith('qreg'):
                 num_qubits = list(map(int, findall(r'\d+', line)))[0]
                 circuit_start = line_num
+                continue
+            if line.startswith('creg'):
+                circuit_start = line_num
+                continue
             if circuit_start == -1:
                 continue
-            circuit_str.append(line.replace('\n', '').replace(';', ''))
+        
+            line, comment = line.split(';')
+            circuit_str.append(line)
+            
+            if parse_comments:
+                comments.append(comment.replace('\n', ''))
     
-    for gate in circuit_str[1:]:
+    for gate in circuit_str:
         if gate.startswith('u3'):
             gate = gate.replace('u3', '')
             thetas, qubit = gate.split(' ')
@@ -224,10 +118,25 @@ def load_qasm_2_0_file(path):
             qubit = int(gate.replace(f'q[', '').replace(']', '').strip())
             circuit.append(['h', qubit])
             continue
+    
+    if parse_comments:
         
+        for gate, comment in zip(circuit, comments):
+            if not comment:
+                gate.append(None)
+                continue
+            comment = comment.replace(' // ', '')
+            
+            if not (comment.startswith('Encoding') or comment.startswith('Variational')):
+                gate.append(comment)
+                continue
+            
+            gate[-1] = None
+            gate.append(comment)
+     
     return circuit, num_qubits
     
-def load_qasm_3_0_file(path):
+def load_qasm_3_0_file(path: str):
     
     circuit = []
     circuit_str = []
@@ -308,7 +217,68 @@ def load_qasm_3_0_file(path):
     
     return circuit, num_qubits, classical_bits
 
-async def apply_circuit(host, circuit, qubits):
+def save_config(path: str, graph: nx.Graph, num_routers: int, num_clients: int=0, routing_table: Dict[int, Dict[int, int]]=None, traffic_type: str=None, traffic_matrix: np.array=None, connection_type: str='l3') -> None:
+    
+    output = {}
+    output['graph'] = {'nodes': dict(graph.nodes(data=True)), 'edges': {str((u, v)): data for u, v, data in graph.edges(data=True)}}
+    output['num_routers'] = num_routers
+    output['num_clients'] = num_clients
+    output['routing_table'] = routing_table
+    output['traffic_type'] = traffic_type
+    output['traffic_matrix'] = traffic_matrix.tolist() if isinstance(traffic_matrix, np.ndarray) else traffic_matrix
+    output['connection_type'] = connection_type
+    
+    with open(path, 'w') as f:
+        js.dump(output, f)
+
+def load_config(path: str) -> None:
+    
+    with open(path, 'r') as f:
+        data = js.load(f)
+        
+    graph = nx.Graph()
+    
+    graph.add_nodes_from([(eval(k), v) for k, v in data['graph']['nodes'].items()])
+    graph.add_edges_from([(*eval(k), v) for k, v in data['graph']['edges'].items()])
+    
+    return graph, data['num_routers'], data['num_clients'], data['routing_table'], data['traffic_type'], np.array(data['traffic_matrix']), data['connection_type']
+
+def apply_circuit(circuit, qubits, classical_bits=None):
+    
+    for circuit_p in circuit:
+        
+        if circuit_p[0] == 'U':
+            qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4])
+            continue
+        if circuit_p[0] == 'CNOT':
+            qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]])
+            continue
+        if circuit_p[0] == 'Rx':
+            qubits[circuit_p[1]].Rx(circuit_p[2])
+            continue
+        if circuit_p[0] == 'Ry':
+            qubits[circuit_p[1]].Ry(circuit_p[2])
+            continue
+        if circuit_p[0] == 'Rz':
+            qubits[circuit_p[1]].Rz(circuit_p[2])
+            continue
+        if circuit_p[0] == 'measure':
+            classical_bits[circuit_p[2]] = qubits[circuit_p[1]].measure()
+            continue
+        if circuit_p[0] == 'x':
+            qubits[circuit_p[1]].X()
+            continue
+        if circuit_p[0] == 'y':
+            qubits[circuit_p[1]].Y()
+            continue
+        if circuit_p[0] == 'z':
+            qubits[circuit_p[1]].Z()
+            continue
+        if circuit_p[0] == 'h':
+            qubits[circuit_p[1]].H()
+            continue
+
+async def dqc_apply_circuit(host, circuit, qubits):
     
     for circuit_p in circuit:
         
@@ -334,7 +304,7 @@ async def apply_circuit(host, circuit, qubits):
             await host.apply_gate('X', qubits[circuit_p[1]])
             continue
         if circuit_p[0] == 'y':
-            await ost.apply_gate('Y', qubits[circuit_p[1]])
+            await host.apply_gate('Y', qubits[circuit_p[1]])
             continue
         if circuit_p[0] == 'z':
             await host.apply_gate('Z', qubits[circuit_p[1]])

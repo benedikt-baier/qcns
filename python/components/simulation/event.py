@@ -71,7 +71,7 @@ class StopEvent(Event):
             /
         """
         
-        self._id: int = 0
+        self._id: int = -1
         self._end_time: float = np.inf
         self._node_id: int = _node_id
 
@@ -113,7 +113,7 @@ class SendEvent(Event):
             /
         """
     
-        self._id: int = 1
+        self._id: int = 0
         self._end_time: float = _end_time
         self._node_id: int = _node_id
         
@@ -155,7 +155,7 @@ class ReceiveEvent(Event):
             /
         """
     
-        self._id: int = 2
+        self._id: int = 1
         self._end_time: float = _end_time
         self._node_id: int = _node_id
         
@@ -197,7 +197,7 @@ class GateEvent(Event):
             / 
         """
         
-        self._id: int = 3
+        self._id: int = 2
         self._end_time = _end_time
         self._node_id = _node_id
         
@@ -214,7 +214,6 @@ class GateEvent(Event):
         """
         
         return f'Gate Event: Node: {self._node_id} Time: {self._end_time}'
-
 
 class WaitEvent(Event):
     
@@ -240,7 +239,7 @@ class WaitEvent(Event):
             /
         """
         
-        self._id: int = 4
+        self._id: int = 2
         self._end_time: float = _end_time
         self._node_id: int = _node_id
         

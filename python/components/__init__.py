@@ -1,16 +1,9 @@
 name = 'components'
 
-from python.components.event import *
-from python.components.qubit import *
-from python.components.channel import *
-from python.components.memory import *
-from python.components.photon_source import *
-from python.components.photon_detector import *
-from python.components.connection import *
-from python.components.host import *
-from python.components.protocol import *
-from python.components.packet import *
-from python.components.utils import *
-from python.components.simulation import *
-from python.components.error import *
-from python.components.qprogram import *
+from .qubit import *
+from .connection import *
+from .simulation import *
+from .hardware import *
+from .packet import *
+from .network import *
+from .utils import *

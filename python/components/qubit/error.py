@@ -3,7 +3,7 @@ import scipy.sparse as sp
 
 from typing import Union, Dict
 
-from python.components.qubit import Qubit, dot, get_single_operator
+from qcns.python.components.qubit.qubit import Qubit, dot, get_single_operator
 
 __all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError',
            'SystematicDephasingError', 'SystematicError', 'DepolarizationMemoryError', 'DephasingMemoryError', 'TimeDependentMemoryError']
@@ -59,8 +59,8 @@ class DepolarizationError:
 
         depolar_prob = np.exp(-(_length * (5e-6)) / self._depolar_time)
         
-        self._gate_e0: Dict[int, Union[np.array, sp.csr_matrix]] = {0: full_gates['P0'] + np.sqrt(1 - depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(1 - depolar_prob) * sparse_gates['P1']}
-        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(1 - depolar_prob) * sparse_gates['P01']}
+        self._gate_e0: Dict[int, Union[np.array, sp.csr_matrix]] = {0: full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(depolar_prob) * sparse_gates['P1']}
+        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(1 - depolar_prob) * full_gates['P01'], 1: np.sqrt(1 - depolar_prob) * sparse_gates['P01']}
         
     def apply(self, _qubit: Qubit) -> None:
         
@@ -74,9 +74,9 @@ class DepolarizationError:
             /
         """
 
-        gate_e0 = get_single_operator('', _qubit._qsystem._sparse, self.gate_e0[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
-        gate_e1 = get_single_operator('', _qubit._qsystem._sparse, self.gate_e1[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
-        _qubit._qsystem._state = dot(_qubit._qsystem._state, gate_e0) + dot(_qubit._qsystem._state, gate_e1)
+        gate_e0 = get_single_operator('', _qubit.sparse, self._gate_e0[_qubit.sparse], _qubit._index, _qubit.num_qubits)
+        gate_e1 = get_single_operator('', _qubit.sparse, self._gate_e1[_qubit.sparse], _qubit._index, _qubit.num_qubits)
+        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
         
         return _qubit
 
@@ -132,9 +132,9 @@ class DephasingError:
             /
         """
 
-        key = f'{_qubit._qsystem._sparse}_s_z_{_qubit._qsystem._num_qubits}_{_qubit._index}'
-        gate_z = get_single_operator(key, _qubit._qsystem._sparse, gates[_qubit._qsystem._sparse]['Z'], _qubit._index, _qubit._qsystem._num_qubits)
-        _qubit._qsystem._state = self._dephase_prob_inv * _qubit._qsystem._state + self._dephase_prob * dot(_qubit._qsystem._state, gate_z)
+        key = f'{_qubit.sparse}_s_z_{_qubit.num_qubits}_{_qubit._index}'
+        gate_z = get_single_operator(key, _qubit.sparse, gates[_qubit.sparse]['Z'], _qubit._index, _qubit.num_qubits)
+        _qubit.state = self._dephase_prob_inv * _qubit.state + self._dephase_prob * dot(_qubit.state, gate_z)
 
         return _qubit
 
@@ -185,9 +185,9 @@ class TimeDependentError:
  
         signal_time = _length * (5e-6)
         
-        depolar_prob = 1 - np.exp(-(signal_time / self._depolar_time))
-        self._gate_e0: Dict[int, Union[np.array, sp.csr_matrix]] = {0: full_gates['P0'] + np.sqrt(1 - depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(1 - depolar_prob) * sparse_gates['P1']}
-        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(depolar_prob) * full_gates['P01'], 1: np.sqrt(depolar_prob) * sparse_gates['P01']}
+        depolar_prob = np.exp(-(signal_time / self._depolar_time))
+        self._gate_e0: Dict[int, Union[np.array, sp.csr_matrix]] = {0: full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1'], 1: sparse_gates['P0'] + np.sqrt(depolar_prob) * sparse_gates['P1']}
+        self._gate_e1: Dict[int, Union[np.array, sp.csr_matrix]] = {0: np.sqrt(1 - depolar_prob) * full_gates['P01'], 1: np.sqrt(1 - depolar_prob) * sparse_gates['P01']}
         
         self._dephase_prob: float = 0.5 * (1 - np.exp(-signal_time * (1/self._dephase_time - 1/(2*self._depolar_time))))
         self._dephase_prob_inv: float = 1 - self._dephase_prob
@@ -204,13 +204,13 @@ class TimeDependentError:
             /
         """
         
-        key = f'{_qubit._qsystem._sparse}_s_z_{_qubit._qsystem._num_qubits}_{_qubit._index}'
-        gate_e0 = get_single_operator('', _qubit._qsystem._sparse, self._gate_e0[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
-        gate_e1 = get_single_operator('', _qubit._qsystem._sparse, self._gate_e1[_qubit._qsystem._sparse], _qubit._index, _qubit._qsystem._num_qubits)
-        gate_z = get_single_operator(key, _qubit._qsystem._sparse, gates[_qubit._qsystem._sparse]['Z'], _qubit._index, _qubit._qsystem._num_qubits)
+        key = f'{_qubit.sparse}_s_z_{_qubit.num_qubits}_{_qubit._index}'
+        gate_e0 = get_single_operator('', _qubit.sparse, self._gate_e0[_qubit.sparse], _qubit._index, _qubit.num_qubits)
+        gate_e1 = get_single_operator('', _qubit.sparse, self._gate_e1[_qubit.sparse], _qubit._index, _qubit.num_qubits)
+        gate_z = get_single_operator(key, _qubit.sparse, gates[_qubit.sparse]['Z'], _qubit._index, _qubit.num_qubits)
         
-        state = dot(_qubit._qsystem._state, gate_e0) + dot(_qubit._qsystem._state, gate_e1)
-        _qubit._qsystem._state = self._dephase_prob_inv * state + self._dephase_prob * dot(state, gate_z)
+        state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
+        _qubit.state = self._dephase_prob_inv * state + self._dephase_prob * dot(state, gate_z)
         
         return _qubit
         
@@ -578,13 +578,13 @@ class DepolarizationMemoryError:
             /
         """
         
-        depolar_prob = 1 - np.exp(-_time / self._depolar_time)
-        gate_e0 = gates[_qubit._qsystem._sparse]['P0'] + np.sqrt(1 - depolar_prob) * gates[_qubit._qsystem._sparse]['P1']
-        gate_e1 = np.sqrt(depolar_prob) * gates[_qubit._qsystem._sparse]['P01']
+        depolar_prob = np.exp(-_time / self._depolar_time)
+        gate_e0 = gates[_qubit.sparse]['P0'] + np.sqrt(depolar_prob) * gates[_qubit.sparse]['P1']
+        gate_e1 = np.sqrt(1 - depolar_prob) * gates[_qubit.sparse]['P01']
         
-        gate_e0 = get_single_operator('', _qubit._qsystem._sparse, gate_e0, _qubit._index, _qubit._qsystem._num_qubits)
-        gate_e1 = get_single_operator('', _qubit._qsystem._sparse, gate_e1, _qubit._index, _qubit._qsystem._num_qubits)
-        _qubit._qsystem._state = dot(_qubit._qsystem._state, gate_e0) + dot(_qubit._qsystem._state, gate_e1)
+        gate_e0 = get_single_operator('', _qubit.sparse, gate_e0, _qubit._index, _qubit.num_qubits)
+        gate_e1 = get_single_operator('', _qubit.sparse, gate_e1, _qubit._index, _qubit.num_qubits)
+        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
         
         return _qubit
 
@@ -627,9 +627,9 @@ class DephasingMemoryError:
         dephase_prob = 0.5 * (1 - np.exp(-_time / self._dephase_time))
         dephase_prob_inv = 1 - dephase_prob
          
-        key = f'{_qubit._qsystem._sparse}s_z_{_qubit._qsystem._num_qubits}_{_qubit._index}'
-        gate_z = get_single_operator(key, _qubit._qsystem._sparse, gates[_qubit._qsystem._sparse]['Z'], _qubit._index, _qubit._qsystem._num_qubits)
-        _qubit._qsystem._state = dephase_prob_inv * _qubit._qsystem._state + dephase_prob * dot(_qubit._qsystem._state, gate_z)
+        key = f'{_qubit.sparse}s_z_{_qubit.num_qubits}_{_qubit._index}'
+        gate_z = get_single_operator(key, _qubit.sparse, gates[_qubit.sparse]['Z'], _qubit._index, _qubit.num_qubits)
+        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
         
         return _qubit
 
@@ -675,20 +675,20 @@ class TimeDependentMemoryError:
             /
         """
 
-        depolar_prob = 1 - np.exp(-_time / self._depolar_time)
+        depolar_prob = np.exp(-_time / self._depolar_time)
         
-        gate_e0 = gates[_qubit._qsystem._sparse]['P0'] + np.sqrt(1 - depolar_prob) * gates[_qubit._qsystem._sparse]['P1']
-        gate_e1 = np.sqrt(depolar_prob) * gates[_qubit._qsystem._sparse]['P01']
+        gate_e0 = gates[_qubit.sparse]['P0'] + np.sqrt(depolar_prob) * gates[_qubit.sparse]['P1']
+        gate_e1 = np.sqrt(1 - depolar_prob) * gates[_qubit.sparse]['P01']
         
         dephase_prob = 0.5 * (1 - np.exp(-_time * (1/self._dephase_time - 1/(2*self._depolar_time))))
         dephase_prob_inv = 1 - dephase_prob
         
-        key = f'{_qubit._qsystem._sparse}_s_z_{_qubit._qsystem._num_qubits}_{_qubit._index}'
-        gate_e0 = get_single_operator('', _qubit._qsystem._sparse, gate_e0, _qubit._index, _qubit._qsystem._num_qubits)
-        gate_e1 = get_single_operator('', _qubit._qsystem._sparse, gate_e1, _qubit._index, _qubit._qsystem._num_qubits)
-        gate_z = get_single_operator(key, _qubit._qsystem._sparse, gates[_qubit._qsystem._sparse]['Z'], _qubit._index, _qubit._qsystem._num_qubits)
+        key = f'{_qubit.sparse}_s_z_{_qubit.num_qubits}_{_qubit._index}'
+        gate_e0 = get_single_operator('', _qubit.sparse, gate_e0, _qubit._index, _qubit.num_qubits)
+        gate_e1 = get_single_operator('', _qubit.sparse, gate_e1, _qubit._index, _qubit.num_qubits)
+        gate_z = get_single_operator(key, _qubit.sparse, gates[_qubit.sparse]['Z'], _qubit._index, _qubit.num_qubits)
         
-        _qubit._qsystem._state = dot(_qubit._qsystem._state, gate_e0) + dot(_qubit._qsystem._state, gate_e1)
-        _qubit._qsystem._state = dephase_prob_inv * _qubit._qsystem._state + dephase_prob * dot(_qubit._qsystem._state, gate_z)
+        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
+        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
         
         return _qubit

@@ -1,7 +1,7 @@
 import numpy as np
-from typing import List, Tuple, Union, Any
+from typing import List, Dict, Tuple, Union, Any
 
-from python.components.protocol import *
+from qcns.python.components.packet.protocol import *
 
 __all__ = ['Packet']
 
@@ -25,11 +25,11 @@ class Packet:
     """
     
     def __base_init(self, l2_src: int, l2_dst: int,
-                      l1_num_requested: int=1, l1_num_needed: int=1,
-                      l2_num_requested: int=None, l2_num_needed: int=None,
-                      l3_src: int=None, l3_dst: int=None, l3_num_requested: int=None, l3_num_needed: int=None,
-                      l4_src: int=None, l4_dst: int=None, l4_num_requested: int=None, l4_num_needed: int=None,
-                      l7_num_requested: int=None, l7_num_needed: int=None, payload: List[Any]=None) -> None:
+                      l1_requested: int=0, l1_needed: int=0,
+                      l2_requested: int=0, l2_needed: int=0,
+                      l3_src: int=None, l3_dst: int=None, l3_requested: int=0, l3_needed: int=0,
+                      l4_src: int=None, l4_dst: int=None, l4_requested: int=0, l4_needed: int=0,
+                      l7_requested: int=0, payload: List[Any]=None) -> None:
         
         """
         Initializes the packet with standard inputs such as L2 src and dst
@@ -37,32 +37,32 @@ class Packet:
         Args:
             l2_src (int): L2 source address
             l2_dst (int): L2 destination address
-            l1_num_requested (int): L1 number of requested qubits
-            l1_num_needed (int): L1 number of needed qubits
-            l2_num_requested (int): L2 number of requested qubits
-            l2_num_needed (int): L2 number of needed qubits
+            l1_requested (int): L1 number of requested qubits
+            l1_needed (int): L1 number of needed qubits
+            l2_requested (int): L2 number of requested qubits
+            l2_needed (int): L2 number of needed qubits
             l3_src (int): L3 source address
             l3_dst (int): L3 destination address
-            l3_num_requested (int): L3 number of requested qubits
-            l3_num_needed (int): L3 number of needed qubits
+            l3_requested (int): L3 number of requested qubits
+            l3_needed (int): L3 number of needed qubits
             l4_src (int): L4 source port
             l4_dst (int): L4 destination port
-            l4_num_requested (int): L4 number of requested qubits
-            l4_num_needed (int): L4 number of needed qubits
-            l7_num_requested (int): L7 number of requested qubits
-            l7_num_needed (int): L7 number of needed qubits
+            l4_requested (int): L4 number of requested qubits
+            l4_needed (int): L4 number of needed qubits
+            l7_requested (int): L7 number of requested qubits
+            payload (list): payload of packet
             
         Returns:
             /
         """
         
-        self._layer1: L1_Protocol = L1_Protocol(l1_num_requested, l1_num_needed)
-        self._layer2: L2_Protocol = L2_Protocol(l2_src, l2_dst, l2_num_requested, l2_num_needed)
+        self._layer1: L1_Protocol = L1_Protocol(l1_requested, l1_needed)
+        self._layer2: L2_Protocol = L2_Protocol(l2_src, l2_dst, l2_requested, l2_needed)
         self._layer3: L3_Protocol = ''
         self._layer4: L4_Protocol = ''
         self._layer7: L7_Protocol = ''
         
-        if l2_num_requested is not None:
+        if l2_requested > 0:
             self._layer_counter = 1
         
         if l3_src is not None or l3_dst is not None:
@@ -71,19 +71,19 @@ class Packet:
         if l4_src is not None or l4_dst is not None:
             self._layer_counter = 3
         
-        if l7_num_requested is not None or payload is not None:
+        if l7_requested > 0 or payload is not None:
             self._layer_counter = 4
         
         if self._layer_counter > 1:
-            self._layer3 = L3_Protocol(l3_src, l3_dst, l3_num_requested, l3_num_needed)
-            self._layer2.next_protcol = self._layer3.protocol
+            self._layer3 = L3_Protocol(l3_src, l3_dst, l3_requested, l3_needed)
+            self._layer2.next_protocol = self._layer3.protocol
             
         if self._layer_counter > 2:
-            self._layer4: L4_Protocol = L4_Protocol(l4_src, l4_dst, l4_num_requested, l4_num_needed)
+            self._layer4: L4_Protocol = L4_Protocol(l4_src, l4_dst, l4_requested, l4_needed)
             self._layer3.next_protocol = self._layer4.protocol
         
         if self._layer_counter > 3:
-            self._layer7: L7_Protocol = L7_Protocol(l7_num_requested, l7_num_needed, payload)
+            self._layer7: L7_Protocol = L7_Protocol(l7_requested, payload)
             self._layer4.next_protocol = self._layer7.protocol
     
     def __derived_init(self, layer1: L1_Protocol, layer2: L2_Protocol, layer3: L3_Protocol='', 
@@ -106,7 +106,7 @@ class Packet:
         self._layer1: L1_Protocol = layer1
         
         self._layer2: L2_Protocol = layer2
-        if self._layer2.num_requested is not None:
+        if self._layer2.requested > 0:
             self._layer1.next_protocol = self._layer2.protocol
             self._layer_counter = 1
             
@@ -331,7 +331,37 @@ class Packet:
     # Layer 1
     
     @property
-    def l1_num_requested(self) -> int:
+    def layer1(self) -> L1_Protocol:
+        
+        """
+        Returns the Layer 1 Protocol
+        
+        Args:
+            /
+            
+        Returns:
+            layer1 (L1_Protocol): Layer 1 Protocol
+        """
+        
+        return self._layer1
+    
+    @layer1.setter
+    def layer1(self, l1_protocol: L1_Protocol) -> None:
+        
+        """
+        Sets the Layer 1 in the packet
+        
+        Args:
+            layer1 (L1_Protocol): Layer 1 Protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer1 = l1_protocol
+    
+    @property
+    def l1_requested(self) -> int:
         
         """
         Returns the number requested qubits on L1
@@ -340,28 +370,28 @@ class Packet:
             /
             
         Returns:
-            l1_num_requested (int): number of requested qubits on L1
+            l1_requested (int): number of requested qubits on L1
         """
         
-        return self._layer1.num_requested
+        return self._layer1.requested
     
-    @l1_num_requested.setter
-    def l1_num_requested(self, _num_requested: int) -> None:
+    @l1_requested.setter
+    def l1_requested(self, l1_requested: int) -> None:
         
         """
         Sets the number of requested qubits on L1
         
         Args:
-            _num_requested (int): number of requested qubits to set
+            l1_requested (int): number of requested qubits to set
             
         Returns:
             /
         """
         
-        self._layer1.num_requested = _num_requested
+        self._layer1.requested = l1_requested
         
     @property
-    def l1_num_needed(self) -> int:
+    def l1_needed(self) -> int:
         
         """
         Returns the number needed qubits on L1
@@ -370,25 +400,25 @@ class Packet:
             /
             
         Returns:
-            l1_num_needed (int): number of needed qubits on L1
+            l1_needed (int): number of needed qubits on L1
         """
         
-        return self._layer1.num_needed
+        return self._layer1.needed
     
-    @l1_num_needed.setter
-    def l1_num_needed(self, _num_needed: int) -> None:
+    @l1_needed.setter
+    def l1_needed(self, l1_needed: int) -> None:
         
         """
         Sets the number of needed qubits on L1, WARNING resets the L1 success array
         
         Args:
-            _num_needed (int): number of needed qubits to set
+            l1_needed (int): number of needed qubits to set
             
         Returns:
             /
         """
         
-        self._layer1.num_needed = _num_needed
+        self._layer1.needed = l1_needed
         
     @property
     def l1_ack(self) -> int:
@@ -405,7 +435,7 @@ class Packet:
         
         return self._layer1.ack
     
-    def set_l1_ack(self) -> None:
+    def l1_set_ack(self) -> None:
         
         """
         Sets the L1 Ack flag
@@ -419,7 +449,7 @@ class Packet:
         
         self._layer1.set_ack()
         
-    def reset_l1_ack(self) -> None:
+    def l1_reset_ack(self) -> None:
         
         """
         Resets the L1 Ack flag
@@ -448,7 +478,7 @@ class Packet:
         
         return self._layer1.ps
     
-    def set_l1_ps(self) -> None:
+    def l1_set_ps(self) -> None:
         
         """
         Sets the Photon Source flag
@@ -462,7 +492,7 @@ class Packet:
         
         self._layer1.set_ps()
         
-    def reset_l1_ps(self) -> None:
+    def l1_reset_ps(self) -> None:
         
         """
         Resets the Photon Source flag
@@ -506,7 +536,7 @@ class Packet:
         
         self._layer1.success = l1_success
 
-    def set_l1_success(self, index: int) -> None:
+    def l1_set_success(self, index: int) -> None:
         
         """
         Sets the L1 success array the specified index
@@ -520,7 +550,7 @@ class Packet:
         
         self._layer1.set_success(index)
         
-    def reset_l1_success(self, index: int) -> None:
+    def l1_reset_success(self, index: int) -> None:
         
         """
         Resets the L1 success array at the index
@@ -597,6 +627,36 @@ class Packet:
     # Layer 2
     
     @property
+    def layer2(self) -> L2_Protocol:
+        
+        """
+        Returns the Layer 2 Protocol
+        
+        Args:
+            /
+            
+        Returns:
+            layer2 (L2_Protocol): Layer 2 Protocol
+        """
+        
+        return self._layer2
+    
+    @layer2.setter
+    def layer2(self, l2_protocol: L2_Protocol) -> None:
+        
+        """
+        Sets the Layer 2 in the packet
+        
+        Args:
+            layer2 (L2_Protocol): Layer 2 Protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer2 = l2_protocol
+    
+    @property
     def l2_src(self) -> int:
         
         """
@@ -656,7 +716,7 @@ class Packet:
         
         self._layer2.dst = l2_dst
     
-    def switch_l2_src_dst(self) -> None:
+    def l2_switch_src_dst(self) -> None:
         
         """
         Switches the L2 source and destination address
@@ -671,7 +731,7 @@ class Packet:
         self._layer2.switch_src_dst()
       
     @property
-    def l2_num_requested(self) -> int:
+    def l2_requested(self) -> int:
         
         """
         Returns the L2 number of requested qubits
@@ -680,28 +740,28 @@ class Packet:
             /
             
         Returns:
-            l2_num_requested (int): number of L2 requested qubits
+            l2_requested (int): number of L2 requested qubits
         """
         
-        return self._layer2.num_requested
+        return self._layer2.requested
     
-    @l2_num_requested.setter
-    def l2_num_requested(self, _num_requested: int) -> None:
+    @l2_requested.setter
+    def l2_requested(self, l2_requested: int) -> None:
         
         """
         Sets the L2 number of requested qubits
         
         Args:
-            _num_requested (int): number of L2 requested qubits to set
+            l2_requested (int): number of L2 requested qubits to set
             
         Returns:
             /
         """
         
-        self._layer2.num_requested = _num_requested
+        self._layer2.requested = l2_requested
         
     @property
-    def l2_num_needed(self) -> int:
+    def l2_needed(self) -> int:
         
         """
         Returns the L2 number of needed qubits
@@ -710,25 +770,25 @@ class Packet:
             /
             
         Returns:
-            l2_num_needed (int): L2 number of needed qubits
+            l2_needed (int): L2 number of needed qubits
         """
         
-        return self._layer2.num_needed
+        return self._layer2.needed
     
-    @l2_num_needed.setter
-    def l2_num_needed(self, _num_needed: int) -> None:
+    @l2_needed.setter
+    def l2_needed(self, l2_needed: int) -> None:
         
         """
         Sets the L2 number of needed qubits, WARNING resets the L2 success array
         
         Args:
-            _num_needed (int): L2 number of needed qubits to set
+            l2_needed (int): L2 number of needed qubits to set
             
         Returns:
             /
         """
         
-        self._layer2.num_needed = _num_needed
+        self._layer2.needed = l2_needed
         
     @property
     def l2_ack(self) -> int:
@@ -745,7 +805,7 @@ class Packet:
         
         return self._layer2.ack
     
-    def set_l2_ack(self) -> None:
+    def l2_set_ack(self) -> None:
         
         """
         Sets the L2 Ack
@@ -759,7 +819,7 @@ class Packet:
         
         self._layer2.set_ack()
         
-    def reset_l2_ack(self) -> None:
+    def l2_reset_ack(self) -> None:
         
         """
         Resets the L2 Ack
@@ -803,7 +863,7 @@ class Packet:
         
         self._layer2.success = l2_success
 
-    def set_l2_success(self, index: int) -> None:
+    def l2_set_success(self, index: int) -> None:
         
         """
         Sets the L2 success array the index
@@ -817,7 +877,7 @@ class Packet:
         
         self._layer2.set_success(index)
         
-    def reset_l2_success(self, index: int) -> None:
+    def l2_reset_success(self, index: int) -> None:
         
         """
         Resets the L2 success array at the index
@@ -894,6 +954,36 @@ class Packet:
     # Layer 3
     
     @property
+    def layer3(self) -> L3_Protocol:
+        
+        """
+        Returns the Layer 3 Protocol
+        
+        Args:
+            /
+            
+        Returns:
+            layer3 (L3_Protocol): Layer 3 Protocol
+        """
+        
+        return self._layer3
+    
+    @layer3.setter
+    def layer3(self, l3_protocol: L3_Protocol) -> None:
+        
+        """
+        Sets the Layer 3 in the packet
+        
+        Args:
+            layer3 (L3_Protocol): Layer 3 Protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer3 = l3_protocol
+    
+    @property
     def l3_src(self) -> int:
         
         """
@@ -905,6 +995,9 @@ class Packet:
         Returns:
             l3_src (int): L3 source address
         """
+        
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
         
         return self._layer3.src
     
@@ -921,6 +1014,9 @@ class Packet:
             /
         """
         
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
         self._layer3.src = l3_src
         
     @property
@@ -935,6 +1031,9 @@ class Packet:
         Returns:
             l3_dst (int): L3 destination address
         """
+        
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
         
         return self._layer3.dst
     
@@ -951,9 +1050,12 @@ class Packet:
             /
         """
         
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
         self._layer3.dst = l3_dst
     
-    def switch_l3_src_dst(self) -> None:
+    def l3_switch_src_dst(self) -> None:
         
         """
         Switches the L3 source and destination address
@@ -965,10 +1067,13 @@ class Packet:
             /
         """
         
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
         self._layer3.switch_src_dst()
     
     @property
-    def l3_num_requested(self) -> int:
+    def l3_requested(self) -> int:
         
         """
         Returns the L3 number of requested qubits
@@ -977,28 +1082,34 @@ class Packet:
             /
             
         Returns:
-            l3_num_requested (int): L3 number of requested qubits
+            l3_requested (int): L3 number of requested qubits
         """
         
-        return self._layer3.num_requested
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        return self._layer3.requested
     
-    @l3_num_requested.setter
-    def l3_num_requested(self, _num_requested: int) -> None:
+    @l3_requested.setter
+    def l3_requested(self, l3_requested: int) -> None:
         
         """
         Sets the L3 number of requested qubits
         
         Args:
-            l3_num_requested (int): L3 number of requested qubits
+            l3_requested (int): L3 number of requested qubits
             
         Returns:
             /
         """
         
-        self._layer3.num_requested = _num_requested
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        self._layer3.requested = l3_requested
         
     @property
-    def l3_num_needed(self) -> int:
+    def l3_needed(self) -> int:
         
         """
         Returns the L3 number of needed qubits
@@ -1007,25 +1118,31 @@ class Packet:
             /
             
         Returns:
-            l3_num_needed (int): L3 number of needed qubits
+            l3_needed (int): L3 number of needed qubits
         """
         
-        return self._layer3.num_needed
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        return self._layer3.needed
     
-    @l3_num_needed.setter
-    def l3_num_needed(self, _num_needed: int) -> None:
+    @l3_needed.setter
+    def l3_needed(self, l3_needed: int) -> None:
         
         """
         Sets the L3 number of needed qubits, WARNING resets the L3 success, X and Z array
         
         Args:
-            _num_needed (int): L3 number of needed qubits
+            l3_needed (int): L3 number of needed qubits
             
         Returns:
             /
         """
         
-        self._layer3.num_needed = _num_needed
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        self._layer3.needed = l3_needed
         
     @property
     def l3_mode(self) -> int:
@@ -1040,12 +1157,15 @@ class Packet:
             l3_mode (int): L3 mode
         """
         
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
         return self._layer3.mode
     
-    def l3_set_mode(self) -> None:
+    def l3_set_cf(self) -> None:
         
         """
-        Sets the L3 mode flag
+        Sets the L3 flag to classical forwarding mode
         
         Args:
             /
@@ -1054,12 +1174,15 @@ class Packet:
             /
         """
         
-        self._layer3.set_mode()
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
         
-    def l3_reset_mode(self) -> None:
+        self._layer3.set_cf()
+        
+    def l3_set_nr(self) -> None:
         
         """
-        Resets the L3 mode flag
+        Sets the L3 flag to no reject mode
         
         Args:
             /
@@ -1068,7 +1191,44 @@ class Packet:
             /
         """
         
-        self._layer3.reset_mode()
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        self._layer3.set_nr()
+    
+    def l3_set_pr(self) -> None:
+        
+        """
+        Sets the L3 flag to partial reject mode
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        self._layer3.set_pr()
+    
+    def l3_set_cr(self) -> None:
+        
+        """
+        Sets the L3 flag to complete reject mode
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        self._layer3.set_cr()
     
     @property
     def l3_es_result(self) -> Tuple[np.array, np.array]:
@@ -1080,8 +1240,11 @@ class Packet:
             /
             
         Returns:
-            es_result (tuple): tuple containing L3 X and Z array
+            l3_es_result (tuple): tuple containing L3 X and Z array
         """
+        
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
         
         return self._layer3.es_result
     
@@ -1098,9 +1261,12 @@ class Packet:
             /
         """
         
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
         self._layer3.es_result = l3_es_result
     
-    def l3_update_es(self, index: int, result: int) -> None:
+    def l3_update_es(self, l3_es_result: int, index: int=0) -> None:
         
         """
         Updates the L3 X and Z array at the index with the result
@@ -1113,9 +1279,12 @@ class Packet:
             /
         """
         
-        self._layer3.update_es(index, result)
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        self._layer3.update_es(l3_es_result, index)
     
-    def l3_reset_es(self) -> None:
+    def l3_reset_es(self, index: int=None) -> None:
         
         """
         Resets the L3 X and Z array
@@ -1127,7 +1296,10 @@ class Packet:
             /
         """
         
-        self._layer3.reset_es()
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
+        self._layer3.reset_es(index)
     
     @property
     def l3_protocol(self) -> int:
@@ -1141,6 +1313,9 @@ class Packet:
         Returns:
             l3_protocol (int): L3 protocol
         """
+        
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
         
         return self._layer3.protocol
     
@@ -1157,6 +1332,9 @@ class Packet:
             /
         """
         
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
         self._layer3.protocol = l3_protocol
         
     @property
@@ -1171,6 +1349,9 @@ class Packet:
         Returns:
             l3_next_protocol (int): L3 next protocol
         """
+        
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
         
         return self._layer3.next_protcol
     
@@ -1187,9 +1368,42 @@ class Packet:
             /
         """
         
+        if not self._layer3:
+            raise ValueError('Layer 3 is not present in the packet')
+        
         self._layer3.next_protocol = l3_next_protocol
     
     # Layer 4
+    
+    @property
+    def layer4(self) -> L4_Protocol:
+        
+        """
+        Returns the Layer 4 Protocol
+        
+        Args:
+            /
+            
+        Returns:
+            layer4 (L4_Protocol): Layer 4 Protocol
+        """
+        
+        return self._layer4
+    
+    @layer4.setter
+    def layer4(self, l4_protocol: L4_Protocol) -> None:
+        
+        """
+        Sets the Layer 4 in the packet
+        
+        Args:
+            layer4 (L4_Protocol): Layer 4 Protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer4 = l4_protocol
     
     @property
     def l4_src(self) -> int:
@@ -1203,6 +1417,9 @@ class Packet:
         Returns:
             l4_src (int): L4 source port
         """
+        
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
         
         return self._layer4.src
     
@@ -1219,6 +1436,9 @@ class Packet:
             /
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         self._layer4.src = l4_src
         
     @property
@@ -1233,6 +1453,9 @@ class Packet:
         Returns:
             l4_dst (int): L4 destination port
         """
+        
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
         
         return self._layer4.dst
     
@@ -1249,9 +1472,12 @@ class Packet:
             /
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         self._layer4.dst = l4_dst
         
-    def switch_l4_src_dst(self) -> None:
+    def l4_switch_src_dst(self) -> None:
         
         """
         Switches the L4 source and destination port
@@ -1263,10 +1489,13 @@ class Packet:
             /
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         self._layer4.switch_src_dst()
         
     @property
-    def l4_num_requested(self) -> int:
+    def l4_requested(self) -> int:
         
         """
         Returns the L4 number of requested qubits
@@ -1275,28 +1504,34 @@ class Packet:
             /
             
         Returns:
-            l4_num_requested (int): L4 number of requested qubits
+            l4_requested (int): L4 number of requested qubits
         """
         
-        return self._layer4.num_requested
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
+        return self._layer4.requested
     
-    @l4_num_requested.setter
-    def l4_num_requested(self, _num_requested: int) -> None:
+    @l4_requested.setter
+    def l4_requested(self, l4_requested: int) -> None:
         
         """
         Sets the L4 number of requested qubits
         
         Args:
-            _num_requested (int): L4 number of requested qubits
+            l4_requested (int): L4 number of requested qubits
             
         Returns:
             /
         """
         
-        self._layer4.num_requested = _num_requested
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
+        self._layer4.requested = l4_requested
         
     @property
-    def l4_num_needed(self) -> int:
+    def l4_needed(self) -> int:
         
         """
         Returns the L4 number of needed qubits
@@ -1305,25 +1540,31 @@ class Packet:
             /
             
         Returns:
-            l4_num_needed (int): number of needed qubits
+            l4_needed (int): number of needed qubits
         """
         
-        return self._layer4.num_needed
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
+        return self._layer4.needed
     
-    @l4_num_needed.setter
-    def l4_num_needed(self, _num_needed: int) -> None:
+    @l4_needed.setter
+    def l4_needed(self, l4_needed: int) -> None:
         
         """
         Sets the L4 number of needed qubits, WARNING resets the L4 success array
         
         Args:
-            _num_needed (int): L4 number of needed qubits
+            l4_needed (int): L4 number of needed qubits
             
         Returns:
             /
         """
         
-        self._layer4.num_needed = _num_needed
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
+        self._layer4.needed = l4_needed
         
     @property
     def l4_ack(self) -> int:
@@ -1338,9 +1579,12 @@ class Packet:
             l4_ack (int): L4 Ack flag
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         return self._layer4.ack
     
-    def set_l4_ack(self) -> None:
+    def l4_set_ack(self) -> None:
         
         """
         Sets the L4 Ack flag
@@ -1352,9 +1596,12 @@ class Packet:
             /
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         self._layer4.set_ack()
         
-    def reset_l4_ack(self) -> None:
+    def l4_reset_ack(self) -> None:
         
         """
         Resets the L4 Ack flag
@@ -1365,6 +1612,9 @@ class Packet:
         Returns:
             /
         """
+        
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
         
         self._layer4.reset_ack()
     
@@ -1381,9 +1631,30 @@ class Packet:
             l4_success (np.array): L4 success array
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         return self._layer4.success
 
-    def set_l4_success(self, index: int) -> None:
+    @l4_success.setter
+    def l4_success(self, l4_success: np.array) -> None:
+        
+        """
+        Sets the L4 success array
+        
+        Args:
+            l4_success (np.array): L4 success array
+            
+        Returns:
+            /
+        """
+        
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
+        self._layer4.success = l4_success
+
+    def l4_set_success(self, index: int) -> None:
         
         """
         Sets the L4 sccess array at the index
@@ -1395,9 +1666,12 @@ class Packet:
             /
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         self._layer4.set_success(index)
         
-    def reset_l4_success(self, index: int) -> None:
+    def l4_reset_success(self, index: int) -> None:
         
         """
         Resets the L4 sccess array at the index
@@ -1408,6 +1682,9 @@ class Packet:
         Returns:
             /
         """
+        
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
         
         self._layer4.reset_success(index)
      
@@ -1424,6 +1701,9 @@ class Packet:
             l4_protocol (int): L4 protocol
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         return self._layer4.protocol
     
     @l4_protocol.setter
@@ -1438,6 +1718,9 @@ class Packet:
         Returns:
             /
         """
+        
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
         
         self._layer4.protocol = l4_protocol
         
@@ -1454,6 +1737,9 @@ class Packet:
             l4_next_protocol (int): L4 next protocol
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         return self._layer4.next_protcol
     
     @l4_next_protocol.setter
@@ -1469,12 +1755,45 @@ class Packet:
             /
         """
         
+        if not self._layer4:
+            raise ValueError('Layer 4 is not present in the packet')
+        
         self._layer4.next_protocol = l4_next_protocol 
      
     # Layer 7
     
     @property
-    def l7_num_requested(self) -> int:
+    def layer7(self) -> L7_Protocol:
+        
+        """
+        Returns the Layer 7 Protocol
+        
+        Args:
+            /
+            
+        Returns:
+            layer7 (L7_Protocol): Layer 7 Protocol
+        """
+        
+        return self._layer7
+    
+    @layer7.setter
+    def layer7(self, l7_protocol: L7_Protocol) -> None:
+        
+        """
+        Sets the Layer 7 in the packet
+        
+        Args:
+            layer7 (L7_Protocol): Layer 7 Protocol
+            
+        Returns:
+            /
+        """
+        
+        self._layer7 = l7_protocol
+    
+    @property
+    def l7_requested(self) -> int:
         
         """
         Returns the L7 number of requested qubits
@@ -1483,55 +1802,31 @@ class Packet:
             /
             
         Returns:
-            l7_num_requested (int): L7 number of requested qubits
+            l7_requested (int): L7 number of requested qubits
         """
         
-        return self._layer7.num_requested
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
+        
+        return self._layer7.requested
     
-    @l7_num_requested.setter
-    def l7_num_requested(self, _num_requested: int) -> None:
+    @l7_requested.setter
+    def l7_requested(self, l7_requested: int) -> None:
         
         """
         Sets the L7 number of requested qubits
         
         Args:
-            _num_requested (int): L7 number of requested qubits
+            l7_requested (int): L7 number of requested qubits
             
         Returns:
             /
         """
         
-        self._layer7.num_requested = _num_requested
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
         
-    @property
-    def l7_num_needed(self) -> int:
-        
-        """
-        Returns the L7 number of needed qubits
-        
-        Args:
-            /
-            
-        Returns:
-            l7_num_needed (int): L7 number of needed qubits
-        """
-        
-        return self._layer7.num_needed
-    
-    @l7_num_needed.setter
-    def l7_num_needed(self, _num_needed: int) -> None:
-        
-        """
-        Setst the L7 number of needed qubits, WARNING resets the L7 success array
-        
-        Args:
-            _num_needed (int): L7 number of needed qubits
-            
-        Returns:
-            /
-        """
-        
-        self._layer7.num_needed = _num_needed
+        self._layer7.requested = l7_requested
         
     @property
     def l7_success(self) -> np.array:
@@ -1546,9 +1841,30 @@ class Packet:
             l7_success (np.array): L7 success array
         """
         
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
+        
         return self._layer7.success
 
-    def set_l7_success(self, index: int) -> None:
+    @l7_success.setter
+    def l7_success(self, l7_success: np.array) -> None:
+        
+        """
+        Sets the L7 success array
+        
+        Args:
+            l7_success (np.array): L7 sucess array
+            
+        Returns:
+            /
+        """
+        
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
+        
+        self._layer7.success = l7_success
+
+    def l7_set_success(self, index: int) -> None:
         
         """
         Sets the L7 success array at the index
@@ -1560,9 +1876,12 @@ class Packet:
             /
         """
         
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
+        
         self._layer7.set_success(index)
         
-    def reset_l7_success(self, index: int) -> None:
+    def l7_reset_success(self, index: int) -> None:
         
         """
         Resets the L7 success array at the index
@@ -1573,6 +1892,9 @@ class Packet:
         Returns:
             /
         """
+        
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
         
         self._layer7.reset_success(index)
     
@@ -1589,6 +1911,9 @@ class Packet:
             l7_protocol (int): L7 protocol
         """
         
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
+        
         return self._layer7.protocol
     
     @l7_protocol.setter
@@ -1603,6 +1928,9 @@ class Packet:
         Returns:
             /
         """
+        
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
         
         self._layer7.protocol = l7_protocol
     
@@ -1619,7 +1947,28 @@ class Packet:
             payload (list): L7 payload
         """
         
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
+        
         return self._layer7.payload
+    
+    @payload.setter
+    def payload(self, payload: List[Any]) -> None:
+        
+        """
+        Sets the payload
+        
+        Args:
+            payload (list): payload of packet
+            
+        Returns:
+            /
+        """
+        
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
+        
+        self._layer7.payload = payload
     
     def __iter__(self) -> Any:
         
@@ -1632,6 +1981,9 @@ class Packet:
         Returns:
             item (any): current item that is in the payload
         """
+        
+        if not self._layer7:
+            raise ValueError('Layer 7 is not present in the packet')
         
         for item in self.payload:
             yield item
