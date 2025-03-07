@@ -276,10 +276,8 @@ class Host:
             receiver_memory_errors = [receiver_memory_errors]
         
         sender_memory_send = QuantumMemory(sender_memory_mode, sender_memory_size, sender_efficiency, sender_memory_errors)
-        # sender_memory_receive = QuantumMemory(receiver_memory_mode, sender_memory_size, sender_efficiency, sender_memory_errors)
         sender_memory_receive = QuantumMemory(receiver_memory_mode, -1, sender_efficiency, sender_memory_errors)
         receiver_memory_send = QuantumMemory(receiver_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
-        # receiver_memory_receive = QuantumMemory(sender_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
         receiver_memory_receive = QuantumMemory(sender_memory_mode, -1, receiver_efficiency, receiver_memory_errors)
         
         if sender_type == 'sr':

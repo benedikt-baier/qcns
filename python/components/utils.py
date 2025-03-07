@@ -6,12 +6,12 @@ import numpy as np
 import networkx as nx
 import scipy.sparse as sp
 
-from typing import List, Tuple, Dict
+from typing import List, Dict
 
 class Qubit:
     pass
 
-__all__ = ['get_measure_dict', 'load_qasm_2_0_file', 'load_qasm_3_0_file', 'apply_circuit', 'dqc_apply_circuit']
+__all__ = ['get_measure_dict', 'load_qasm_2_0_file', 'save_config', 'load_config', 'load_qasm_3_0_file', 'apply_circuit', 'dqc_apply_circuit']
   
 def get_measure_dict(num_qubits: int) -> Dict[str, int]:
     

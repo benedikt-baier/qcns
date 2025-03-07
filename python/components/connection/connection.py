@@ -346,18 +346,12 @@ class SenderReceiverConnection:
         Attempts to create the needed number of qubits
         
         Args:
-            _num_requested (int): number of requested bell pairs
-            _num_needed (int): number of needed bell pairs
+            _requested (int): number of requested bell pairs
+            _needed (int): number of needed bell pairs
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _needed:
-        #     _needed = self._receiver_memory.remaining_space()
-        
-        # if not _needed:
-        #     return
         
         packet = Packet(self._sender.id, self._receiver.id, _requested, _needed)
         
@@ -387,17 +381,11 @@ class SenderReceiverConnection:
         Creates the number of requested qubits, no matter how long it takes
         
         Args:
-            _num_requested (int): number of requested qubits
+            _requested (int): number of requested qubits
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _requested:
-        #     _requested = self._receiver_memory.remaining_space()
-        
-        # if not _requested:
-        #     return
         
         packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
         
@@ -593,18 +581,12 @@ class TwoPhotonSourceConnection:
         Attempts to create the needed number of qubits
         
         Args:
-            _num_requested (int): number of requested bell pairs
-            _num_needed (int): number of needed bell pairs
+            _requested (int): number of requested bell pairs
+            _needed (int): number of needed bell pairs
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _needed:
-        #     _needed = self._receiver_memory.remaining_space()
-        
-        # if not _needed:
-        #     return
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
@@ -646,17 +628,11 @@ class TwoPhotonSourceConnection:
         Creates the number of requested qubits, no matter how long it takes
         
         Args:
-            _num_requested (int): number of requested qubits
+            _requested (int): number of requested qubits
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _requested:
-        #     _requested = self._receiver_memory.remaining_space()
-        
-        # if not _requested:
-        #     return
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -872,18 +848,12 @@ class BellStateMeasurementConnection:
         Attempts to create the number of needed qubits
         
         Args:
-            _num_requested (int): number of requested bell pairs
-            _num_needed (int): number of needed bell pairs
+            _requested (int): number of requested bell pairs
+            _needed (int): number of needed bell pairs
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _needed:
-        #     _needed = self._receiver_memory.remaining_space()
-        
-        # if not _needed:
-        #     return
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
@@ -925,17 +895,11 @@ class BellStateMeasurementConnection:
         Creates the number of requested qubits, no matter how long it takes
         
         Args:
-            _num_requested (int): number of requested qubits
+            _requested (int): number of requested qubits
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _requested:
-        #     _requested = self._receiver_memory.remaining_space()
-        
-        # if not _requested:
-        #     return
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -1117,9 +1081,8 @@ class FockStateConnection:
     
         _s = np.sqrt(self._visibility * up_down_prob * down_up_prob)
         
-        self._sender_duration: float = self._sender_source_duration + _sender_channel._sending_time + _duration + _sender_detector._duration
-        self._receiver_duration: float = self._receiver_source_duration + _receiver_channel._sending_time + _duration + _receiver_detector._duration
-        self._total_duration: float = 2 * (_sender_channel._sending_time + _receiver_channel._sending_time)
+        self._sender_duration: float = self._sender_source_duration + _sender_channel._sending_time + self._duration + _sender_detector._duration
+        self._receiver_duration: float = self._receiver_source_duration + _receiver_channel._sending_time + self._duration + _receiver_detector._duration
     
         self._state: np.array = np.array([[(1 - self._spin_photon_correlation) * up_down_prob, 0., 0., (1 - self._spin_photon_correlation) * np.exp(1j * self._coherent_phase) * _s], 
                                           [0., 0.5 * self._spin_photon_correlation * (up_down_prob + down_up_prob) + up_up_prob, 0., 0.],
@@ -1184,18 +1147,12 @@ class FockStateConnection:
         Attempts to create the needed number of qubits
         
         Args:
-            _num_requested (int): number of requested bell pairs
-            _num_needed (int): number of needed bell pairs
+            _requested (int): number of requested bell pairs
+            _needed (int): number of needed bell pairs
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _needed:
-        #     _needed = self._receiver_memory.remaining_space()
-        
-        # if not _needed:
-        #     return
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
@@ -1237,17 +1194,11 @@ class FockStateConnection:
         Creates the number of requested qubits, no matter how long it takes
         
         Args:
-            _num_requested (int): number of requested qubits
+            _requested (int): number of requested qubits
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _requested:
-        #     _requested = self._receiver_memory.remaining_space()
-        
-        # if not _requested:
-        #     return
         
         packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
         packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
@@ -1392,18 +1343,12 @@ class L3Connection:
         Attempt the number of bell pairs
         
         Args:
-            _num_requested (int): number of requested qubits
-            _num_needed (int): number of needed qubits
+            _requested (int): number of requested qubits
+            _needed (int): number of needed qubits
             
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _needed:
-        #     _needed = self._receiver_memory.remaining_space()
-        
-        # if not _needed:
-        #     return
         
         packet = Packet(self._sender.id, self._receiver_id, _requested, _needed)
 
@@ -1431,17 +1376,11 @@ class L3Connection:
         Creates the number of requested qubits
         
         Args:
-            _num_requested (int): number of requested qubits
+            _requested (int): number of requested qubits
         
         Returns:
             /
         """
-        
-        # if self._receiver_memory.remaining_space() < _requested:
-        #     _requested = self._receiver_memory.remaining_space()
-        
-        # if not _requested:
-        #     return
         
         packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
         

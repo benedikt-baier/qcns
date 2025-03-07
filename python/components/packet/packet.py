@@ -607,7 +607,7 @@ class Packet:
             l1_next_protocol (int): L1 next protocol
         """
         
-        return self._layer1.next_protcol
+        return self._layer1.next_protocol
     
     @l1_next_protocol.setter
     def l1_next_protocol(self, l1_next_protocol: int) -> None:
@@ -934,7 +934,7 @@ class Packet:
             l2_next_protocol (int): L2 next protocol
         """
         
-        return self._layer2.next_protcol
+        return self._layer2.next_protocol
     
     @l2_next_protocol.setter
     def l2_next_protocol(self, l2_next_protocol: int) -> None:

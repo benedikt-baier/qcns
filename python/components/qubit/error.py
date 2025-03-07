@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.sparse as sp
 
+import copy
+
 from typing import Union, Dict
 
 from qcns.python.components.qubit.qubit import Qubit, dot, get_single_operator
