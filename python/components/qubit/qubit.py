@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
-import functools as ft
-from typing import List, Union
+from functools import wraps, partial
+from typing import List, Union, Callable
 
 __all__ = ['Qubit', 'QSystem', 'tensor_operator', 'dot', 'get_single_operator', 'depolarization_error', 'combine_state', 'remove_qubits']
 
@@ -61,7 +61,7 @@ class Qubit:
 class QSystem:
     pass
 
-def cache(func):
+def cache(func: Callable) -> partial:
     
     """
     Caches the applied gates to reduce calculation times
@@ -75,7 +75,7 @@ def cache(func):
 
     _cache = {}
     
-    @ft.wraps(func)
+    @wraps(func)
     def wrapper(*args):
         
         key = args[0]
