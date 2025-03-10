@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from functools import wraps, partial
+from functools import wraps, partial, reduce
 from typing import List, Union, Callable
 
 __all__ = ['Qubit', 'QSystem', 'tensor_operator', 'dot', 'get_single_operator', 'depolarization_error', 'combine_state', 'remove_qubits']
@@ -134,7 +134,7 @@ def tensor_operator(_sparse: bool, _operator_l: np.array) -> Union[np.array, sp.
         res (np.array): resulting tensor operator
     """
 
-    return ft.reduce(_KRON_DICT[_sparse], _operator_l)
+    return reduce(_KRON_DICT[_sparse], _operator_l)
 
 def dot(_state: Union[np.array, sp.csr_matrix], _gate: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.csr_matrix]:
     
