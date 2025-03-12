@@ -483,9 +483,9 @@ class Host:
             receiver_memory_errors = [receiver_memory_errors]
         
         sender_memory_send = QuantumMemory(sender_memory_mode, sender_memory_size, sender_efficiency, sender_memory_errors)
-        sender_memory_receive = QuantumMemory(receiver_memory_mode, sender_memory_size, sender_efficiency, sender_memory_errors)
+        sender_memory_receive = QuantumMemory(receiver_memory_mode, -1, sender_efficiency, sender_memory_errors)
         receiver_memory_send = QuantumMemory(receiver_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
-        receiver_memory_receive = QuantumMemory(sender_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
+        receiver_memory_receive = QuantumMemory(sender_memory_mode, -1, receiver_efficiency, receiver_memory_errors)
         
         connection_s_r = L3Connection(self, host._node_id, self._sim, length, sender_num_sources, sender_source_duration, sender_success_probability, sender_fidelity, sender_fidelity_variance, sender_memory_send, receiver_memory_receive)
         connection_r_s = L3Connection(host, self._node_id, self._sim, length, receiver_num_sources, receiver_source_duration, receiver_success_probability, receiver_fidelity, receiver_fidelity_variance, receiver_memory_send, sender_memory_receive)

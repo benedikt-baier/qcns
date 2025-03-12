@@ -581,6 +581,21 @@ class Qubit:
         
         return self._qsystem._num_qubits
     
+    @num_qubits.setter
+    def num_qubits(self, num_qubits: int) -> None:
+        
+        """
+        Sets the number of qubits in the qsystem
+        
+        Args:
+            num_qubits (int): new number of qubits
+            
+        Returns:
+            /
+        """
+        
+        self._qsystem._num_qubits = num_qubits
+    
     @property
     def sparse(self) -> int:
         
