@@ -154,17 +154,17 @@ class Simulation:
         for host in self._hosts.values():
             host.stop = True
     
-    async def _handle_events(self, _num_hosts: int) -> None:
+    async def _handle_events(self) -> None:
         
         pass
     
-    async def _handle_event(self, _num_hosts: int) -> None:
+    async def _handle_event(self) -> None:
         
         """
         Handles Events in the event queue
         
         Args:
-            _num_hosts (int): number of non terminating hosts
+            /
             
         Returns:
             / 
@@ -172,7 +172,7 @@ class Simulation:
         
         tasks = [asc.create_task(host.run()) for host in self._hosts.values()]
         
-        self._num_hosts = len(tasks) - _num_hosts
+        self._num_hosts = len(tasks)
         
         while self._num_hosts > 0:
             
@@ -194,13 +194,13 @@ class Simulation:
             
         self.stop_simulation()
     
-    async def _handle_event_end_time(self, _num_hosts: int) -> None:
+    async def _handle_event_end_time(self) -> None:
         
         """
         Handles events with a given end time
         
         Args:
-            _num_hosts (int): number of non terminating hosts
+            /
             
         Returns:
             /
@@ -208,7 +208,7 @@ class Simulation:
         
         tasks = [asc.create_task(host.run()) for host in self._hosts.values()]
         
-        self._num_hosts = len(tasks) - _num_hosts
+        self._num_hosts = len(tasks)
         
         while self._num_hosts > 0:
             
@@ -219,6 +219,8 @@ class Simulation:
             
             event = heappop(self._event_queue)
             
+            logging.info(event)
+            
             if not (event._id + 1):
                 self._num_hosts -= 1
                 continue
@@ -226,20 +228,17 @@ class Simulation:
             if event._end_time > self._sim_end_time:
                 continue
             
-            logging.info(event)
-            
             self._sim_time = event._end_time
             self._hosts[event._node_id]._resume[event._id].set()
             
         self.stop_simulation()
     
-    def run(self, num_hosts: int=0, end_time: float=None) -> None:
+    def run(self, end_time: float=None) -> None:
         
         """
         Runs the simulation by handling all Events in the event queue
         
         Args:
-            num_hosts (int): number of hosts that are not terminating
             end_time (float): end time of simulation
             
         Returns:
@@ -251,5 +250,5 @@ class Simulation:
         if end_time is not None:
             self.set_end_time(end_time)
         
-        asc.run(self._handle_events(num_hosts))
+        asc.run(self._handle_events())
         
