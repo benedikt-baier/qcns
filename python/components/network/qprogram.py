@@ -622,7 +622,7 @@ class L3_QFP(QProgram):
             /
         """
         
-        for index in range(packet.l3_num_needed):
+        for index in range(packet.l3_needed):
         
             qubit_src = self.host.l3_retrieve_qubit(packet.l2_src, 1, offset_index)
             qubit_dst = self.host.l3_retrieve_qubit(packet.l2_dst, 0)
@@ -653,7 +653,7 @@ class L3_QFP(QProgram):
             /
         """
         
-        for index in range(packet.l3_num_needed):
+        for index in range(packet.l3_needed):
         
             qubit_src = self.host.l3_retrieve_qubit(packet.l2_src, 1, offset_index)
             qubit_dst = self.host.l3_retrieve_qubit(packet.l2_dst, 0)
