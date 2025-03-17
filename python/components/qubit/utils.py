@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import combinations
 from typing import List, Tuple
 
 class Qubit:
@@ -74,7 +75,7 @@ def W_state(q_l: List[Qubit]) -> None:
     """
 
     op = get_w_operator(1, len(q_l) - 1)
-    q_l[0].custom_gate(op)
+    q_l[0].custom_single_gate(op)
 
     for i in range(len(q_l) - 2):
         q_l[i].CU(q_l[i + 1], get_w_operator(1, len(q_l) - 2 - i))
@@ -97,7 +98,7 @@ def graph_state(q_l: List[Qubit], graph: List[Tuple[int, int]]) -> None:
         /
     """
     
-    for q_1, q_2 in it.combinations(q_l, 2):
+    for q_1, q_2 in combinations(q_l, 2):
         if not q_1.qsystem == q_2.qsystem:
             raise ValueError('Qubits need to be in the same qsystem')
         

@@ -8,6 +8,8 @@ import scipy.sparse as sp
 
 from typing import List, Dict
 
+from qubit import combine_gates
+
 class Qubit:
     pass
 
@@ -245,70 +247,82 @@ def load_config(path: str) -> None:
 
 def apply_circuit(circuit, qubits, classical_bits=None):
     
+    gates = []
+    
     for circuit_p in circuit:
         
         if circuit_p[0] == 'U':
-            qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4])
+            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=False))
             continue
         if circuit_p[0] == 'CNOT':
-            qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]])
+            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=False))
             continue
         if circuit_p[0] == 'Rx':
-            qubits[circuit_p[1]].Rx(circuit_p[2])
+            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=False))
             continue
         if circuit_p[0] == 'Ry':
-            qubits[circuit_p[1]].Ry(circuit_p[2])
+            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=False))
             continue
         if circuit_p[0] == 'Rz':
-            qubits[circuit_p[1]].Rz(circuit_p[2])
+            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=False))
             continue
         if circuit_p[0] == 'measure':
             classical_bits[circuit_p[2]] = qubits[circuit_p[1]].measure()
             continue
         if circuit_p[0] == 'x':
-            qubits[circuit_p[1]].X()
+            gates.append(qubits[circuit_p[1]].X(apply=False))
             continue
         if circuit_p[0] == 'y':
-            qubits[circuit_p[1]].Y()
+            gates.append(qubits[circuit_p[1]].Y(apply=False))
             continue
         if circuit_p[0] == 'z':
-            qubits[circuit_p[1]].Z()
+            gates.append(qubits[circuit_p[1]].Z(apply=False))
             continue
         if circuit_p[0] == 'h':
-            qubits[circuit_p[1]].H()
+            gates.append(qubits[circuit_p[1]].H(apply=False))
             continue
+        
+    gate = combine_gates(gates)
+    
+    qubits[0].custom_gate(gate)
 
 async def dqc_apply_circuit(host, circuit, qubits):
+    
+    gates = []
     
     for circuit_p in circuit:
         
         if circuit_p[0] == 'U':
-            await host.apply_gate('general_rotation', qubits[circuit_p[1]], circuit_p[2], circuit_p[3], circuit_p[4])
+            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=False))
             continue
         if circuit_p[0] == 'CNOT':
-            await host.apply_gate('CNOT', qubits[circuit_p[1]], qubits[circuit_p[2]])
+            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=False))
             continue
         if circuit_p[0] == 'Rx':
-            await host.apply_gate('Rx', qubits[circuit_p[1]], circuit_p[2])
+            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=False))
             continue
         if circuit_p[0] == 'Ry':
-            await host.apply_gate('Ry', qubits[circuit_p[1]], circuit_p[2])
+            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=False))
             continue
         if circuit_p[0] == 'Rz':
-            await host.apply_gate('Rz', qubits[circuit_p[1]], circuit_p[2])
+            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=False))
             continue
         if circuit_p[0] == 'measure':
             host.classical_bits[circuit_p[2]] = await host.apply_gate('measure', qubits[circuit_p[1]])
             continue
         if circuit_p[0] == 'x':
-            await host.apply_gate('X', qubits[circuit_p[1]])
+            gates.append(qubits[circuit_p[1]].X(apply=False))
             continue
         if circuit_p[0] == 'y':
-            await host.apply_gate('Y', qubits[circuit_p[1]])
+            gates.append(qubits[circuit_p[1]].Y(apply=False))
             continue
         if circuit_p[0] == 'z':
-            await host.apply_gate('Z', qubits[circuit_p[1]])
+            gates.append(qubits[circuit_p[1]].Z(apply=False))
             continue
         if circuit_p[0] == 'h':
-            await host.apply_gate('H', qubits[circuit_p[1]])
+            gates.append(qubits[circuit_p[1]].H(apply=False))
             continue
+        
+    gate = combine_gates(gates)
+    
+    await host.apply_gate('custom_gate', qubits[0], gate)

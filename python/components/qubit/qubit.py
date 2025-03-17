@@ -3,7 +3,7 @@ import scipy.sparse as sp
 from functools import wraps, partial, reduce
 from typing import List, Union, Callable
 
-__all__ = ['Qubit', 'QSystem', 'tensor_operator', 'dot', 'get_single_operator', 'depolarization_error', 'combine_state', 'remove_qubits']
+__all__ = ['Qubit', 'QSystem', 'tensor_operator', 'dot', 'get_single_operator', 'depolarization_error', 'combine_state', 'combine_gates', 'remove_qubits']
 
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),
