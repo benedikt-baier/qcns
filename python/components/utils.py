@@ -3,6 +3,7 @@ import itertools as it
 import json as js
 
 import numpy as np
+from numpy import pi
 import networkx as nx
 import scipy.sparse as sp
 
@@ -281,10 +282,13 @@ def apply_circuit(circuit, qubits, classical_bits=None):
         if circuit_p[0] == 'h':
             gates.append(qubits[circuit_p[1]].H(apply=False))
             continue
-        
-    gate = combine_gates(gates)
     
-    qubits[0].custom_gate(gate)
+    if not gates:
+        return
+    
+    gate = combine_gates(0, gates)
+    
+    next(iter(qubits.values())).custom_gate(gate)
 
 async def dqc_apply_circuit(host, circuit, qubits):
     
@@ -322,7 +326,10 @@ async def dqc_apply_circuit(host, circuit, qubits):
         if circuit_p[0] == 'h':
             gates.append(qubits[circuit_p[1]].H(apply=False))
             continue
-        
-    gate = combine_gates(gates)
     
-    await host.apply_gate('custom_gate', qubits[0], gate)
+    if not gates:
+        return
+    
+    gate = combine_gates(0, gates)
+    
+    await host.apply_gate('custom_gate', next(iter(qubits.values())), gate)
