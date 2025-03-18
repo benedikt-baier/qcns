@@ -8,7 +8,7 @@ import scipy.sparse as sp
 
 from typing import List, Dict
 
-from qubit import combine_gates
+from qcns.python.components.qubit import combine_gates
 
 class Qubit:
     pass
