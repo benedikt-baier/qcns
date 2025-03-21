@@ -84,7 +84,7 @@ class Host:
             /
         """
         
-        self._node_id: int = node_id
+        self.id: int = node_id
         self._sim: Simulation = sim
         
         self._qprograms: Dict[int, QProgram] = {layer: qprogram for layer, qprogram in {L1: l1_qprogram, L2: l2_qprogram, L3: l3_qprogram, L4: l4_qprogram, L7: l7_qprogram}.items() if qprogram.layer}
@@ -145,7 +145,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(StopEvent(self._node_id))
+        self._sim.schedule_event(StopEvent(self.id))
         
         try:
             await func()
@@ -185,8 +185,11 @@ class Host:
             /
         """
         
-        self._neighbors.add(host._node_id)
-        host._neighbors.add(self._node_id)
+        if sender_length < 0. or receiver_length < 0.:
+            raise ValueError('Length of connection cannot be negative')
+        
+        self._neighbors.add(host.id)
+        host._neighbors.add(self.id)
             
         if sender_channel_errors is None:
             sender_channel_errors = []
@@ -205,13 +208,13 @@ class Host:
         for com_error in receiver_channel_errors:
             com_error.add_signal_time(sender_length + receiver_length)
         
-        connection_s_r = SingleQubitConnection(self, host, self._sim, sender_source, sender_num_sources, sender_length + receiver_length, 
+        connection_s_r = SingleQubitConnection(self, host.id, self._sim, sender_source, sender_num_sources, sender_length + receiver_length, 
                                                sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, sender_channel_errors)
-        connection_r_s = SingleQubitConnection(host, self, self._sim, receiver_source, receiver_num_sources, sender_length + receiver_length, 
+        connection_r_s = SingleQubitConnection(host, self.id, self._sim, receiver_source, receiver_num_sources, sender_length + receiver_length, 
                                                receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, receiver_channel_errors)
         
-        self._connections['sqs'][host._node_id] = {SEND: connection_s_r, RECEIVE: connection_r_s._channel}
-        host._connections['sqs'][self._node_id] = {SEND: connection_r_s, RECEIVE: connection_s_r._channel}
+        self._connections['sqs'][host.id] = {SEND: connection_s_r, RECEIVE: connection_r_s._channel}
+        host._connections['sqs'][self.id] = {SEND: connection_r_s, RECEIVE: connection_s_r._channel}
     
     def set_eqs_connection(self, host: Host, sender_type: str='sr', sender_model: str='perfect', 
                            receiver_type: str='sr', receiver_model: str='perfect',
@@ -261,8 +264,11 @@ class Host:
             /
         """
         
-        self._neighbors.add(host._node_id)
-        host._neighbors.add(self._node_id)
+        if sender_length < 0. or receiver_length < 0.:
+            raise ValueError('Length of connection cannot be negative')
+        
+        self._neighbors.add(host.id)
+        host._neighbors.add(self.id)
         
         if sender_memory_errors is None:
             sender_memory_errors = []
@@ -281,56 +287,56 @@ class Host:
         receiver_memory_receive = QuantumMemory(sender_memory_mode, -1, receiver_efficiency, receiver_memory_errors)
         
         if sender_type == 'sr':
-            connection_s_r = SenderReceiverConnection(self, host, self._sim, sender_model, sender_source, receiver_detector, sender_num_sources,
+            connection_s_r = SenderReceiverConnection(self, host.id, self._sim, sender_model, sender_source, receiver_detector, sender_num_sources,
                                                       sender_length + receiver_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
                                                       sender_memory_send, receiver_memory_receive)
         
         if sender_type == 'tps':
-            connection_s_r = TwoPhotonSourceConnection(self, host, self._sim, sender_model, sender_source, sender_detector, receiver_detector, sender_num_sources, 
+            connection_s_r = TwoPhotonSourceConnection(self, host.id, self._sim, sender_model, sender_source, sender_detector, receiver_detector, sender_num_sources, 
                                                        sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
                                                        receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
                                                        sender_memory_send, receiver_memory_receive)
         
         if sender_type == 'bsm':
-            connection_s_r = BellStateMeasurementConnection(self, host, self._sim, sender_model, sender_source, receiver_source, sender_detector, receiver_detector, sender_num_sources, 
+            connection_s_r = BellStateMeasurementConnection(self, host.id, self._sim, sender_model, sender_source, receiver_source, sender_detector, receiver_detector, sender_num_sources, 
                                                             sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
                                                             receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
                                                             sender_memory_send, receiver_memory_receive)
             
         if sender_type == 'fs':
-            connection_s_r = FockStateConnection(self, host, self._sim, sender_model, sender_source, receiver_source, sender_detector, receiver_detector, sender_num_sources, 
+            connection_s_r = FockStateConnection(self, host.id, self._sim, sender_model, sender_source, receiver_source, sender_detector, receiver_detector, sender_num_sources, 
                                                             sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
                                                             receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
                                                             sender_memory_send, receiver_memory_receive)
         
         if receiver_type == 'sr':
-            connection_r_s = SenderReceiverConnection(host, self, self._sim, receiver_model, receiver_source, sender_detector, receiver_num_sources,
+            connection_r_s = SenderReceiverConnection(host, self.id, self._sim, receiver_model, receiver_source, sender_detector, receiver_num_sources,
                                                       sender_length + receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
                                                       receiver_memory_send, sender_memory_receive)
             
         if receiver_type == 'tps':
-            connection_r_s = TwoPhotonSourceConnection(host, self, self._sim, receiver_model, receiver_source, receiver_detector, sender_detector, receiver_num_sources,
+            connection_r_s = TwoPhotonSourceConnection(host, self.id, self._sim, receiver_model, receiver_source, receiver_detector, sender_detector, receiver_num_sources,
                                                        receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
                                                        sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
                                                        receiver_memory_send, sender_memory_receive)
         
         if receiver_type == 'bsm':
-            connection_r_s = BellStateMeasurementConnection(host, self, self._sim, receiver_model, receiver_source, sender_source, receiver_detector, sender_detector, receiver_num_sources, 
+            connection_r_s = BellStateMeasurementConnection(host, self.id, self._sim, receiver_model, receiver_source, sender_source, receiver_detector, sender_detector, receiver_num_sources, 
                                                             receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
                                                             sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
                                                             receiver_memory_send, sender_memory_receive)
             
         if receiver_type == 'fs':
-            connection_r_s = FockStateConnection(host, self, self._sim, receiver_model, receiver_source, sender_source, receiver_detector, sender_detector, receiver_num_sources, 
+            connection_r_s = FockStateConnection(host, self.id, self._sim, receiver_model, receiver_source, sender_source, receiver_detector, sender_detector, receiver_num_sources, 
                                                             receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
                                                             sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
                                                             receiver_memory_send, sender_memory_receive)
         
-        self._connections['eqs'][host._node_id] = connection_s_r
-        host._connections['eqs'][self._node_id] = connection_r_s
+        self._connections['eqs'][host.id] = connection_s_r
+        host._connections['eqs'][self.id] = connection_r_s
         
-        self._connections['memory'][host._node_id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
-        host._connections['memory'][self._node_id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
+        self._connections['memory'][host.id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
+        host._connections['memory'][self.id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
     
     def set_pconnection(self, host: Host, length: float=0.) -> None:
         
@@ -345,20 +351,23 @@ class Host:
             /
         """
         
-        self._neighbors.add(host._node_id)
-        host._neighbors.add(self._node_id)
+        if length < 0.:
+            raise ValueError('Length of connection cannot be negative')
+        
+        self._neighbors.add(host.id)
+        host._neighbors.add(self.id)
         
         channel_s = PChannel(length)
         channel_r = PChannel(length)
         
-        self._connections['packet'][host._node_id] = {SEND: channel_s, RECEIVE: channel_r}
-        host._connections['packet'][self._node_id] = {SEND: channel_r, RECEIVE: channel_s}
+        self._connections['packet'][host.id] = {SEND: channel_s, RECEIVE: channel_r}
+        host._connections['packet'][self.id] = {SEND: channel_r, RECEIVE: channel_s}
     
-        self._layer_results[host._node_id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
-        host._layer_results[self._node_id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
+        self._layer_results[host.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
+        host._layer_results[self.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
         
-        self._packets[host._node_id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
-        host._packets[self._node_id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
+        self._packets[host.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
+        host._packets[self.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
     
     def set_connection(self, host: Host, sender_type: str='sr', sender_model: str='perfect', 
                         receiver_type: str='sr', receiver_model: str='perfect',
@@ -414,8 +423,8 @@ class Host:
             /
         """
         
-        self._neighbors.add(host._node_id)
-        host._neighbors.add(self._node_id)
+        self._neighbors.add(host.id)
+        host._neighbors.add(self.id)
         
         self.set_sqs_connection(host, sp_sender_source, sp_receiver_source, sp_sender_num_sources, sp_receiver_num_sources,
                                 sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, sender_channel_errors, 
@@ -468,8 +477,11 @@ class Host:
             /
         """
         
-        self._neighbors.add(host._node_id)
-        host._neighbors.add(self._node_id)
+        if length < 0.:
+            raise ValueError('Length of connection cannot be negative')
+        
+        self._neighbors.add(host.id)
+        host._neighbors.add(self.id)
         
         if sender_memory_errors is None:
             sender_memory_errors = []
@@ -487,14 +499,14 @@ class Host:
         receiver_memory_send = QuantumMemory(receiver_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
         receiver_memory_receive = QuantumMemory(sender_memory_mode, -1, receiver_efficiency, receiver_memory_errors)
         
-        connection_s_r = L3Connection(self, host._node_id, self._sim, length, sender_num_sources, sender_source_duration, sender_success_probability, sender_fidelity, sender_fidelity_variance, sender_memory_send, receiver_memory_receive)
-        connection_r_s = L3Connection(host, self._node_id, self._sim, length, receiver_num_sources, receiver_source_duration, receiver_success_probability, receiver_fidelity, receiver_fidelity_variance, receiver_memory_send, sender_memory_receive)
+        connection_s_r = L3Connection(self, host.id, self._sim, length, sender_num_sources, sender_source_duration, sender_success_probability, sender_fidelity, sender_fidelity_variance, sender_memory_send, receiver_memory_receive)
+        connection_r_s = L3Connection(host, self.id, self._sim, length, receiver_num_sources, receiver_source_duration, receiver_success_probability, receiver_fidelity, receiver_fidelity_variance, receiver_memory_send, sender_memory_receive)
         
-        self._connections['eqs'][host._node_id] = connection_s_r
-        host._connections['eqs'][self._node_id] = connection_r_s
+        self._connections['eqs'][host.id] = connection_s_r
+        host._connections['eqs'][self.id] = connection_r_s
         
-        self._connections['memory'][host._node_id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
-        host._connections['memory'][self._node_id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
+        self._connections['memory'][host.id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
+        host._connections['memory'][self.id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
         
         self.set_pconnection(host, length)
     
@@ -512,7 +524,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -536,7 +548,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -557,7 +569,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -590,7 +602,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -618,7 +630,7 @@ class Host:
             res (int/None): result of the gate
         """
         
-        self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(gate, 5e-6), self._node_id))
+        self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(gate, 5e-6), self.id))
         
         await self._resume[GATE].wait()
         self._resume[GATE].clear()
@@ -685,8 +697,8 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver, self.id))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -730,8 +742,8 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time + len(_packet) * self._pulse_duration, self._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time + len(_packet) * self._pulse_duration, self.id, _packet.l2_dst))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst, _packet.l2_src))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()

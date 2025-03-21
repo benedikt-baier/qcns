@@ -74,7 +74,7 @@ class SingleQubitConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, _sender_source: str='perfect', _num_sources: int=-1,
+    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _sender_source: str='perfect', _num_sources: int=-1,
                  _length: float=0., _attenuation_coefficient: float=-0.016, _in_coupling_prob: float=1., _out_coupling_prob: float=1., _lose_qubits: bool=False, _com_errors: List[QuantumError]=None) -> None:
         
         """
@@ -98,7 +98,7 @@ class SingleQubitConnection:
         """
         
         self._sender: Host = _sender
-        self._receiver: Host = _receiver
+        self._receiver_id: int = _receiver
         self._num_sources: int = _num_sources
         self._source: SinglePhotonSource = SinglePhotonSource(_sender_source)
         self._channel: QChannel = QChannel(_length, _attenuation_coefficient, _in_coupling_prob, _out_coupling_prob, _com_errors)
@@ -175,7 +175,7 @@ class SingleQubitConnection:
         
         for success, _curr_time in zip(_success_samples, _curr_time_samples):
             self._creation_functions[success]()
-            self._sim.schedule_event(ReceiveEvent(_curr_time + self._channel._sending_time, self._receiver._node_id))
+            self._sim.schedule_event(ReceiveEvent(_curr_time + self._channel._sending_time, self._receiver_id, self._sender.id))
             
     def create_qubit(self, _requested: int=1) -> None:
         
@@ -205,7 +205,7 @@ class SingleQubitConnection:
         
         for _curr_time in _curr_time_samples:
             self.success_creation(_curr_time)
-            self._sim.schedule_event(ReceiveEvent(_curr_time + self._channel._sending_time, self._receiver._node_id))
+            self._sim.schedule_event(ReceiveEvent(_curr_time + self._channel._sending_time, self._receiver_id, self._sender.id))
         
 class SenderReceiverConnection:
     
@@ -263,7 +263,7 @@ class SenderReceiverConnection:
         model = SENDER_RECEIVER_MODELS[_model_name]
         
         self._sender: Host = _sender
-        self._receiver: Host = _receiver
+        self._receiver_id: int = _receiver
         self._num_sources: int = _num_sources
         
         _duration: float = model[0]
@@ -353,7 +353,7 @@ class SenderReceiverConnection:
             /
         """
         
-        packet = Packet(self._sender.id, self._receiver.id, _requested, _needed)
+        packet = Packet(self._sender.id, self._receiver_id, _requested, _needed)
         
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -372,8 +372,8 @@ class SenderReceiverConnection:
         packet.l1_success = _success_samples
         packet.l1_protocol = 1
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][SEND].put(packet)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_num_tries - 1) * self._source_duration, self._receiver_id, self._sender.id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
     
     def create_bell_pairs(self, _requested: int=1) -> None:
         
@@ -410,7 +410,7 @@ class SenderReceiverConnection:
         packet.l1_protocol = 1
         
         self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_duration + (_current_try - 1) * self._source_duration, self._receiver_id))
-        self._sender._connections['packet'][self._receiver._node_id][SEND].put(packet)
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
         
 class TwoPhotonSourceConnection:
     
@@ -440,7 +440,7 @@ class TwoPhotonSourceConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, 
+    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, 
                  _model_name: str='perfect', _source: str='perfect', _sender_detector: str='perfect', _receiver_detector: str='perfect', _num_sources: int=-1,
                  _sender_length: float=0., _sender_attenuation: float=-0.016, _sender_in_coupling_prob: float=1., _sender_out_coupling_prob: float=1., _sender_lose_qubits: bool=False,
                  _receiver_length: float=0., _receiver_attenuation: float=-0.016, _receiver_in_coupling_prob: float=1., _receiver_out_coupling_prob: float=1., _receiver_lose_qubits: bool=False,
@@ -481,7 +481,7 @@ class TwoPhotonSourceConnection:
         model = TWO_PHOTON_MODELS[_model_name]
         
         self._sender: Host = _sender # fix
-        self._receiver: int = _receiver # fix
+        self._receiver_id: int = _receiver # fix
         self._num_sources: int = _num_sources # fix
         
         _duration: float = model[0]
@@ -588,8 +588,8 @@ class TwoPhotonSourceConnection:
             /
         """
         
-        packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
-        packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
+        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _needed)
+        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _needed)
         
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -617,10 +617,10 @@ class TwoPhotonSourceConnection:
         packet_s.l1_protocol = 2
         packet_r.l1_protocol = 2
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._source_duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
-        self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._source_duration, self._sender.id, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._source_duration, self._receiver_id, self._sender.id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet_s)
 
     def create_bell_pairs(self, _requested: int=1):
         
@@ -634,8 +634,8 @@ class TwoPhotonSourceConnection:
             /
         """
         
-        packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
-        packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
+        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _requested)
+        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _requested)
         
         _curr_time = self._sim._sim_time + self._source_duration
         
@@ -665,10 +665,10 @@ class TwoPhotonSourceConnection:
         packet_s.l1_protocol = 2
         packet_r.l1_protocol = 2
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._source_duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
-        self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._source_duration, self._sender.id, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._source_duration, self._receiver_id, self._sender.id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet_s)
 
 class BellStateMeasurementConnection:
     
@@ -698,7 +698,7 @@ class BellStateMeasurementConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation, 
+    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, 
                  _model_name: str='perfect', _sender_source: str='perfect', _receiver_source: str='perfect', _sender_detector: str='perfect', _receiver_detector: str='perfect', _num_sources: int=-1,
                  _sender_length: float=0., _sender_attenuation_coefficient: float=-0.016, _sender_in_coupling_prob: float=1., _sender_out_coupling_prob: float=1., _sender_lose_qubits: bool=False,
                  _receiver_length: float=0., _receiver_attenuation_coefficient: float=-0.016, _receiver_in_coupling_prob: float=1., _receiver_out_coupling_prob: float=1., _receiver_lose_qubits: bool=False,
@@ -740,7 +740,7 @@ class BellStateMeasurementConnection:
         model = BSM_MODELS[_model_name]
         
         self._sender: Host = _sender
-        self._receiver: Host = _receiver
+        self._receiver_id: int = _receiver
         self._num_sources: int = _num_sources
         
         _duration: float = model[0]
@@ -855,8 +855,8 @@ class BellStateMeasurementConnection:
             /
         """
         
-        packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
-        packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
+        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _needed)
+        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _needed)
 
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -884,10 +884,10 @@ class BellStateMeasurementConnection:
         packet_s.l1_protocol = 3
         packet_r.l1_protocol = 3
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
-        self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender.id, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver_id, self._sender.id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet_s)        
     
     def create_bell_pairs(self, _requested: int=1) -> None:
         
@@ -901,8 +901,8 @@ class BellStateMeasurementConnection:
             /
         """
         
-        packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
-        packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
+        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _requested)
+        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _requested)
         
         _sender_time = self._sim._sim_time + self._sender_source_duration
         _receiver_time = self._sim._sim_time + self._receiver_source_duration
@@ -933,10 +933,10 @@ class BellStateMeasurementConnection:
         packet_s.l1_protocol = 3
         packet_r.l1_protocol = 3
     
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
-        self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender.id, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver_id, self._sender.id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet_s)
     
 class FockStateConnection:
     
@@ -971,7 +971,7 @@ class FockStateConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: Host, _sim: Simulation,
+    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation,
                  _model_name: str='perfect', _sender_source: str='perfect', _receiver_source: str='perfect', _sender_detector: str='perfect', _receiver_detector: str='perfect', _num_sources: int=-1,
                  _sender_length: float=0., _sender_attenuation_coefficient: float=-0.016, _sender_in_coupling_prob: float=1., _sender_out_coupling_prob: float=1., _sender_lose_qubits: bool=False,
                  _receiver_length: float=0., _receiver_attenuation_coefficient: float=-0.016, _receiver_in_coupling_prob: float=1., _receiver_out_coupling_prob: float=1., _receiver_lose_qubits: bool=False,
@@ -1013,7 +1013,7 @@ class FockStateConnection:
         _model = FOCK_STATE_MODELS[_model_name]
         
         self._sender: Host = _sender
-        self._receiver: Host = _receiver
+        self._receiver_id: int = _receiver
         self._num_sources: int = _num_sources
         
         _duration: float = _model[0]
@@ -1156,8 +1156,8 @@ class FockStateConnection:
             /
         """
         
-        packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _needed)
-        packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _needed)
+        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _needed)
+        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _needed)
 
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -1185,10 +1185,10 @@ class FockStateConnection:
         packet_s.l1_protocol = 4
         packet_r.l1_protocol = 4
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
-        self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender.id, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver_id, self._sender.id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet_s)
 
     def create_bell_pairs(self, _requested: int=1) -> None:
         
@@ -1202,8 +1202,8 @@ class FockStateConnection:
             /
         """
         
-        packet_s = Packet(self._receiver._node_id, self._sender._node_id, _requested, _requested)
-        packet_r = Packet(self._sender._node_id, self._receiver._node_id, _requested, _requested)
+        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _requested)
+        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _requested)
         
         _sender_time = self._sim._sim_time + self._sender_source_duration
         _receiver_time = self._sim._sim_time + self._receiver_source_duration
@@ -1234,10 +1234,10 @@ class FockStateConnection:
         packet_s.l1_protocol = 4
         packet_r.l1_protocol = 4
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender._node_id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver._node_id))
-        self._sender._connections['packet'][self._receiver._node_id][RECEIVE].put(packet_s)
-        self._receiver._connections['packet'][self._sender._node_id][RECEIVE].put(packet_r)
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender.id, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver_id, self._sender.id))
+        self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
+        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet_s)
         
 class L3Connection:
     
@@ -1369,7 +1369,7 @@ class L3Connection:
         
         packet.l1_success = _success_samples
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + (_num_tries - 1) * self._source_duration, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + (_num_tries - 1) * self._source_duration, self._receiver_id, self._sender.id))
         self._sender._connections['packet'][self._receiver_id][SEND].put(packet)
     
     def create_bell_pairs(self, _requested: int=1) -> None:
@@ -1384,7 +1384,7 @@ class L3Connection:
             /
         """
         
-        packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
+        packet = Packet(self._sender.id, self._receiver_id, _requested, _requested)
         
         _time_samples = np.zeros(_requested + self._num_sources + 1) + self._sim._sim_time + self._sending_time
         
@@ -1404,5 +1404,5 @@ class L3Connection:
         
         packet.l1_success = np.ones(_requested, dtype=np.bool_)
         
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + (_current_try - 1) * self._source_duration, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._sending_time + (_current_try - 1) * self._source_duration, self._receiver_id, self._sender.id))
         self._sender._connections['packet'][self._receiver_id][SEND].put(packet)

@@ -87,7 +87,7 @@ class StopEvent(Event):
             _event (str): printable representation of Event
         """
         
-        return f'StopEvent Node: {self._node_id}'
+        return f'Stop Event Node: {self._node_id}'
 
 class SendEvent(Event):
     
@@ -100,7 +100,7 @@ class SendEvent(Event):
         _node_id (int): ID of Host which scheduled event
     """
     
-    def __init__(self, _end_time: float, _node_id: int) -> None:
+    def __init__(self, _end_time: float, _node_id: int, _receiver: int) -> None:
     
         """
         Initializes a Send Event
@@ -116,6 +116,7 @@ class SendEvent(Event):
         self._id: int = 0
         self._end_time: float = _end_time
         self._node_id: int = _node_id
+        self._receiver: int = _receiver
         
     def __repr__(self) -> str:
         
@@ -129,7 +130,7 @@ class SendEvent(Event):
             _event (str): printable representation of Event
         """
         
-        return f'Send Event Node: {self._node_id} Time: {self._end_time}'
+        return f'Send Event Node: {self._node_id} Receiver: {self._receiver} Time: {self._end_time}'
 
 class ReceiveEvent(Event):
     
@@ -142,7 +143,7 @@ class ReceiveEvent(Event):
         _node_id (int): ID of Host which scheduled event
     """
     
-    def __init__(self, _end_time: float, _node_id: int) -> None:
+    def __init__(self, _end_time: float, _node_id: int, _sender: int) -> None:
         
         """
         Initializes a Receive Event
@@ -158,6 +159,7 @@ class ReceiveEvent(Event):
         self._id: int = 1
         self._end_time: float = _end_time
         self._node_id: int = _node_id
+        self._sender: int = _sender
         
     def __repr__(self) -> str:
         
@@ -171,7 +173,7 @@ class ReceiveEvent(Event):
             _event (str): printable representation of Event
         """
         
-        return f'Receive Event Node: {self._node_id} Time: {self._end_time}'
+        return f'Receive Event Node: {self._node_id} Sender: {self._sender} Time: {self._end_time}'
     
 class GateEvent(Event):
     

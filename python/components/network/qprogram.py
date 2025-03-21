@@ -214,7 +214,7 @@ class L1_EGP(QProgram):
         
         Args:
             receiver (int): receiver of bell pairs
-            num_requested (int): number of requested bell pairs
+            requested (int): number of requested bell pairs
             estimate (bool): whether to estimate the number of needed qubits or not
             
         Returns:
@@ -230,7 +230,7 @@ class L1_EGP(QProgram):
         
         Args:
             receiver (int): receiver of bell pairs
-            num_requested (int): number of requested bell pairs
+            requested (int): number of requested bell pairs
             
         Returns:
             /
@@ -710,12 +710,12 @@ class L3_QFP(QProgram):
             /
         """
         
-        if packet.l3_num_needed > self.host.memory_size(packet.l2_dst, 0):
+        if packet.l3_needed > self.host.memory_size(packet.l2_dst, 0):
             await self.reject_packet(packet)
             return
         
-        if packet.l3_num_needed > self.host.l3_num_qubits(packet.l2_dst, 0):
-            offset_index = self.host.l3_add_offset(packet.l2_src, 1, packet.l3_num_needed)
+        if packet.l3_needed > self.host.l3_num_qubits(packet.l2_dst, 0):
+            offset_index = self.host.l3_add_offset(packet.l2_src, 1, packet.l3_needed)
             self.host.l3_store_packet(packet.l2_dst, 0, packet, offset_index)
             await self.prev_protocol.prev_protocol.quantum_data_plane(packet.l2_dst, self.host.remaining_space(packet.l2_dst, 0), True)
             return
