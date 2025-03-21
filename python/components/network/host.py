@@ -84,7 +84,7 @@ class Host:
             /
         """
         
-        self.id: int = node_id
+        self._node_id: int = node_id
         self._sim: Simulation = sim
         
         self._qprograms: Dict[int, QProgram] = {layer: qprogram for layer, qprogram in {L1: l1_qprogram, L2: l2_qprogram, L3: l3_qprogram, L4: l4_qprogram, L7: l7_qprogram}.items() if qprogram.layer}
