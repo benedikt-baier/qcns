@@ -61,7 +61,7 @@ class Host:
         stop (bool): stop flag for infinitly running hosts  
     """
     
-    def __init__(self, node_id: int, sim: Simulation, l1_qprogram: QProgram=QProgram(), l2_qprogram: QProgram=QProgram(), l3_qprogram: QProgram=QProgram(),
+    def __init__(self, node_id: int, sim: Simulation, stop: bool=True, l1_qprogram: QProgram=QProgram(), l2_qprogram: QProgram=QProgram(), l3_qprogram: QProgram=QProgram(),
                  l4_qprogram: QProgram=QProgram(), l7_qprogram: QProgram=QProgram(), gate_duration: Dict[str, float]=_GATE_DURATION, 
                  gate_parameters: Dict[str, float]=_GATE_PARAMETERS, pulse_duration: float=10**(-11)) -> None:
         
@@ -71,6 +71,7 @@ class Host:
         Args:
             node_id (int): ID of Host
             sim (Simulation): Simulation
+            stop (bool): whether the Host has a finite number of events
             l1_qprogram (QProgram): Program handling L1 packets
             l2_qprogram (QProgram): Program handling L2 packets
             l3_qprogram (QProgram): Program handling L3 packets
@@ -114,7 +115,7 @@ class Host:
         self._packets: Dict[int, Dict[int, Dict[int, List[Packet]]]] = {}
         
         self._resume: Dict[int, asc.Event] = {0: asc.Event(), 1: asc.Event(), 2: asc.Event()}
-        self.stop: bool = False
+        self.stop: bool = stop
     
         self.run = partial(self.log_exceptions, self.run)
         self._sim.add_host(self)
@@ -145,10 +146,13 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(StopEvent(self.id))
+        if not self.stop:
+            self._sim.schedule_event(StopEvent(self.id))
         
         try:
             await func()
+            if self.stop:
+                self._sim.schedule_event(StopEvent(self.id))
         except Exception as e:
             logging.error(f'Host {self.id} has Exception')
             logging.error(traceback.format_exc())
