@@ -540,6 +540,8 @@ class Host:
             _num_needed = int(np.ceil(_num_needed / self._connections['sqs'][receiver][SEND]._success_prob))
         
         self._connections['sqs'][receiver][SEND].attempt_qubit(_num_needed)
+        
+        self._sim._resume.set()
 
     async def create_qubit(self, receiver: int, num_requested: int=1) -> None:
         
@@ -560,6 +562,8 @@ class Host:
         self._resume[SEND].clear()
         
         self._connections['sqs'][receiver][SEND].create_qubit(num_requested)
+        
+        self._sim._resume.set()
     
     async def attempt_bell_pairs(self, receiver: int, num_requested: int=1, estimate: bool=False) -> None:
         
@@ -594,6 +598,8 @@ class Host:
             num_requested = _num_needed
         
         self._connections['eqs'][receiver].attempt_bell_pairs(num_requested, _num_needed)
+        
+        self._sim._resume.set()
     
     async def create_bell_pairs(self, receiver: int, num_requested: int=1) -> None:
         
@@ -620,6 +626,8 @@ class Host:
             return
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
+        
+        self._sim._resume.set()
     
     async def apply_gate(self, gate: str, *args: List[Any], combine: bool=False, remove: bool=False) -> Union[int, None]:
         
