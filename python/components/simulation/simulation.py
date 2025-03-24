@@ -39,11 +39,8 @@ class Simulation:
         self._event_queue: List[Event] = []
         self._hosts: List[Host] = []
         self._num_hosts: int = 0
-        self._sim_time: float = 0.
         self._sim_end_time: float = end_time
         self._logging_path: str = logging_path
-        
-        self._resume: asc.Event = asc.Event()
         
         _handle_events = {0: self._handle_event, 1: self._handle_event_end_time}
         self._handle_events: Awaitable = _handle_events[self._sim_end_time > 0.]
@@ -53,6 +50,7 @@ class Simulation:
         if self._logging_path and os.path.exists(self._logging_path):
             with open(self._logging_path, 'w'):
                 pass
+            
         if self._logging_path:
             logging.basicConfig(filename=self._logging_path, level=logging.DEBUG)
     
@@ -185,18 +183,17 @@ class Simulation:
             
             event = heappop(self._event_queue)
             
-            logging.info(event)
-            
             if event._id == -1:
                 self._num_hosts -= 1
                 continue
             
-            self._sim_time = event._end_time
-            self._hosts[event._node_id]._resume[event._id].set()
+            logging.info(event)
             
-            if event._id != 1:
-                await self._resume.wait()
-                self._resume.clear()
+            if event._end_time > self._hosts[event._node_id]._time:
+                self._hosts[event._node_id]._time = event._end_time
+            
+            if event._id == 1:
+                self._hosts[event._node_id]._resume[event._id].set()
             
         self.stop_simulation()
     
@@ -225,17 +222,20 @@ class Simulation:
             
             event = heappop(self._event_queue)
             
-            logging.info(event)
-            
-            if not (event._id + 1):
+            if event._id == -1:
                 self._num_hosts -= 1
                 continue
             
             if event._end_time > self._sim_end_time:
                 continue
             
-            self._sim_time = event._end_time
-            self._hosts[event._node_id]._resume[event._id].set()
+            logging.info(event)
+            
+            if event._end_time > self._hosts[event._node_id]._time:
+                self._hosts[event._node_id]._time = event._end_time
+            
+            if event._id == 1:
+                self._hosts[event._node_id]._resume[event._id].set()
             
         self.stop_simulation()
     

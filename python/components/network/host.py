@@ -109,14 +109,14 @@ class Host:
         
         self._connections: Dict[str, Dict[str, Any]] = {'sqs': {}, 'eqs': {}, 'packet': {}, 'memory': {}}
         self._neighbors: Set[int] = set()
-        self._qubit_buffer: List[Qubit] = []
-        self._packet_buffer: List[Packet] = []
+        
+        self._time: float = 0.
         
         self._layer_results: Dict[int, Dict[int, Dict[int, List[np.array]]]] = {}
         
         self._packets: Dict[int, Dict[int, Dict[int, List[Packet]]]] = {}
         
-        self._resume: Dict[int, asc.Event] = {0: asc.Event(), 1: asc.Event(), 2: asc.Event()}
+        self._resume: Dict[int, asc.Event] = {SEND: asc.Event(), RECEIVE: asc.Event(), GATE: asc.Event()}
         self.stop: bool = stop
     
         self.run = partial(self.log_exceptions, self.run)
@@ -530,18 +530,13 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
-        
-        await self._resume[SEND].wait()
-        self._resume[SEND].clear()
+        self._sim.schedule_event(SendEvent(self._time, self.id))
         
         _num_needed = num_requested
         if estimate:
             _num_needed = int(np.ceil(_num_needed / self._connections['sqs'][receiver][SEND]._success_prob))
         
         self._connections['sqs'][receiver][SEND].attempt_qubit(_num_needed)
-        
-        self._sim._resume.set()
 
     async def create_qubit(self, receiver: int, num_requested: int=1) -> None:
         
@@ -556,14 +551,9 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
-        
-        await self._resume[SEND].wait()
-        self._resume[SEND].clear()
+        self._sim.schedule_event(SendEvent(self._time, self.id))
         
         self._connections['sqs'][receiver][SEND].create_qubit(num_requested)
-        
-        self._sim._resume.set()
     
     async def attempt_bell_pairs(self, receiver: int, num_requested: int=1, estimate: bool=False) -> None:
         
@@ -579,10 +569,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
-        
-        await self._resume[SEND].wait()
-        self._resume[SEND].clear()
+        self._sim.schedule_event(SendEvent(self._time, self.id))
         
         _num_needed = num_requested
         if estimate:
@@ -598,8 +585,6 @@ class Host:
             num_requested = _num_needed
         
         self._connections['eqs'][receiver].attempt_bell_pairs(num_requested, _num_needed)
-        
-        self._sim._resume.set()
     
     async def create_bell_pairs(self, receiver: int, num_requested: int=1) -> None:
         
@@ -614,10 +599,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
-        
-        await self._resume[SEND].wait()
-        self._resume[SEND].clear()
+        self._sim.schedule_event(SendEvent(self._time, self.id))
         
         if not self.has_space(receiver, 0, num_requested):
             num_requested = self.remaining_space(receiver, 0)
@@ -626,10 +608,8 @@ class Host:
             return
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
-        
-        self._sim._resume.set()
     
-    async def apply_gate(self, gate: str, *args: List[Any], combine: bool=False, remove: bool=False) -> Union[int, None]:
+    def apply_gate(self, gate: str, *args: List[Any], combine: bool=False, remove: bool=False) -> Union[int, None]:
         
         """
         Applys a gate to qubits
@@ -644,10 +624,8 @@ class Host:
             res (int/None): result of the gate
         """
         
-        self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(gate, 5e-6), self.id))
-        
-        await self._resume[GATE].wait()
-        self._resume[GATE].clear()
+        self._time += self._gate_duration.get(gate, 5e-6)
+        self._sim.schedule_event(GateEvent(self._time + self._gate_duration.get(gate, 5e-6), self.id))
         
         if combine and gate in ['CNOT', 'CY', 'CZ', 'CH', 'CPHASE', 'CU', 'SWAP', 'bell_state', 'bsm', 'prob_bsm']:
             combine_state(args[:2])
@@ -661,11 +639,9 @@ class Host:
         if remove and gate in ['bsm', 'prob_bsm']:
             remove_qubits(args[:2])
         
-        self._sim._resume.set()
-        
         return res
     
-    async def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
+    def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
         
         """
         Purifies two qubits in the store given the indices
@@ -683,12 +659,10 @@ class Host:
             res (int): measurement result
         """
         
-        self._sim.schedule_event(GateEvent(self._sim._sim_time + self._gate_duration.get(gate, 5e-6), self.id))
+        self._time += self._gate_duration.get(gate, 5e-6)
+        self._sim.schedule_event(GateEvent(self._time, self.id))
         
-        await self._resume[GATE].wait()
-        self._resume[GATE].clear()
-        
-        _qubit_src, _qubit_dst = self._connections['memory'][host][store].purify(index_src, index_dst, self._sim._sim_time)
+        _qubit_src, _qubit_dst = self._connections['memory'][host][store].purify(index_src, index_dst, self._time)
         
         combine_state([_qubit_src, _qubit_dst])
         
@@ -696,9 +670,7 @@ class Host:
         
         remove_qubits([_qubit_dst])
         
-        self._connections['memory'][host][store].store_qubit(L2, _qubit_src, -1, self._sim._sim_time)
-        
-        self._sim._resume.set()
+        self._connections['memory'][host][store].store_qubit(L2, _qubit_src, -1, self._time)
         
         return _res
     
@@ -715,15 +687,11 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver))
         
-        await self._resume[SEND].wait()
-        self._resume[SEND].clear()
+        self._sim.schedule_event(SendEvent(self._time, self.id))
+        self._sim.schedule_event(ReceiveEvent(self._time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver))
         
         self._connections['sqs'][receiver][SEND].put(qubit)
-        
-        self._sim._resume.set()
     
     async def receive_qubit(self, sender: int=None, time_out: float=None) -> Union[Qubit, None]:
         
@@ -737,10 +705,6 @@ class Host:
             _qubit (Qubit): received qubit
         """
         
-        if self._qubit_buffer:
-            self._resume[RECEIVE].set()
-            return self._qubit_buffer.pop(0)
-        
         try:
             await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
             self._resume[RECEIVE].clear()
@@ -752,12 +716,7 @@ class Host:
         
         for _sender in self.neighbors:
             if not self._connections['sqs'][_sender][RECEIVE].empty():
-                self._qubit_buffer.append(self._connections['sqs'][_sender][RECEIVE].get())
-                
-        if not self._qubit_buffer:
-            return None
-        
-        return self._qubit_buffer.pop(0)
+                return self._connections['sqs'][_sender][RECEIVE].get()
          
     async def send_packet(self, _packet: Packet) -> None:
         
@@ -771,15 +730,11 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time + len(_packet) * self._pulse_duration, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst))
-        
-        await self._resume[SEND].wait()
-        self._resume[SEND].clear()
+        self._time += len(_packet) * self._pulse_duration
+        self._sim.schedule_event(SendEvent(self._time, self.id))
+        self._sim.schedule_event(ReceiveEvent(self._time + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst))
         
         self._connections['packet'][_packet.l2_dst][SEND].put(_packet)
-        
-        self._sim._resume.set()
         
     async def receive_packet(self, sender: int=None, time_out: float=None) -> Union[Packet, None]:
         
@@ -793,30 +748,20 @@ class Host:
             _packet (Packet): received packet
         """
         
-        if self._packet_buffer:
-            self._resume[RECEIVE].clear()
-            return self._packet_buffer.pop(0)
-        
         try:
             await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
             self._resume[RECEIVE].clear()
         except asc.TimeoutError:
-            self._resume[RECEIVE].clear()
             return None
         
         if sender is not None:
             return self._connections['packet'][sender][RECEIVE].get()
-            
+        
         for _sender in self.neighbors:
             if not self._connections['packet'][_sender][RECEIVE].empty():
-                self._packet_buffer.append(self._connections['packet'][_sender][RECEIVE].get())
-        
-        if not self._packet_buffer:
-            return None
-        
-        return self._packet_buffer.pop(0)
+                return self._connections['packet'][_sender][RECEIVE].get()
     
-    async def wait(self, duration: float) -> None:
+    def wait(self, duration: float) -> None:
         
         """
         Waits the defined seconds
@@ -828,13 +773,9 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(WaitEvent(self._sim._sim_time + duration, self.id))
-    
-        await self._resume[GATE].wait()
-        self._resume[GATE].clear()
-        
-        self._sim._resume.set()
-    
+        self._time += duration
+        self._sim.schedule_event(WaitEvent(self._time, self.id))
+
     @property
     def id(self) -> int:
         
@@ -849,21 +790,6 @@ class Host:
         """
         
         return self._node_id
-    
-    @property
-    def sim_time(self) -> float:
-        
-        """
-        Returns the current simulation time
-        
-        Args:
-            /
-            
-        Returns:
-            sim_time (float): current simulation time
-        """
-        
-        return self._sim._sim_time
     
     @property
     def neighbors(self) -> Set[int]:
@@ -1017,7 +943,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L0, qubit, index, self._sim._sim_time)
+        self._connections['memory'][host][store].store_qubits(L0, qubit, index, self._time)
         
     def l1_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -1034,7 +960,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L1, qubit, index, self._sim._sim_time)
+        self._connections['memory'][host][store].store_qubits(L1, qubit, index, self._time)
         
     def l2_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -1051,7 +977,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L2, qubit, index, self._sim._sim_time)
+        self._connections['memory'][host][store].store_qubits(L2, qubit, index, self._time)
         
     def l3_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -1068,7 +994,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L3, qubit, index, self._sim._sim_time)
+        self._connections['memory'][host][store].store_qubits(L3, qubit, index, self._time)
         
     def l0_retrieve_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
         
@@ -1084,7 +1010,7 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L0, index, self._sim._sim_time)
+        return self._connections['memory'][host][store].retrieve_qubit(L0, index, self._time)
     
     def l1_retrieve_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
         
@@ -1100,7 +1026,7 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L1, index, self._sim._sim_time)
+        return self._connections['memory'][host][store].retrieve_qubit(L1, index, self._time)
     
     def l2_retrieve_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
         
@@ -1116,7 +1042,7 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L2, index, self._sim._sim_time)
+        return self._connections['memory'][host][store].retrieve_qubit(L2, index, self._time)
     
     def l3_retrieve_qubit(self, host: int, store: int, index: int=None, offset_index: int=None) -> Union[Qubit, None]:
         
@@ -1133,7 +1059,7 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L3, index, self._sim._sim_time, offset_index)
+        return self._connections['memory'][host][store].retrieve_qubit(L3, index, self._time, offset_index)
     
     def l0_peek_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
         
@@ -1399,7 +1325,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L0, index, self._sim._sim_time)
+        return self._connections['memory'][host][store].estimate_fidelity(L0, index, self._time)
     
     def l1_estimate_fidelity(self, host: int, store: int, index: int=None) -> float:
         
@@ -1415,7 +1341,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L1, index, self._sim._sim_time)
+        return self._connections['memory'][host][store].estimate_fidelity(L1, index, self._time)
     
     def l2_estimate_fidelity(self, host: int, store: int, index: int=None) -> float:
         
@@ -1431,7 +1357,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L2, index, self._sim._sim_time)
+        return self._connections['memory'][host][store].estimate_fidelity(L2, index, self._time)
     
     def l3_estimate_fidelity(self, host: int, store: int, index: int=None) -> float:
         
@@ -1447,7 +1373,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L3, index, self._sim._sim_time)
+        return self._connections['memory'][host][store].estimate_fidelity(L3, index, self._time)
     
     def l1_check_results(self, host: int, store: int) -> bool:
         
