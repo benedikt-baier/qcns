@@ -530,7 +530,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -554,7 +554,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -575,7 +575,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -608,7 +608,7 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
@@ -707,8 +707,8 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id, receiver))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver, self.id))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time, self.id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
