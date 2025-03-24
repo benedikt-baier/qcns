@@ -87,10 +87,10 @@ class QChannel:
         
         if np.random.uniform(0, 1) > self._in_coupling_prob:
             remove_qubits([_qubit])
-            self._channel.put(None)
+            self._channel.put_nowait(None)
             return
         
-        self._channel.put(_qubit)
+        self._channel.put_nowait(_qubit)
 
     def get(self) -> Union[Qubit, None]:
         
@@ -169,7 +169,7 @@ class PChannel:
             /
         """
         
-        self._channel.put(_packet)
+        self._channel.put_nowait(_packet)
         
     def get(self) -> Packet:
         

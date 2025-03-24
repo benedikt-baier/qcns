@@ -109,6 +109,8 @@ class Host:
         
         self._connections: Dict[str, Dict[str, Any]] = {'sqs': {}, 'eqs': {}, 'packet': {}, 'memory': {}}
         self._neighbors: Set[int] = set()
+        self._qubit_buffer: List[Qubit] = []
+        self._packet_buffer: List[Packet] = []
         
         self._layer_results: Dict[int, Dict[int, Dict[int, List[np.array]]]] = {}
         
@@ -651,6 +653,8 @@ class Host:
         if remove and gate in ['bsm', 'prob_bsm']:
             remove_qubits(args[:2])
         
+        self._sim._resume.set()
+        
         return res
     
     async def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
@@ -686,6 +690,8 @@ class Host:
         
         self._connections['memory'][host][store].store_qubit(L2, _qubit_src, -1, self._sim._sim_time)
         
+        self._sim._resume.set()
+        
         return _res
     
     async def send_qubit(self, receiver: int, qubit: Qubit) -> None:
@@ -707,7 +713,9 @@ class Host:
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
         
-        self._connections['sqs'][receiver][SEND]._channel.put(qubit)
+        self._connections['sqs'][receiver][SEND].put(qubit)
+        
+        self._sim._resume.set()
     
     async def receive_qubit(self, sender: int=None, time_out: float=None) -> Union[Qubit, None]:
         
@@ -721,6 +729,10 @@ class Host:
             _qubit (Qubit): received qubit
         """
         
+        if self._qubit_buffer:
+            self._resume[RECEIVE].set()
+            return self._qubit_buffer.pop(0)
+        
         try:
             await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
             self._resume[RECEIVE].clear()
@@ -732,7 +744,12 @@ class Host:
         
         for _sender in self.neighbors:
             if not self._connections['sqs'][_sender][RECEIVE].empty():
-                return self._connections['sqs'][_sender][RECEIVE].get()
+                self._qubit_buffer.append(self._connections['sqs'][_sender][RECEIVE].get())
+                
+        if not self._qubit_buffer:
+            return None
+        
+        return self._qubit_buffer.pop(0)
          
     async def send_packet(self, _packet: Packet) -> None:
         
@@ -746,13 +763,15 @@ class Host:
             /
         """
         
-        self._sim.schedule_event(SendEvent(self._sim._sim_time + len(_packet) * self._pulse_duration, self.id, _packet.l2_dst))
-        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst, _packet.l2_src))
+        self._sim.schedule_event(SendEvent(self._sim._sim_time + len(_packet) * self._pulse_duration, self.id))
+        self._sim.schedule_event(ReceiveEvent(self._sim._sim_time + len(_packet) * self._pulse_duration + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst))
         
         await self._resume[SEND].wait()
         self._resume[SEND].clear()
         
         self._connections['packet'][_packet.l2_dst][SEND].put(_packet)
+        
+        self._sim._resume.set()
         
     async def receive_packet(self, sender: int=None, time_out: float=None) -> Union[Packet, None]:
         
@@ -766,18 +785,28 @@ class Host:
             _packet (Packet): received packet
         """
         
+        if self._packet_buffer:
+            self._resume[RECEIVE].clear()
+            return self._packet_buffer.pop(0)
+        
         try:
             await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
             self._resume[RECEIVE].clear()
         except asc.TimeoutError:
+            self._resume[RECEIVE].clear()
             return None
         
         if sender is not None:
             return self._connections['packet'][sender][RECEIVE].get()
-        
+            
         for _sender in self.neighbors:
             if not self._connections['packet'][_sender][RECEIVE].empty():
-                return self._connections['packet'][_sender][RECEIVE].get()
+                self._packet_buffer.append(self._connections['packet'][_sender][RECEIVE].get())
+        
+        if not self._packet_buffer:
+            return None
+        
+        return self._packet_buffer.pop(0)
     
     async def wait(self, duration: float) -> None:
         
@@ -795,6 +824,8 @@ class Host:
     
         await self._resume[GATE].wait()
         self._resume[GATE].clear()
+        
+        self._sim._resume.set()
     
     @property
     def id(self) -> int:

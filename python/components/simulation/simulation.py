@@ -23,7 +23,7 @@ class Simulation:
         _sim_time (float): current simulation time
     """
     
-    def __init__(self, end_time: float=None, logging_path: str='') -> None:
+    def __init__(self, end_time: float=0, logging_path: str='') -> None:
         
         """
         Initializes a Simulation object
@@ -43,8 +43,10 @@ class Simulation:
         self._sim_end_time: float = end_time
         self._logging_path: str = logging_path
         
+        self._resume: asc.Event = asc.Event()
+        
         _handle_events = {0: self._handle_event, 1: self._handle_event_end_time}
-        self._handle_events: Awaitable = _handle_events[self._sim_end_time is not None]
+        self._handle_events: Awaitable = _handle_events[self._sim_end_time > 0.]
         
         if logging_path and not os.path.exists(os.path.dirname(self._logging_path)):
             os.makedirs(os.path.dirname(self._logging_path))
@@ -185,12 +187,16 @@ class Simulation:
             
             logging.info(event)
             
-            if not (event._id + 1):
+            if event._id == -1:
                 self._num_hosts -= 1
                 continue
             
             self._sim_time = event._end_time
-            self._hosts[event._node_id]._resume[event._id].set() 
+            self._hosts[event._node_id]._resume[event._id].set()
+            
+            if event._id != 1:
+                await self._resume.wait()
+                self._resume.clear()
             
         self.stop_simulation()
     
@@ -233,7 +239,7 @@ class Simulation:
             
         self.stop_simulation()
     
-    def run(self, end_time: float=None) -> None:
+    def run(self, end_time: float=0) -> None:
         
         """
         Runs the simulation by handling all Events in the event queue
@@ -245,9 +251,9 @@ class Simulation:
             /
         """
         
-        self._hosts = {host._node_id: host for host in self._hosts}
+        self._hosts = {host.id: host for host in self._hosts}
         
-        if end_time is not None:
+        if end_time > 0.:
             self.set_end_time(end_time)
         
         asc.run(self._handle_events())

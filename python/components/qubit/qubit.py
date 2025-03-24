@@ -369,7 +369,7 @@ def get_swap_operator(_sparse: bool, _index_1: int, _index_2: int, _num_qubits: 
 def depolarization_error(_sparse: bool, _qubit: Qubit, _fidelity: float) -> None:
     
     """
-    Applys a depolarization error to the qubit given a fidelity
+    Applies a depolarization error to the qubit given a fidelity
     
     Args:
         _sparse (bool): sparsity of QSystem
@@ -674,7 +674,7 @@ class Qubit:
     def X(self, fidelity: float=1., apply: bool=True) -> None:
 
         """
-        Applys the X gate to the qubit
+        Applies the X gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -696,7 +696,7 @@ class Qubit:
     def Y(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the Y gate to the qubit
+        Applies the Y gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -718,7 +718,7 @@ class Qubit:
     def Z(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the Z gate to the qubit
+        Applies the Z gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -740,7 +740,7 @@ class Qubit:
     def H(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the Hadamard gate to the qubit
+        Applies the Hadamard gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -762,7 +762,7 @@ class Qubit:
     def SX(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the square root X gate to the qubit
+        Applies the square root X gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -784,7 +784,7 @@ class Qubit:
     def SY(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the square root Y gate to the qubit
+        Applies the square root Y gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -806,7 +806,7 @@ class Qubit:
     def SZ(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the square root Z gate to the qubit
+        Applies the square root Z gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -828,7 +828,7 @@ class Qubit:
     def T(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the T gate to the qubit
+        Applies the T gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -850,7 +850,7 @@ class Qubit:
     def K(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the K gate to the qubit
+        Applies the K gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -872,7 +872,7 @@ class Qubit:
     def iSX(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the inverse square root X gate to the qubit
+        Applies the inverse square root X gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -894,7 +894,7 @@ class Qubit:
     def iSY(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the inverse square root Y gate to the qubit
+        Applies the inverse square root Y gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -916,7 +916,7 @@ class Qubit:
     def iSZ(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the inverse square root Z gate to the qubit
+        Applies the inverse square root Z gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -938,7 +938,7 @@ class Qubit:
     def iT(self, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the inverse of T gate to the qubit
+        Applies the inverse of T gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -960,7 +960,7 @@ class Qubit:
     def iK(self, fidelity: float=1., apply: bool=True):
         
         """
-        Applys the inverse of K gate to the qubit
+        Applies the inverse of K gate to the qubit
         
         Args:
             fidelity (float): fidelity of the depolarization error
@@ -982,7 +982,7 @@ class Qubit:
     def Rx(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the rotation gate around the x axis to the qubit
+        Applies the rotation gate around the x axis to the qubit
         
         Args:
             theta (float): angle for the rotation matrix
@@ -1008,7 +1008,7 @@ class Qubit:
     def Ry(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the rotation gate around the y axis to the qubit
+        Applies the rotation gate around the y axis to the qubit
         
         Args:
             theta (float): angle for the rotation matrix
@@ -1034,7 +1034,7 @@ class Qubit:
     def Rz(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the rotation gate around the z axis to the qubit
+        Applies the rotation gate around the z axis to the qubit
         
         Args:
             theta (float): angle for the rotation matrix
@@ -1060,7 +1060,7 @@ class Qubit:
     def PHASE(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the PHASE gate to the qubit
+        Applies the PHASE gate to the qubit
         
         Args:
             theta (float): angle for the rotation matrix
@@ -1086,7 +1086,7 @@ class Qubit:
     def general_rotation(self, theta: float, phi: float, psi: float, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys a general rotation to a single qubit
+        Applies a general rotation to a single qubit
         
         Args:
             theta (float): angle theta
@@ -1114,7 +1114,7 @@ class Qubit:
     def custom_single_gate(self, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys a custom gate to the qubit
+        Applies a custom gate to the qubit
         
         Args:
             gate (np.array): unitary gate to apply
@@ -1137,7 +1137,7 @@ class Qubit:
     def CNOT(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the CNOT gate to a target qubit, with this qubit as the controll qubit
+        Applies the CNOT gate to a target qubit, with this qubit as the controll qubit
         
         Args:
             target (qubit): target qubit to apply the CNOT gate to
@@ -1161,7 +1161,7 @@ class Qubit:
     def CX(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the CNOT gate to a target qubit, with this qubit as the controll qubit
+        Applies the CNOT gate to a target qubit, with this qubit as the controll qubit
         
         Args:
             target (qubit): target qubit to apply the CNOT gate to
@@ -1185,7 +1185,7 @@ class Qubit:
     def CY(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the CY gate to a target qubit, with this qubit as the control qubit
+        Applies the CY gate to a target qubit, with this qubit as the control qubit
         
         Args:
             target (qubit): target qubit to apply the CNOT gate to
@@ -1209,7 +1209,7 @@ class Qubit:
     def CZ(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the CZ gate to a target qubit, with this qubit as the control qubit
+        Applies the CZ gate to a target qubit, with this qubit as the control qubit
         
         Args:
             target (qubit): target qubit to apply the CNOT gate to
@@ -1233,7 +1233,7 @@ class Qubit:
     def CH(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the CH gate to a target qubit, with this qubit as the control qubit
+        Applies the CH gate to a target qubit, with this qubit as the control qubit
         
         Args:
             target (qubit): target qubit to apply the CNOT gate to
@@ -1257,7 +1257,7 @@ class Qubit:
     def CPHASE(self, target: Qubit, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the CPHASE gate to a target qubit, with this qubit as the controll qubit
+        Applies the CPHASE gate to a target qubit, with this qubit as the controll qubit
         
         Args:
             target (qubit): target qubit to apply the CPHASE gate to
@@ -1285,7 +1285,7 @@ class Qubit:
     def CU(self, target: Qubit, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys a custom gate to a target qubit, with this qubit as the controll qubit
+        Applies a custom gate to a target qubit, with this qubit as the controll qubit
         
         Args:
             target (qubit): target qubit to apply a custom gate to
@@ -1336,7 +1336,7 @@ class Qubit:
     def iSWAP(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the Imaginary Swap gate to this qubit and target qubit
+        Applies the Imaginary Swap gate to this qubit and target qubit
         
         Args:
             target (qubit): target qubit to apply the CPHASE gate to
@@ -1363,7 +1363,7 @@ class Qubit:
     def QAND(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the quantum AND gate to the target qubit with this qubit and control qubit as control qubits
+        Applies the quantum AND gate to the target qubit with this qubit and control qubit as control qubits
         
         Args:
             control (qubit): second control qubit
@@ -1391,7 +1391,7 @@ class Qubit:
     def QOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the quantum OR gate to the target qubit with this qubit and control qubit as control qubits
+        Applies the quantum OR gate to the target qubit with this qubit and control qubit as control qubits
         
         Args:
             control (qubit): second control qubit
@@ -1419,7 +1419,7 @@ class Qubit:
     def QXOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the quantum XOR gate to the target qubit with this qubit and control qubit as control qubits
+        Applies the quantum XOR gate to the target qubit with this qubit and control qubit as control qubits
         
         Args:
             control (qubit): second control qubit
@@ -1447,7 +1447,7 @@ class Qubit:
     def QNAND(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the quantum NAND gate to the target qubit with this qubit and control qubit as control qubits
+        Applies the quantum NAND gate to the target qubit with this qubit and control qubit as control qubits
         
         Args:
             control (qubit): second control qubit
@@ -1475,7 +1475,7 @@ class Qubit:
     def QNOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the quantum NOR gate to the target qubit with this qubit and control qubit as control qubits
+        Applies the quantum NOR gate to the target qubit with this qubit and control qubit as control qubits
         
         Args:
             control (qubit): second control qubit
@@ -1503,7 +1503,7 @@ class Qubit:
     def QXNOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the quantum XNOR gate to the target qubit with this qubit and control qubit as control qubits
+        Applies the quantum XNOR gate to the target qubit with this qubit and control qubit as control qubits
         
         Args:
             control (qubit): second control qubit
@@ -1531,7 +1531,7 @@ class Qubit:
     def CCU(self, control: Qubit, target: Qubit, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys a custom unitary gate to controled by this qubit and control qubit
+        Applies a custom unitary gate to controled by this qubit and control qubit
         
         Args:
             control (qubit): second control qubit
@@ -1560,7 +1560,7 @@ class Qubit:
     def CSWAP(self, target1: Qubit, target2: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
         """
-        Applys the CSWAP gate with self as control and target1 and target2 as targets
+        Applies the CSWAP gate with self as control and target1 and target2 as targets
         
         Args:
             target1 (qubit): first target qubit
@@ -1751,7 +1751,7 @@ class Qubit:
     def custom_gate(self, gate: np.array) -> None:
         
         """
-        Applys a custom gate to the qubit
+        Applies a custom gate to the qubit
         
         Args:
             gate (np.array): unitary gate to apply
