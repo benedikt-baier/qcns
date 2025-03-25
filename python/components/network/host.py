@@ -116,7 +116,7 @@ class Host:
         
         self._packets: Dict[int, Dict[int, Dict[int, List[Packet]]]] = {}
         
-        self._resume: Dict[int, asc.Event] = {SEND: asc.Event(), RECEIVE: asc.Event(), GATE: asc.Event()}
+        self._resume: asc.Event = asc.Event()
         self.stop: bool = stop
     
         self.run = partial(self.log_exceptions, self.run)
@@ -369,11 +369,11 @@ class Host:
         self._connections['packet'][host.id] = {SEND: channel_s, RECEIVE: channel_r}
         host._connections['packet'][self.id] = {SEND: channel_r, RECEIVE: channel_s}
     
-        self._layer_results[host.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
-        host._layer_results[self.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
+        self._layer_results[host.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
+        host._layer_results[self.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
         
-        self._packets[host.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
-        host._packets[self.id] = {SEND: [[], [], []], RECEIVE: [[], [], []]}
+        self._packets[host.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
+        host._packets[self.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
     
     def set_connection(self, host: Host, sender_type: str='sr', sender_model: str='perfect', 
                         receiver_type: str='sr', receiver_model: str='perfect',
