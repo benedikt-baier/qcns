@@ -449,6 +449,9 @@ def combine_gates(_sparse: bool, gate_l: List[np.array]) -> np.array:
         gate_n (np.array): new gate
     """
     
+    if len(gate_l) < 2:
+        return gate_l[0]
+    
     return reduce(_COMBINE_DICT[_sparse], gate_l[::-1])
     
 def ptrace_full(_q: Qubit) -> None:

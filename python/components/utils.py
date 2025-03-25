@@ -7,9 +7,10 @@ from numpy import pi
 import networkx as nx
 import scipy.sparse as sp
 
-from typing import List, Dict
+from typing import List, Dict, Any
 
 from qcns.python.components.qubit import combine_gates
+from qcns.python.components.network.host import Host
 
 class Qubit:
     pass
@@ -246,90 +247,84 @@ def load_config(path: str) -> None:
     
     return graph, data['num_routers'], data['num_clients'], data['routing_table'], data['traffic_type'], np.array(data['traffic_matrix']), data['connection_type']
 
-def apply_circuit(circuit, qubits, classical_bits=None):
+def apply_circuit(circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
     
     gates = []
     
     for circuit_p in circuit:
         
         if circuit_p[0] == 'U':
-            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=False))
+            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=apply))
             continue
         if circuit_p[0] == 'CNOT':
-            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=False))
+            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=apply))
             continue
         if circuit_p[0] == 'Rx':
-            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=False))
+            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=apply))
             continue
         if circuit_p[0] == 'Ry':
-            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=False))
+            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=apply))
             continue
         if circuit_p[0] == 'Rz':
-            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=False))
-            continue
-        if circuit_p[0] == 'measure':
-            classical_bits[circuit_p[2]] = qubits[circuit_p[1]].measure()
+            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=apply))
             continue
         if circuit_p[0] == 'x':
-            gates.append(qubits[circuit_p[1]].X(apply=False))
+            gates.append(qubits[circuit_p[1]].X(apply=apply))
             continue
         if circuit_p[0] == 'y':
-            gates.append(qubits[circuit_p[1]].Y(apply=False))
+            gates.append(qubits[circuit_p[1]].Y(apply=apply))
             continue
         if circuit_p[0] == 'z':
-            gates.append(qubits[circuit_p[1]].Z(apply=False))
+            gates.append(qubits[circuit_p[1]].Z(apply=apply))
             continue
         if circuit_p[0] == 'h':
-            gates.append(qubits[circuit_p[1]].H(apply=False))
+            gates.append(qubits[circuit_p[1]].H(apply=apply))
             continue
     
-    if not gates:
+    if apply:
         return
     
     gate = combine_gates(0, gates)
     
-    next(iter(qubits.values())).custom_gate(gate)
-
-async def dqc_apply_circuit(host, circuit, qubits):
+    next(iter(qubits)).custom_gate(gate)
+    
+def dqc_apply_circuit(host: Host, circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
     
     gates = []
     
     for circuit_p in circuit:
         
         if circuit_p[0] == 'U':
-            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=False))
+            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=apply))
             continue
         if circuit_p[0] == 'CNOT':
-            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=False))
+            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=apply))
             continue
         if circuit_p[0] == 'Rx':
-            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=False))
+            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=apply))
             continue
         if circuit_p[0] == 'Ry':
-            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=False))
+            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=apply))
             continue
         if circuit_p[0] == 'Rz':
-            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=False))
-            continue
-        if circuit_p[0] == 'measure':
-            host.classical_bits[circuit_p[2]] = await host.apply_gate('measure', qubits[circuit_p[1]])
+            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=apply))
             continue
         if circuit_p[0] == 'x':
-            gates.append(qubits[circuit_p[1]].X(apply=False))
+            gates.append(qubits[circuit_p[1]].X(apply=apply))
             continue
         if circuit_p[0] == 'y':
-            gates.append(qubits[circuit_p[1]].Y(apply=False))
+            gates.append(qubits[circuit_p[1]].Y(apply=apply))
             continue
         if circuit_p[0] == 'z':
-            gates.append(qubits[circuit_p[1]].Z(apply=False))
+            gates.append(qubits[circuit_p[1]].Z(apply=apply))
             continue
         if circuit_p[0] == 'h':
-            gates.append(qubits[circuit_p[1]].H(apply=False))
+            gates.append(qubits[circuit_p[1]].H(apply=apply))
             continue
     
-    if not gates:
+    if apply:
         return
     
     gate = combine_gates(0, gates)
     
-    await host.apply_gate('custom_gate', next(iter(qubits.values())), gate)
+    host.apply_gate('custom_gate', next(iter(qubits)), gate)
