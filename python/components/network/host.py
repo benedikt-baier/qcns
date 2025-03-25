@@ -625,7 +625,7 @@ class Host:
         """
         
         self._time += self._gate_duration.get(gate, 5e-6)
-        self._sim.schedule_event(GateEvent(self._time + self._gate_duration.get(gate, 5e-6), self.id))
+        self._sim.schedule_event(GateEvent(self._time, self.id))
         
         if combine and gate in ['CNOT', 'CY', 'CZ', 'CH', 'CPHASE', 'CU', 'SWAP', 'bell_state', 'bsm', 'prob_bsm']:
             combine_state(args[:2])

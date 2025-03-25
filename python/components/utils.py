@@ -51,6 +51,9 @@ def load_qasm_2_0_file(path: str, parse_comments: bool=False):
             if circuit_start == -1:
                 continue
         
+            if line.startswith('\n'):
+                continue
+        
             line, comment = line.split(';')
             circuit_str.append(line)
             
@@ -249,6 +252,9 @@ def load_config(path: str) -> None:
 
 def apply_circuit(circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
     
+    if not circuit:
+        return
+    
     gates = []
     
     for circuit_p in circuit:
@@ -290,6 +296,9 @@ def apply_circuit(circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: boo
     
 def dqc_apply_circuit(host: Host, circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
     
+    if not circuit:
+        return
+    
     gates = []
     
     for circuit_p in circuit:
@@ -327,4 +336,4 @@ def dqc_apply_circuit(host: Host, circuit: List[List[Any]], qubits: Dict[int, Qu
     
     gate = combine_gates(0, gates)
     
-    host.apply_gate('custom_gate', next(iter(qubits)), gate)
+    host.apply_gate('custom_gate', next(iter(qubits.values())), gate)
