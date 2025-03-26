@@ -706,8 +706,8 @@ class Host:
         """
         
         try:
-            await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
-            self._resume[RECEIVE].clear()
+            await asc.wait_for(self._resume.wait(), timeout=time_out)
+            self._resume.clear()
         except asc.TimeoutError:
             return None
         
@@ -749,8 +749,8 @@ class Host:
         """
         
         try:
-            await asc.wait_for(self._resume[RECEIVE].wait(), timeout=time_out)
-            self._resume[RECEIVE].clear()
+            await asc.wait_for(self._resume.wait(), timeout=time_out)
+            self._resume.clear()
         except asc.TimeoutError:
             return None
         
