@@ -151,8 +151,6 @@ class Simulation:
         logging.info('Stopping Simulation')
         
         self._num_hosts = 0
-        for host in self._hosts.values():
-            host.stop = True
     
     async def _handle_events(self) -> None:
         

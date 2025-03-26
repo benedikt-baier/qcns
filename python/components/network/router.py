@@ -56,7 +56,7 @@ class Router(Host):
             assert graph is not None and clients is not None
             self.routing_table = self.calculate_routing_table(graph, clients)
     
-        super(Router, self).__init__(node_id, sim, l1_qprogram=L1_EGP(l1_eg_mode, l1_rap_mode, l1_reattempt), l2_qprogram=L2_FIP(l2_fip_mode, l2_reattempt), l3_qprogram=L3_QFP(self.routing_table, l3_qf_mode, l3_bsm_mode))
+        super(Router, self).__init__(node_id, sim, False, l1_qprogram=L1_EGP(l1_eg_mode, l1_rap_mode, l1_reattempt), l2_qprogram=L2_FIP(l2_fip_mode, l2_reattempt), l3_qprogram=L3_QFP(self.routing_table, l3_qf_mode, l3_bsm_mode))
     
     def calculate_routing_table(self, graph: nx.Graph, clients: List[int]) -> None:
         
@@ -88,7 +88,7 @@ class Router(Host):
             /
         """
         
-        while not self.stop:
+        while 1:
             
             packet = await self.receive_packet()
             

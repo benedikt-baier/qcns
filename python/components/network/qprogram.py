@@ -628,11 +628,11 @@ class L3_QFP(QProgram):
             qubit_dst = self.host.l3_retrieve_qubit(packet.l2_dst, 0)
             
             if packet.l3_es_result[0][index]:
-                await self.host.apply_gate('X', qubit_src)
+                self.host.apply_gate('X', qubit_src)
             if packet.l3_es_result[1][index]:
-                await self.host.apply_gate('Z', qubit_src)
+                self.host.apply_gate('Z', qubit_src)
             
-            res = await self.host.apply_gate(self._bsm_mode, qubit_src, qubit_dst, combine=True, remove=True)
+            res = self.host.apply_gate(self._bsm_mode, qubit_src, qubit_dst, combine=True, remove=True)
             
             packet.l3_reset_es(index)
             packet.l3_update_es(res, index)  
@@ -658,7 +658,7 @@ class L3_QFP(QProgram):
             qubit_src = self.host.l3_retrieve_qubit(packet.l2_src, 1, offset_index)
             qubit_dst = self.host.l3_retrieve_qubit(packet.l2_dst, 0)
             
-            res = await self.host.apply_gate(self._bsm_mode, qubit_src, qubit_dst, combine=True, remove=True)
+            res = self.host.apply_gate(self._bsm_mode, qubit_src, qubit_dst, combine=True, remove=True)
             
             packet.l3_update_es(res, index)  
         
@@ -885,7 +885,7 @@ class L7_TPP(QProgram):
         
             com_qubit = self.host.l3_retrieve_qubit(l2_receiver, 0)
             
-            res = await self.host.apply_gate(self._bsm_mode, qubit, com_qubit, combine=True, remove=True)
+            res = self.host.apply_gate(self._bsm_mode, qubit, com_qubit, combine=True, remove=True)
             
             results.append(res)
             
@@ -912,9 +912,9 @@ class L7_TPP(QProgram):
             qubit = self.host.l3_retrieve_qubit(packet.l2_src, 1)
             
             if packet.l3_es_result[0][index]:
-                await self.host.apply_gate('X', qubit)
+                self.host.apply_gate('X', qubit)
             if packet.l3_es_result[1][index]:
-                await self.host.apply_gate('Z', qubit)
+                self.host.apply_gate('Z', qubit)
             qubits.append(qubit)
         return qubits
     
