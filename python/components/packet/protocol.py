@@ -770,10 +770,11 @@ class L3_Protocol:
         self._z_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
         
         self._mode: int = 1 # 2 bit
+        self._hop_count: int = 0 # 1byte
         
         self._protocol: int = 0 # 1byte
         self._next_protocol: int = 0 # 1byte
-        self._header_length: int = 802
+        self._header_length: int = 810
     
     def __len__(self) -> int:
         
@@ -1015,6 +1016,36 @@ class L3_Protocol:
         """
         
         self._mode: int = 3
+    
+    @property
+    def hop_count(self) -> int:
+        
+        """
+        Returns the hop count 
+        
+        Args:
+            /
+            
+        Returns:
+            hop_count (int): hop count of the packet
+        """
+        
+        return self._hop_count
+    
+    @hop_count.setter
+    def hop_count(self, hop_count: int) -> None:
+        
+        """
+        Sets the hop count of a packet
+        
+        Args:
+            hop_count (int): new hop count
+            
+        Returns:
+            /
+        """
+        
+        self._hop_count = hop_count
     
     @property
     def es_result(self) -> Tuple[np.array, np.array]:

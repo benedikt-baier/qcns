@@ -1231,6 +1231,36 @@ class Packet:
         self._layer3.set_cr()
     
     @property
+    def l3_hop_count(self) -> int:
+        
+        """
+        Returns the L3 hop count
+        
+        Args:
+            /
+            
+        Returns:
+            hop_count (int): hop count of L3
+        """
+        
+        return self._layer3.hop_count
+    
+    @l3_hop_count.setter
+    def l3_hop_count(self, hop_count: int) -> None:
+        
+        """
+        Sets the new L3 hop count
+        
+        Args:
+            hop_count (int): new hop count of L3
+            
+        Returns:
+            /
+        """
+        
+        self._layer3.hop_count = hop_count
+    
+    @property
     def l3_es_result(self) -> Tuple[np.array, np.array]:
         
         """
