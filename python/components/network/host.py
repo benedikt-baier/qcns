@@ -943,7 +943,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L0, qubit, index, self._time)
+        self._connections['memory'][host][store].store_qubit(L0, qubit, index, self._time)
         
     def l1_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -960,7 +960,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L1, qubit, index, self._time)
+        self._connections['memory'][host][store].store_qubit(L1, qubit, index, self._time)
         
     def l2_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -977,7 +977,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L2, qubit, index, self._time)
+        self._connections['memory'][host][store].store_qubit(L2, qubit, index, self._time)
         
     def l3_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -994,7 +994,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubits(L3, qubit, index, self._time)
+        self._connections['memory'][host][store].store_qubit(L3, qubit, index, self._time)
         
     def l0_retrieve_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
         

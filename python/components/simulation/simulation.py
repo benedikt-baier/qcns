@@ -54,19 +54,6 @@ class Simulation:
         if self._logging_path:
             logging.basicConfig(filename=self._logging_path, level=logging.DEBUG)
     
-    def add_host(self, host: Host) -> None:
-        
-        """
-        Adds a host to the simulation
-        
-        Args:
-            host (Host): host to add to simulation
-            
-        Returns:
-            /
-        """
-        
-        self._hosts.append(host)
     
     @staticmethod
     def create_qsystem(num_qubits: int=1, fidelity: float=1., sparse: bool=0) -> QSystem:
@@ -84,6 +71,20 @@ class Simulation:
         """
         
         return QSystem(num_qubits, fidelity, sparse)
+    
+    def add_host(self, host: Host) -> None:
+        
+        """
+        Adds a host to the simulation
+        
+        Args:
+            host (Host): host to add to simulation
+            
+        Returns:
+            /
+        """
+        
+        self._hosts.append(host)
     
     def set_end_time(self, end_time: float) -> None:
         
