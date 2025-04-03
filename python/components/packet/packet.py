@@ -1231,6 +1231,66 @@ class Packet:
         self._layer3.set_cr()
     
     @property
+    def l3_is_cf(self) -> bool:
+        
+        """
+        Returns whether the cf flag is set
+        
+        Args:
+            /
+            
+        Returns:
+            is_cf (bool): whether the cf flag is set
+        """
+        
+        return self._layer3.is_cf
+    
+    @property
+    def l3_is_nr(self) -> bool:
+        
+        """
+        Returns whether the nr flag is set
+        
+        Args:
+            /
+            
+        Returns:
+            is_nr (bool): whether the nr flag is set
+        """
+        
+        return self._layer3.is_nr
+    
+    @property
+    def l3_is_pr(self) -> bool:
+        
+        """
+        Returns whether the pr flag is set
+        
+        Args:
+            /
+            
+        Returns:
+            is_pr (bool): whether the pr flag is set
+        """
+        
+        return self._layer3.is_pr
+    
+    @property
+    def l3_is_cr(self) -> bool:
+        
+        """
+        Returns whether the cr flag is set
+        
+        Args:
+            /
+            
+        Returns:
+            is_cr (bool): whether the cr flag is set
+        """
+        
+        return self._layer3.is_cr
+    
+    @property
     def l3_hop_count(self) -> int:
         
         """

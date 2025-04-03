@@ -1018,6 +1018,66 @@ class L3_Protocol:
         self._mode: int = 3
     
     @property
+    def is_cf(self) -> bool:
+        
+        """
+        Returns whether the packet is in cf mode
+        
+        Args:
+            /
+            
+        Returns:
+            is_cf (bool): whether the packet is in cf mode
+        """
+        
+        return self._mode == 0
+    
+    @property
+    def is_nr(self) -> bool:
+        
+        """
+        Returns whether the packet is in nr mode
+        
+        Args:
+            /
+            
+        Returns:
+            is_nr (bool): whether the packet is in nr mode
+        """
+        
+        return self._mode == 1
+    
+    @property
+    def is_pr(self) -> bool:
+        
+        """
+        Returns whether the packet is in pr mode
+        
+        Args:
+            /
+            
+        Returns:
+            is_pr (bool): whether the packet is in pr mode
+        """
+        
+        return self._mode == 2
+    
+    @property
+    def is_cr(self) -> bool:
+        
+        """
+        Returns whether the packet is in cr mode
+        
+        Args:
+            /
+            
+        Returns:
+            is_cr (bool): whether the packet is in cr mode
+        """
+        
+        return self._mode == 3
+    
+    @property
     def hop_count(self) -> int:
         
         """
