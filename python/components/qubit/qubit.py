@@ -1621,6 +1621,7 @@ class Qubit:
             target (Qubit): target qubit
             bell_state (int): bell state to put state into
             fidelity (float): fidelity of the depolarization error
+            apply (bool): whether to apply the gate or return it
             
         Returns:
             /

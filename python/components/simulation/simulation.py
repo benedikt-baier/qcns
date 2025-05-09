@@ -129,9 +129,9 @@ class Simulation:
         """
         
         self._event_queue = []
-        self._hosts = [host for host in self._hosts.values()]
-        self._num_hosts = 0
-        self._sim_time = 0.
+        for host in self._hosts.values():
+            host.reset()
+        self._num_hosts = len(self._hosts)
         
         if self._logging_path:
             with open(self._logging_path, 'w'):

@@ -160,6 +160,27 @@ class Host:
             logging.error(traceback.format_exc())
             self._sim.stop_simulation()
     
+    def reset(self) -> None:
+        
+        """
+        Resets a host
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._time = 0.
+        self._resume.clear()
+        
+        for neighbor in self.neighbors:
+            self._connections['memory'][neighbor][SEND].discard_qubits()
+            self._connections['memory'][neighbor][RECEIVE].discard_qubits()
+            self._layer_results[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
+            self._packets[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
+        
     def set_sqs_connection(self, host: Host, sender_source: str='perfect', receiver_source: str='perfect',
                            sender_num_sources: int=-1, receiver_num_sources: int=-1,
                            sender_length: float=0., sender_attenuation: float=-0.016, sender_in_coupling_prob: float=1., sender_out_coupling_prob: float=1., sender_lose_qubits: bool=False, sender_channel_errors: List[QuantumError]=None,
@@ -621,7 +642,7 @@ class Host:
             remove (bool): to remove qubits
             
         Returns:
-            res (int/None): result of the gate
+            res (int/np.array/None): result of the gate
         """
         
         self._time += self._gate_duration.get(gate, 5e-6)
