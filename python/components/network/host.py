@@ -3,16 +3,16 @@ import traceback
 import numpy as np
 import asyncio as asc
 from functools import partial
-from typing import List, Dict, Tuple, Set, Union, Any
+from typing import List, Dict, Set, Union, Any
 
 from qcns.python.components.simulation import Simulation
 from qcns.python.components.simulation.event import StopEvent, SendEvent, ReceiveEvent, GateEvent, WaitEvent
-from qcns.python.components.qubit.qubit import Qubit, QSystem, combine_state, remove_qubits
+from qcns.python.components.qubit.qubit import Qubit, combine_state, remove_qubits
 from qcns.python.components.connection.channel import PChannel
 from qcns.python.components.packet import Packet
 from qcns.python.components.hardware.memory import QuantumMemory
 from qcns.python.components.connection import SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
-from qcns.python.components.network.qprogram import QProgram
+from qcns.python.components.network.qprogram import QProgram  
 
 __all__ = ['Host']
 
@@ -96,8 +96,10 @@ class Host:
         for layer, qprogram in self._qprograms.items():
             qprogram.host = self
             
-            qprogram.prev_protocol = self._qprograms[layer - 1]
-            qprogram.next_protocol = self._qprograms[layer + 1]
+            if (layer - 1) in self._qprograms:
+                qprogram.prev_protocol = self._qprograms[layer - 1]
+            if (layer + 1) in self._qprograms:
+                qprogram.next_protocol = self._qprograms[layer + 1]
             
             if not (layer + 1):
                 pass
@@ -826,6 +828,81 @@ class Host:
         """
         
         return self._neighbors
+    
+    @property
+    def l1_qprogram(self) -> QProgram:
+        
+        """
+        Returns the L1 QProgram
+        
+        Args:
+            /
+            
+        Returns:
+            L1_QProgram (QProgram): L1 program to return
+        """
+        
+        return self._qprograms[L1]
+    
+    @property
+    def l2_qprogram(self) -> QProgram:
+        
+        """
+        Returns the L2 QProgram
+        
+        Args:
+            /
+            
+        Returns:
+            L2_QProgram (QProgram): L2 program to return
+        """
+        
+        return self._qprograms[L2]
+    
+    @property
+    def l3_qprogram(self) -> QProgram:
+        
+        """
+        Returns the L3 QProgram
+        
+        Args:
+            /
+            
+        Returns:
+            L3_QProgram (QProgram): L3 program to return
+        """
+        
+        return self._qprograms[L3]
+    
+    @property
+    def l4_qprogram(self) -> QProgram:
+        
+        """
+        Returns the L4 QProgram
+        
+        Args:
+            /
+            
+        Returns:
+            L4_QProgram (QProgram): L4 program to return
+        """
+        
+        return self._qprograms[L4]
+    
+    @property
+    def l7_qprogram(self) -> QProgram:
+        
+        """
+        Returns the L7 QProgram
+        
+        Args:
+            /
+            
+        Returns:
+            L7_QProgram (QProgram): L7 program to return
+        """
+        
+        return self._qprograms[L7]
     
     def has_space(self, host: int, store: int, num_qubits: int=1) -> bool:
         

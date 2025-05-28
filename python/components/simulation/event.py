@@ -74,7 +74,7 @@ class StopEvent(Event):
         self._id: int = -1
         self._end_time: float = np.inf
         self._node_id: int = _node_id
-
+    
     def __repr__(self) -> str:
         
         """

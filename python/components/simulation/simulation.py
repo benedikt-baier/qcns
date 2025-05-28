@@ -54,7 +54,6 @@ class Simulation:
         if self._logging_path:
             logging.basicConfig(filename=self._logging_path, level=logging.DEBUG)
     
-    
     @staticmethod
     def create_qsystem(num_qubits: int=1, fidelity: float=1., sparse: bool=0) -> QSystem:
     
