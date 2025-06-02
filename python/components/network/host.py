@@ -592,6 +592,9 @@ class Host:
             /
         """
         
+        if not num_requested:
+            raise ValueError('Attempting 0 qubits')
+        
         self._sim.schedule_event(SendEvent(self._time, self.id))
         
         _num_needed = num_requested
@@ -621,6 +624,9 @@ class Host:
         Returns:
             /
         """
+        
+        if not num_requested:
+            raise ValueError('Attempting 0 qubits')
         
         self._sim.schedule_event(SendEvent(self._time, self.id))
         

@@ -269,7 +269,8 @@ class L1_EGP(QProgram):
         """
         
         await func(packet)
-        await self.next_protocol.quantum_data_plane(packet)
+        if self.next_protocol is not None:
+            await self.next_protocol.quantum_data_plane(packet)
 
     async def _l3cp(self, packet: Packet) -> None:
         
@@ -540,7 +541,7 @@ class L2_FIP(QProgram):
         """
         
         await func(packet)
-        if self.host.l3_check_packets(packet.l2_src, 0):
+        if self.host.l3_check_packets(packet.l2_src, 0) and self.next_protocol is not None:
             await self.next_protocol.handle_stored_packets(packet.l2_src, 0)
     
     async def quantum_data_plane(self, packet: Packet) -> None:
