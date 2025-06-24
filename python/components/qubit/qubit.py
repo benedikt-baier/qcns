@@ -1803,6 +1803,9 @@ class Qubit:
             fidelity (float): fidelity of the quantum state
         """
         
+        if isinstance(_op, Qubit):
+            _op = _op.state
+        
         _sqrt_mat = sqrt_matrix(self.state)
         return float((np.real(np.trace(sqrt_matrix(np.dot(_sqrt_mat, np.dot(_op, _sqrt_mat)))))**2))
         
@@ -1942,6 +1945,9 @@ class QSystem:
         Returns:
             fidelity (float): fidelity of the quantum state
         """
+        
+        if isinstance(_op, Qubit):
+            _op = _op.state
         
         _sqrt_mat = sqrt_matrix(self._state)
         return float((np.real(np.trace(sqrt_matrix(np.dot(_sqrt_mat, np.dot(_op, _sqrt_mat)))))**2))
