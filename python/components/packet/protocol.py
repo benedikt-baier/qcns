@@ -382,10 +382,10 @@ class L2_Protocol:
         self._requested: int = _requested # 1byte
         self._needed: int = _needed # 1byte
         
-        if not self._requested and self._needed > 0:
+        if self._requested < 1 and self._needed > 0:
             self._requested = self._needed
-        
-        if self._requested > 0 and not self._needed:
+            
+        if self._requested > 0 and self._needed < 1:
             self._needed = self._requested
         
         self._success: np.array = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32 byte
@@ -760,12 +760,12 @@ class L3_Protocol:
         self._requested: int = _requested # 1byte
         self._needed: int = _needed # 1byte
         
-        if not self._requested and self._needed > 0:
-            self._requested =  self._needed
-        
-        if self._requested > 0 and not self._needed:
+        if self._requested < 1 and self._needed > 0:
+            self._requested = self._needed
+            
+        if self._requested > 0 and self._needed < 1:
             self._needed = self._requested
-         
+             
         self._x_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
         self._z_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
         
@@ -1270,12 +1270,12 @@ class L4_Protocol:
         self._requested: int = _requested # 1byte
         self._needed: int = _needed # 1byte
         
-        if not self._requested and self._needed > 0:
+        if self._requested < 1 and self._needed > 0:
             self._requested = self._needed
             
-        if self._requested > 0 and not self._needed:
+        if self._requested > 0 and self._needed < 1:
             self._needed = self._requested
-        
+            
         self._success: np.array = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32byte
         self._ack: int = 0 # 1 bit
         

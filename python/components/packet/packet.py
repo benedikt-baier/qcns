@@ -64,11 +64,14 @@ class Packet:
         
         if l2_requested > 0:
             self._layer_counter = 1
+            
+        if l2_needed > 0:
+            self._layer_counter = 1
         
-        if l3_src is not None or l3_dst is not None:
+        if l3_src is not None or l3_dst is not None or l3_requested > 0 or l3_needed > 0:
             self._layer_counter = 2
         
-        if l4_src is not None or l4_dst is not None:
+        if l4_src is not None or l4_dst is not None or l4_requested > 0 or l4_needed > 0:
             self._layer_counter = 3
         
         if l7_requested > 0 or payload is not None:
