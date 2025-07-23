@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.sparse as sp
 from functools import wraps, partial, reduce
 from typing import List, Union, Callable
 
@@ -24,29 +23,6 @@ full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'iSX': 0.5 * np.array([[1 - 1j, 1 + 1j], [1 + 1j, 1 - 1j]], dtype=np.complex128),
               'iSY': 0.5 * np.array([[1 - 1j, 1 - 1j], [-1 + 1j, 1 - 1j]], dtype=np.complex128),
               'iSZ': np.array([[1, 0], [0, -1j]], dtype=np.complex128)}
-
-sparse_gates = {'P0': sp.csr_matrix([[1, 0], [0, 0]], dtype=np.complex128),
-                'P1': sp.csr_matrix([[0, 0], [0, 1]], dtype=np.complex128),
-                'P01': sp.csr_matrix([[0, 1], [0, 0]], dtype=np.complex128),
-                'P10': sp.csr_matrix([[0, 0], [1, 0]], dtype=np.complex128),
-                'I': sp.csr_matrix([[1, 0], [0, 1]], dtype=np.complex128),
-                'X': sp.csr_matrix([[0, 1], [1, 0]], dtype=np.complex128),
-                'Y': sp.csr_matrix([[0, -1j], [1j, 0]], dtype=np.complex128),
-                'Z': sp.csr_matrix([[1, 0], [0, -1]], dtype=np.complex128),
-                'H': sp.csr_matrix([[1, 1], [1, -1]], dtype=np.complex128) / (np.sqrt(2)),
-                'K': 0.5 * sp.csr_matrix([[1 + 1j, 1 - 1j], [-1 + 1j, -1 - 1j]], dtype=np.complex128),
-                'T': sp.csr_matrix([[1, 0], [0, np.exp(1j * 0.25 * np.pi)]], dtype=np.complex128),
-                'SX': 0.5 * sp.csr_matrix([[1 + 1j, 1 - 1j], [1 - 1j, 1 + 1j]], dtype=np.complex128),
-                'SY': 0.5 * sp.csr_matrix([[1 + 1j, -1 - 1j], [1 + 1j, 1 + 1j]], dtype=np.complex128),
-                'SZ': sp.csr_matrix([[1, 0], [0, 1j]], dtype=np.complex128),
-                'iK': 0.5 * sp.csr_matrix([[1 - 1j, -1 - 1j], [1 + 1j, -1 + 1j]], dtype=np.complex128),
-                'iT': sp.csr_matrix([[1, 0], [0, np.exp(-1j * 0.25 * np.pi)]], dtype=np.complex128),
-                'iSX': 0.5 * sp.csr_matrix([[1 - 1j, 1 + 1j], [1 + 1j, 1 - 1j]], dtype=np.complex128),
-                'iSY': 0.5 * sp.csr_matrix([[1 - 1j, 1 - 1j], [-1 + 1j, 1 - 1j]], dtype=np.complex128),
-                'iSZ': sp.csr_matrix([[1, 0], [0, -1j]], dtype=np.complex128)}
-
-gates = {0: full_gates, 1: sparse_gates}
-identity_gates = {0: np.eye, 1: sp.eye}
 
 purification_gates = {'CNOT': 'X', 'CY': 'Y', 'CZ': 'Z', 'CH': 'H'}
 
@@ -86,7 +62,7 @@ def cache(func: Callable) -> Callable:
         return _cache[key]
     return wrapper
 
-def kronecker_product_full(_op_1: np.array, _op_2: np.array) -> np.array:
+def kronecker_product(_op_1: np.array, _op_2: np.array) -> np.array:
     
     """
     Computes the kronecker product of two full 2d matrices
@@ -100,43 +76,23 @@ def kronecker_product_full(_op_1: np.array, _op_2: np.array) -> np.array:
     """
 
     _op = _op_1[:, None, :, None] * _op_2[None, :, None, :]
-    _op.shape = (_op_1.shape[0] * _op_2.shape[0], _op_1.shape[1] * _op_2.shape[1])
+    return _op.reshape(_op_1.shape[0] * _op_2.shape[0], _op_1.shape[1] * _op_2.shape[1])
 
-    return _op
-
-def kronecker_product_sparse(_op_1: sp.csr_matrix, _op_2: sp.csr_matrix) -> sp.csr_matrix:
-    
-    """
-    Computes the kronecker product of two sparse 2d matrices
-
-    Args:
-        _op_1 (sp.csr_matrix): first matrix
-        _op_2 (sp.csr_matrix): second matrix
-
-    Returns:
-        _op (sp.csr_matrix): result of the kronecker product
-    """
-    
-    return sp.kron(_op_1, _op_2)
-
-_KRON_DICT = {0: kronecker_product_full, 1: kronecker_product_sparse}
-
-def tensor_operator(_sparse: bool, _operator_l: np.array) -> Union[np.array, sp.csr_matrix]:
+def tensor_operator(_operator_l: np.array) -> np.array:
     
     """
     Creates the tensor operator out of a operator list
     
     Args:
-        _sparse (bool): indicator whether the operators are full or sparse
         _operator_l (list): list of 2x2 np.arrays
         
     Returns:
         res (np.array): resulting tensor operator
     """
 
-    return reduce(_KRON_DICT[_sparse], _operator_l)
+    return reduce(kronecker_product, _operator_l)
 
-def dot(_state: Union[np.array, sp.csr_matrix], _gate: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.csr_matrix]:
+def dot(_state: np.array, _gate: np.array) -> np.array:
     
     """
     Performs the linalg dot for quantum gates
@@ -151,7 +107,7 @@ def dot(_state: Union[np.array, sp.csr_matrix], _gate: Union[np.array, sp.csr_ma
     
     return _gate.dot(_state).dot(_gate.conj().T)
 
-def sqrt_matrix(_state: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.csr_matrix]:
+def sqrt_matrix(_state: np.array) -> np.array:
     
     """
     Calculates the square root of a matrix
@@ -167,13 +123,12 @@ def sqrt_matrix(_state: Union[np.array, sp.csr_matrix]) -> Union[np.array, sp.cs
     return dot(np.diag(np.sqrt(np.abs(evs))), vecs)
 
 @cache
-def get_single_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _index: int, _num_qubits: int) -> np.array:
+def get_single_operator(_gate: np.array, _index: int, _num_qubits: int) -> np.array:
 
     """
     Creates the tensor operator for a single qubit gate
     
     Args:
-        _sparse (bool): indicator whether the operators are full or sparse
         _gate (np.array): 2x2 gate to apply to the target qubit
         _index (int): index of target qubit in QSystem
         _num_qubits (int): number of qubits in QSystem
@@ -186,30 +141,29 @@ def get_single_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _i
         return _gate
     
     if _num_qubits < 3:
-        operator_l = np.array([gates[_sparse]['I']] * _num_qubits)  
+        operator_l = np.array([full_gates['I']] * _num_qubits)  
         operator_l[_index] = _gate
         
-        return tensor_operator(_sparse, operator_l)
+        return tensor_operator(operator_l)
 
     if _index == 0:
-        return _KRON_DICT[_sparse](_gate, identity_gates[_sparse](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128))
+        return kronecker_product(_gate, full_gates['I'](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128))
         
     if _index == _num_qubits - 1:
-        return _KRON_DICT[_sparse](identity_gates[_sparse](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128), _gate)
+        return kronecker_product(full_gates['I'](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128), _gate)
     
-    left_array = identity_gates[_sparse](2**_index, 2**_index, dtype=np.complex128)
-    right_array = identity_gates[_sparse](2**(_num_qubits - _index - 1), 2**(_num_qubits - _index - 1), dtype=np.complex128)
+    left_array = full_gates['I'](2**_index, 2**_index, dtype=np.complex128)
+    right_array = full_gates['I'](2**(_num_qubits - _index - 1), 2**(_num_qubits - _index - 1), dtype=np.complex128)
     
-    return _KRON_DICT[_sparse](left_array, _KRON_DICT[_sparse](_gate, right_array))
+    return kronecker_product(left_array, kronecker_product(_gate, right_array))
 
 @cache
-def get_double_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _c_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
+def get_double_operator(_gate: np.array, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
     
     """
     Creates the tensor operator for a controlled qubit gate
     
     Args:
-        _sparse (bool): indicator whether the operators are full or sparse
         _gate (np.array): 2x2 gate to apply to the target qubit
         _c_index (int): index of control qubit
         _t_index (int): index of target index
@@ -219,10 +173,10 @@ def get_double_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _c
         _op (np.array): resulting tensor for the controlled qubit gate
     """
     
-    key = f'{_sparse}_s_m0_{1}_{1}_{_t_num_qubits}_{_c_index}'
-    proj0 = get_single_operator(key, _sparse, gates[_sparse]['P0'], _c_index, _t_num_qubits)
+    key = f's_m0_{1}_{1}_{_t_num_qubits}_{_c_index}'
+    proj0 = get_single_operator(key, full_gates['P0'], _c_index, _t_num_qubits)
 
-    gate_dict = {_c_index: gates[_sparse]['P1'], _t_index: _gate}
+    gate_dict = {_c_index: full_gates['P1'], _t_index: _gate}
     index_1, index_2 = sorted([_c_index, _t_index])
     
     left_index = index_1
@@ -231,23 +185,22 @@ def get_double_operator(_sparse: bool, _gate: Union[np.array, sp.csr_matrix], _c
     
     proj1 = gate_dict[index_1]
     if left_index:
-        proj1 = _KRON_DICT[_sparse](identity_gates[_sparse](2**left_index, 2**left_index, dtype=np.complex128), proj1)
+        proj1 = kronecker_product(full_gates['I'](2**left_index, 2**left_index, dtype=np.complex128), proj1)
     if middle_index:
-        proj1 = _KRON_DICT[_sparse](proj1, identity_gates[_sparse](2**middle_index, 2**middle_index, dtype=np.complex128))
-    proj1 = _KRON_DICT[_sparse](proj1, gate_dict[index_2])
+        proj1 = kronecker_product(proj1, full_gates['I'](2**middle_index, 2**middle_index, dtype=np.complex128))
+    proj1 = kronecker_product(proj1, gate_dict[index_2])
     if right_index:
-        proj1 = _KRON_DICT[_sparse](proj1, identity_gates[_sparse](2**right_index, 2**right_index, dtype=np.complex128))
+        proj1 = kronecker_product(proj1, full_gates['I'](2**right_index, 2**right_index, dtype=np.complex128))
     
     return proj0 + proj1
 
 @cache
-def get_triple_operator(_sparse: bool, _gate_l: Union[np.array, sp.csr_matrix], _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
+def get_triple_operator(_gate_l: np.array, _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
     
     """
     Generates the operator for a 3 qubit gate
     
     Args:
-        _sparse (bool): indicator whether the operators are full or sparse
         _gate_l (np.array): gate list to apply to target
         _c1_index (int): index of first control qubit
         _c2_index (int): index of second control qubit
@@ -258,8 +211,8 @@ def get_triple_operator(_sparse: bool, _gate_l: Union[np.array, sp.csr_matrix], 
         _op (np.array): resulting tensor for the controlled controlled qubit gate
     """
     
-    gate_dict = {_c1_index: [gates[_sparse]['P0'], gates[_sparse]['P0'], gates[_sparse]['P1'], gates[_sparse]['P1']],
-                  _c2_index: [gates[_sparse]['P0'], gates[_sparse]['P1'], gates[_sparse]['P0'], gates[_sparse]['P1']],
+    gate_dict = {_c1_index: [full_gates['P0'], full_gates['P0'], full_gates['P1'], full_gates['P1']],
+                  _c2_index: [full_gates['P0'], full_gates['P1'], full_gates['P0'], full_gates['P1']],
                   _t_index: _gate_l}
     
     index_1, index_2, index_3 = sorted([_c1_index, _c2_index, _t_index])
@@ -268,20 +221,19 @@ def get_triple_operator(_sparse: bool, _gate_l: Union[np.array, sp.csr_matrix], 
     gate_list = [[0] * 7 for _ in range(4)]
     
     for i in range(4):
-        gate_list[i][::2] = [identity_gates[_sparse](2**(index), 2**(index), dtype=np.complex128) if index else None for index in indices]
+        gate_list[i][::2] = [full_gates['I'](2**(index), 2**(index), dtype=np.complex128) if index else None for index in indices]
         gate_list[i][1::2] = [gate_dict[index_1][i], gate_dict[index_2][i], gate_dict[index_3][i]]
         gate_list[i] = [gate for gate in gate_list[i] if gate is not None]
     
-    return tensor_operator(_sparse, gate_list[0]) + tensor_operator(_sparse, gate_list[1]) + tensor_operator(_sparse, gate_list[2]) + tensor_operator(_sparse, gate_list[3])
+    return tensor_operator(gate_list[0]) + tensor_operator(gate_list[1]) + tensor_operator(gate_list[2]) + tensor_operator(gate_list[3])
     
 @cache
-def get_bell_operator(_sparse: bool, _bell_state: int, _c_index: int, _t_index: int, _t_num_qubits: int) -> Union[np.array, sp.csr_matrix]:
+def get_bell_operator(_bell_state: int, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
     
     """
     Generates the bell operator
     
     Args:
-        _sparse (bool): indicator whether the operators are full or sparse
         _bell_state (int): bell state to calculate
         _c_index (int): index of control qubit
         _t_index (int): index of target qubit
@@ -291,30 +243,29 @@ def get_bell_operator(_sparse: bool, _bell_state: int, _c_index: int, _t_index: 
         _op (np.array): resulting tensor for the bell state operator
     """
     
-    h_gate = get_single_operator(f'{_sparse}_s_h_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['H'], _c_index, _t_num_qubits)
-    cnot_gate = get_double_operator(f'{_sparse}_d_x_{_t_num_qubits}_{_c_index}_{_t_index}', _sparse, gates[_sparse]['X'], _c_index, _t_index, _t_num_qubits)
+    h_gate = get_single_operator(f's_h_{_t_num_qubits}_{_c_index}', full_gates['H'], _c_index, _t_num_qubits)
+    cnot_gate = get_double_operator(f'd_x_{_t_num_qubits}_{_c_index}_{_t_index}', full_gates['X'], _c_index, _t_index, _t_num_qubits)
     
     if _bell_state == 0:
         return cnot_gate.dot(h_gate)
     if _bell_state == 1:
-        x_gate = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_t_index}', _sparse, gates[_sparse]['X'], _t_index, _t_num_qubits)
+        x_gate = get_single_operator(f's_x_{_t_num_qubits}_{_t_index}', full_gates['X'], _t_index, _t_num_qubits)
         return cnot_gate.dot(h_gate).dot(x_gate)
     if _bell_state == 2:
-        x_gate = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['X'], _c_index, _t_num_qubits)
+        x_gate = get_single_operator(f's_x_{_t_num_qubits}_{_c_index}', full_gates['X'], _c_index, _t_num_qubits)
         return cnot_gate.dot(h_gate).dot(x_gate)
     if _bell_state == 3:
-        x_gate_c = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['X'], _c_index, _t_num_qubits)
-        x_gate_t = get_single_operator(f'{_sparse}_s_x_{_t_num_qubits}_{_t_index}', _sparse, gates[_sparse]['X'], _t_index, _t_num_qubits)
+        x_gate_c = get_single_operator(f's_x_{_t_num_qubits}_{_c_index}', full_gates['X'], _c_index, _t_num_qubits)
+        x_gate_t = get_single_operator(f's_x_{_t_num_qubits}_{_t_index}', full_gates['X'], _t_index, _t_num_qubits)
         return cnot_gate.dot(h_gate).dot(x_gate_c).dot(x_gate_t)
 
 @cache
-def get_bsm_operator(_sparse: bool, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
+def get_bsm_operator(_c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
     
     """
     Generates the bsm operator
     
     Args:
-        _sparse (bool): indicator whether the operators are full or sparse
         _c_index (int): index of control qubit
         _t_index (int): index of target qubit
         _t_num_qubits (int): number of qubits in target QSystem
@@ -323,19 +274,18 @@ def get_bsm_operator(_sparse: bool, _c_index: int, _t_index: int, _t_num_qubits:
         _op (np.array): resulting tensor for the bsm operator
     """
     
-    cnot_gate = get_double_operator(f'{_sparse}_d_x_{_t_num_qubits}_{_c_index}_{_t_index}', _sparse, gates[_sparse]['X'], _c_index, _t_index, _t_num_qubits)
-    h_gate = get_single_operator(f'{_sparse}_s_h_{_t_num_qubits}_{_c_index}', _sparse, gates[_sparse]['H'], _c_index, _t_num_qubits)
+    cnot_gate = get_double_operator(f'd_x_{_t_num_qubits}_{_c_index}_{_t_index}', full_gates['X'], _c_index, _t_index, _t_num_qubits)
+    h_gate = get_single_operator(f's_h_{_t_num_qubits}_{_c_index}', full_gates['H'], _c_index, _t_num_qubits)
     
     return h_gate.dot(cnot_gate) 
 
 @cache
-def get_swap_operator(_sparse: bool, _index_1: int, _index_2: int, _num_qubits: int) -> np.array:
+def get_swap_operator(_index_1: int, _index_2: int, _num_qubits: int) -> np.array:
     
     """
     Generates the swap operator
     
     Args:
-        _sparse (bool): whether the operators are full or sparse
         _index_1 (int): index of first qubit
         _index_2 (int): index of second qubit
         _num_qubits (int):  number of qubits in QSystem
@@ -344,35 +294,34 @@ def get_swap_operator(_sparse: bool, _index_1: int, _index_2: int, _num_qubits: 
         _op (np.array): resulting tensor for the bsm operator
     """
     
-    _op = np.array([gates[_sparse]['I']] * _num_qubits)
+    _op = np.array([full_gates['I']] * _num_qubits)
     
-    _op[_index_1] = gates[_sparse]['P0']
-    _op[_index_2] = gates[_sparse]['P0']
+    _op[_index_1] = full_gates['P0']
+    _op[_index_2] = full_gates['P0']
     
-    _res = tensor_operator(_sparse, _op)
+    _res = tensor_operator(_op)
     
-    _op[_index_1] = gates[_sparse]['P01']
-    _op[_index_2] = gates[_sparse]['P10']
+    _op[_index_1] = full_gates['P01']
+    _op[_index_2] = full_gates['P10']
     
-    _res += tensor_operator(_sparse, _op)
+    _res += tensor_operator(_op)
     
-    _op[_index_1] = gates[_sparse]['P10']
-    _op[_index_2] = gates[_sparse]['P01']
+    _op[_index_1] = full_gates['P10']
+    _op[_index_2] = full_gates['P01']
     
-    _res += tensor_operator(_sparse, _op)
+    _res += tensor_operator(_op)
     
-    _op[_index_1] = gates[_sparse]['P1']
-    _op[_index_2] = gates[_sparse]['P1']
+    _op[_index_1] = full_gates['P1']
+    _op[_index_2] = full_gates['P1']
     
-    return _res + tensor_operator(_sparse, _op)
+    return _res + tensor_operator(_op)
 
-def depolarization_error(_sparse: bool, _qubit: Qubit, _fidelity: float) -> None:
+def depolarization_error(_qubit: Qubit, _fidelity: float) -> None:
     
     """
     Applies a depolarization error to the qubit given a fidelity
     
     Args:
-        _sparse (bool): sparsity of QSystem
         _qubit (Qubit): qubit to apply error to
         _fidelity (float): fidelity of the depolarization error
         
@@ -380,13 +329,13 @@ def depolarization_error(_sparse: bool, _qubit: Qubit, _fidelity: float) -> None
         /
     """
     
-    key_x = f'{_sparse}_s_x_{_qubit.num_qubits}_{_qubit._index}'
-    key_y = f'{_sparse}_s_y_{_qubit.num_qubits}_{_qubit._index}'
-    key_z = f'{_sparse}_s_z_{_qubit.num_qubits}_{_qubit._index}'
+    key_x = f's_x_{_qubit.num_qubits}_{_qubit._index}'
+    key_y = f's_y_{_qubit.num_qubits}_{_qubit._index}'
+    key_z = f's_z_{_qubit.num_qubits}_{_qubit._index}'
     
-    gate_x = get_single_operator(key_x, _sparse, gates[_sparse]['X'], _qubit._index, _qubit.num_qubits)    
-    gate_y = get_single_operator(key_y, _sparse, gates[_sparse]['y'], _qubit._index, _qubit.num_qubits)
-    gate_z = get_single_operator(key_z, _sparse, gates[_sparse]['Z'], _qubit._index, _qubit.num_qubits)
+    gate_x = get_single_operator(key_x, full_gates['X'], _qubit._index, _qubit.num_qubits)    
+    gate_y = get_single_operator(key_y, full_gates['y'], _qubit._index, _qubit.num_qubits)
+    gate_z = get_single_operator(key_z, full_gates['Z'], _qubit._index, _qubit.num_qubits)
         
     _qubit.state = _fidelity * _qubit.state + ((1 - _fidelity) / 3) * (dot(_qubit.state, gate_x) + dot(_qubit.state, gate_y) + dot(_qubit.state, gate_z))
 
@@ -411,7 +360,7 @@ def combine_state(q_l: List[Qubit]) -> QSystem:
     
     qsys_n._qubits = [q for qsys in qsys_l for q in qsys._qubits]
     qsys_n._num_qubits = num_qubits_n
-    qsys_n._state = tensor_operator(q_l[0].sparse, np.array([qsys._state for qsys in qsys_l], dtype=object))
+    qsys_n._state = tensor_operator(np.array([qsys._state for qsys in qsys_l], dtype=object))
     qsys_n._state = qsys_n._state.astype(np.complex128)
     for i in range(num_qubits_n):
         qsys_n._qubits[i]._index = i
@@ -419,30 +368,12 @@ def combine_state(q_l: List[Qubit]) -> QSystem:
 
     return qsys_n
 
-def sparse_dot(op_1: sp.csr_matrix, op_2: sp.csr_matrix) -> sp.csr_matrix:
-    
-    """
-    Calculates the sparse dot product of two matrices
-    
-    Args:
-        op_1 (sp.csr_matrix): first matrix
-        op_2 (sp.csr_matrix): second matrix
-        
-    Returns:
-        res (sp.csr_matrix): resulting matrix
-    """
-    
-    return op_1.dot(op_2)
-
-_COMBINE_DICT = {0: np.dot, 1: sparse_dot}
-
-def combine_gates(_sparse: bool, gate_l: List[np.array]) -> np.array:
+def combine_gates(gate_l: List[np.array]) -> np.array:
     
     """
     Combines multiple gates into one gate
     
     Args:
-        _sparse (bool): indicator whether the operators are full or sparse
         gate_l (list): List of gates
         
     Returns:
@@ -452,7 +383,7 @@ def combine_gates(_sparse: bool, gate_l: List[np.array]) -> np.array:
     if len(gate_l) < 2:
         return gate_l[0]
     
-    return reduce(_COMBINE_DICT[_sparse], gate_l[::-1])
+    return reduce(np.dot, gate_l[::-1])
     
 def ptrace_full(_q: Qubit) -> None:
     
@@ -481,41 +412,6 @@ def ptrace_full(_q: Qubit) -> None:
     for i in range(_q.num_qubits):
         _q._qsystem._qubits[i]._index = i
 
-def ptrace_sparse(_q: Qubit) -> None:
-        
-    """
-    Traces out a qubit from the state, adjusts the QSystem accordingly
-    
-    Args:
-        _q (Qubit): qubit to trace out
-        
-    Returns:
-        /
-    """
-    
-    v1 = sp.csr_matrix([[1, 0]], dtype=np.complex128)
-    v2 = sp.csr_matrix([[0, 1]], dtype=np.complex128)
-    
-    key_1 = f'{1}_v1_{_q.num_qubits}_{_q._index}'
-    key_2 = f'{1}_v1T_{_q.num_qubits}_{_q._index}'
-    key_3 = f'{1}_v2_{_q.num_qubits}_{_q._index}'
-    key_4 = f'{1}_v2T_{_q.num_qubits}_{_q._index}'
-    
-    op_1_a = get_single_operator(key_1, 1, v1, _q._index, _q.num_qubits)
-    op_1_b = get_single_operator(key_2, 1, v1.T, _q._index, _q.num_qubits)
-    op_2_a = get_single_operator(key_3, 1, v2, _q._index, _q.num_qubits)
-    op_2_b = get_single_operator(key_4, 1, v2.T, _q._index, _q.num_qubits)
-
-    _q.state = sp.csr_matrix(op_1_a.dot(_q.state.dot(op_1_b)) + op_2_a.dot(_q.state.dot(op_2_b)))
-    _q.state.eliminate_zeros()
-    _q.num_qubits -= 1
-    
-    del _q._qsystem._qubits[_q._index]
-    for i in range(_q.num_qubits):
-        _q._qsystem._qubits[i]._index = i
-
-_PTRACE_DICT = {0: ptrace_full, 1: ptrace_sparse}
-
 def remove_qubits(q_l: List[Qubit]) -> None:
 
     """
@@ -529,7 +425,7 @@ def remove_qubits(q_l: List[Qubit]) -> None:
     """
     
     for qubit in q_l:
-        _PTRACE_DICT[qubit.sparse](qubit)
+        ptrace_full(qubit)
 
 class Qubit:
     
@@ -632,20 +528,6 @@ class Qubit:
         self._qsystem._num_qubits = num_qubits
     
     @property
-    def sparse(self) -> int:
-        
-        """
-        Returns whether the state of the QSystem is in sparse representation or not
-        
-        Args:
-            /
-            
-        Returns:
-            _sparse (int): sparsity of state
-        """
-        
-        return self._qsystem._sparse
-    
     def qubit_id(self) -> int:
         
         """
@@ -660,6 +542,7 @@ class Qubit:
         
         return id(self)
     
+    @property
     def qsystem_id(self) -> int:
         
         """
@@ -686,15 +569,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_x_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['X'], self._index, self.num_qubits)
+        key = f's_x_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['X'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
         
     def Y(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -708,15 +591,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_y_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['Y'], self._index, self.num_qubits)
+        key = f's_y_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['Y'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
         
     def Z(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -730,15 +613,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_z_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['Z'], self._index, self.num_qubits)
+        key = f's_z_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['Z'], self._index, self.num_qubits)
         
         if not apply:    
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
         
     def H(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -752,15 +635,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_h_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['H'], self._index, self.num_qubits)
+        key = f's_h_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['H'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
 
     def SX(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -774,15 +657,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_sx_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['SX'], self._index, self.num_qubits)
+        key = f's_sx_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['SX'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def SY(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -796,15 +679,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_sy_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['SY'], self._index, self.num_qubits)
+        key = f's_sy_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['SY'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def SZ(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -818,15 +701,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_sz_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['SZ'], self._index, self.num_qubits)
+        key = f's_sz_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['SZ'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def T(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -840,15 +723,15 @@ class Qubit:
             /
         """
     
-        key = f'{self.sparse}_s_t_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['T'], self._index, self.num_qubits)
+        key = f's_t_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['T'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def K(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -862,15 +745,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_k_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['K'], self._index, self.num_qubits)
+        key = f's_k_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['K'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def iSX(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -884,15 +767,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_isx_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['iSX'], self._index, self.num_qubits)
+        key = f's_isx_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['iSX'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def iSY(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -906,15 +789,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_isy_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['iSY'], self._index, self.num_qubits)
+        key = f's_isy_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['iSY'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def iSZ(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -928,15 +811,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_isz_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['iSZ'], self._index, self.num_qubits)
+        key = f's_isz_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['iSZ'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def iT(self, fidelity: float=1., apply: bool=True) -> None:
         
@@ -950,15 +833,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_it_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['iT'], self._index, self.num_qubits)
+        key = f's_it_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['iT'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def iK(self, fidelity: float=1., apply: bool=True):
         
@@ -972,15 +855,15 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_ik_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, self.sparse, gates[self.sparse]['iK'], self._index, self.num_qubits)
+        key = f's_ik_{self.num_qubits}_{self._index}'
+        gate = get_single_operator(key, full_gates['iK'], self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def Rx(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
@@ -995,18 +878,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_rx_{theta}_{self.num_qubits}_{self._index}'
+        key = f's_rx_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.cos(theta/2), -1j * np.sin(theta/2)], [-1j * np.sin(theta/2), np.cos(theta/2)]], dtype=np.complex128)
-        if self.sparse:
-            gate_s = sp.csr_matrix([[np.cos(theta/2), -1j * np.sin(theta/2)], [-1j * np.sin(theta/2), np.cos(theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, self.sparse, gate_s, self._index, self.num_qubits)
+        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def Ry(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1021,18 +902,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_ry_{theta}_{self.num_qubits}_{self._index}'
+        key = f's_ry_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.cos(theta/2), -np.sin(theta/2)], [np.sin(theta/2), np.cos(theta/2)]], dtype=np.complex128)
-        if self.sparse:
-            gate_s = sp.csr_matrix([[np.cos(theta/2), -np.sin(theta/2)], [np.sin(theta/2), np.cos(theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, self.sparse, gate_s, self._index, self.num_qubits)
+        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)        
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
         
     def Rz(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1047,18 +926,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_rz_{theta}_{self.num_qubits}_{self._index}'
+        key = f's_rz_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.exp(-1j * theta/2), 0], [0, np.exp(1j * theta/2)]], dtype=np.complex128)
-        if self.sparse:
-            sp.csr_matrix([[np.exp(-1j * theta/2), 0], [0, np.exp(1j * theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, self.sparse, gate_s, self._index, self.num_qubits)
+        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
         
     def PHASE(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1073,18 +950,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_p_{theta}_{self.num_qubits}_{self._index}'
+        key = f's_p_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
-        if self.sparse:
-            gate_s = sp.csr_matrix([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
-        gate = get_single_operator(key, self.sparse, gate_s, self._index, self.num_qubits)
+        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def general_rotation(self, theta: float, phi: float, psi: float, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1101,18 +976,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_s_gr_{theta}_{phi}_{psi}_{self.num_qubits}_{self._index}'
+        key = f's_gr_{theta}_{phi}_{psi}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.cos(theta/2), -np.exp(1j*psi)*np.sin(theta/2)], [np.exp(1j*phi)*np.sin(theta/2), np.exp(1j*(phi+psi))*np.cos(theta/2)]], dtype=np.complex128)
-        if self.sparse:
-            gate_s = sp.csr_matrix([[np.cos(theta/2), -np.exp(1j*psi)*np.sin(theta/2)], [np.exp(1j*phi)*np.sin(theta/2), np.exp(1j*(phi+psi))*np.cos(theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, self.sparse, gate_s, self._index, self.num_qubits)
+        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
         
         if not apply:
             return gate
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def custom_single_gate(self, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1127,7 +1000,7 @@ class Qubit:
             /
         """
         
-        gate = get_single_operator('', self.sparse, gate, self._index, self.num_qubits)
+        gate = get_single_operator('', gate, self._index, self.num_qubits)
         
         if not apply:
             return gate
@@ -1135,7 +1008,7 @@ class Qubit:
         self.state = dot(self.state, gate)
         
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
      
     def CNOT(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1150,16 +1023,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_d_x_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, target.sparse, gates[self.sparse]['X'], self._index, target._index, target.num_qubits)
+        key = f'd_x_{target.num_qubits}_{self._index}_{target._index}'
+        gate = get_double_operator(key, full_gates['X'], self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, target.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
 
     def CX(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1174,16 +1047,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_d_x_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, target.sparse, gates[self.sparse]['X'], self._index, target._index, target.num_qubits)
+        key = f'd_x_{target.num_qubits}_{self._index}_{target._index}'
+        gate = get_double_operator(key, full_gates['X'], self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, target.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
 
     def CY(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1198,16 +1071,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_d_y_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, target.sparse, gates[self.sparse]['Y'], self._index, target._index, target.num_qubits)
+        key = f'd_y_{target.num_qubits}_{self._index}_{target._index}'
+        gate = get_double_operator(key, full_gates['Y'], self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, target.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def CZ(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1222,16 +1095,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_d_z_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, target.sparse, gates[self.sparse]['Z'], self._index, target._index, target.num_qubits)
+        key = f'd_z_{target.num_qubits}_{self._index}_{target._index}'
+        gate = get_double_operator(key, full_gates['Z'], self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, target.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def CH(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1246,16 +1119,16 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_d_h_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, target.sparse, gates[self.sparse]['H'], self._index, target._index, target.num_qubits)
+        key = f'd_h_{target.num_qubits}_{self._index}_{target._index}'
+        gate = get_double_operator(key, full_gates['H'], self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, target.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def CPHASE(self, target: Qubit, theta: float, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1271,19 +1144,17 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_d_p_{theta}_{target.num_qubits}_{self._index}_{target._index}'
+        key = f'd_p_{theta}_{target.num_qubits}_{self._index}_{target._index}'
         gate_s = np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
-        if self.sparse:
-            gate_s = sp.csr_matrix([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
-        gate = get_double_operator(key, target.sparse, gate_s, self._index, target._index, target.num_qubits)
+        gate = get_double_operator(key, gate_s, self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def CU(self, target: Qubit, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1299,15 +1170,15 @@ class Qubit:
             /
         """
         
-        gate = get_double_operator('', target.sparse, gate, self._index, target._index, target.num_qubits)
+        gate = get_double_operator('', gate, self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def SWAP(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1322,8 +1193,8 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_d_sw_{self.num_qubits}_{self._index}_{target._index}'
-        swap_gate = get_swap_operator(key, self.sparse, self._index, target._index, self.num_qubits)
+        key = f'd_sw_{self.num_qubits}_{self._index}_{target._index}'
+        swap_gate = get_swap_operator(key, self._index, target._index, self.num_qubits)
         
         if not apply:
             return swap_gate
@@ -1333,8 +1204,8 @@ class Qubit:
         self._index, target._index = target._index, self._index
         
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, target.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def iSWAP(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1360,8 +1231,8 @@ class Qubit:
             return combine_gates([s_t_swap, s_sz, t_sz, t_h, s_t_cx, t_h])
         
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def QAND(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1377,9 +1248,9 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_t_iiix_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
-        gate = get_triple_operator(key, target.sparse, 
-                                    [gates[self.sparse]['I'],gates[self.sparse]['I'], gates[self.sparse]['I'], gates[self.sparse]['X']], 
+        key = f't_iiix_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
+        gate = get_triple_operator(key, 
+                                    [full_gates['I'], full_gates['I'], full_gates['I'], full_gates['X']], 
                                     self._index, control._index, target._index, target.num_qubits)
         
         if not apply:
@@ -1387,9 +1258,9 @@ class Qubit:
     
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(control, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(control, fidelity)
+            depolarization_error(target, fidelity)
     
     def QOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1405,9 +1276,9 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_t_ixxx_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
-        gate = get_triple_operator(key, target.sparse, 
-                                    [gates[self.sparse]['I'],gates[self.sparse]['X'], gates[self.sparse]['X'], gates[self.sparse]['X']], 
+        key = f't_ixxx_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
+        gate = get_triple_operator(key, 
+                                    [full_gates['I'], full_gates['X'], full_gates['X'], full_gates['X']], 
                                     self._index, control._index, target._index, target.num_qubits)
         
         if not apply:
@@ -1415,9 +1286,9 @@ class Qubit:
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(control, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(control, fidelity)
+            depolarization_error(target, fidelity)
     
     def QXOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1433,9 +1304,9 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_t_ixxi_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
-        gate = get_triple_operator(key, target.sparse, 
-                                    [gates[self.sparse]['I'],gates[self.sparse]['X'], gates[self.sparse]['X'], gates[self.sparse]['I']], 
+        key = f't_ixxi_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
+        gate = get_triple_operator(key, 
+                                    [full_gates['I'], full_gates['X'], full_gates['X'], full_gates['I']], 
                                     self._index, control._index, target._index, target.num_qubits)
         
         if not apply:
@@ -1443,9 +1314,9 @@ class Qubit:
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(control, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(control, fidelity)
+            depolarization_error(target, fidelity)
     
     def QNAND(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1461,9 +1332,9 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_t_xxxi_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
-        gate = get_triple_operator(key, target.sparse, 
-                                    [gates[self.sparse]['X'],gates[self.sparse]['X'], gates[self.sparse]['X'], gates[self.sparse]['I']], 
+        key = f't_xxxi_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
+        gate = get_triple_operator(key, 
+                                    [full_gates['X'], full_gates['X'], full_gates['X'], full_gates['I']], 
                                     self._index, control._index, target._index, target.num_qubits)
         
         if not apply:
@@ -1471,9 +1342,9 @@ class Qubit:
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(control, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(control, fidelity)
+            depolarization_error(target, fidelity)
     
     def QNOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1489,9 +1360,9 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_t_xiii_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
-        gate = get_triple_operator(key, target.sparse, 
-                                    [gates[self.sparse]['X'],gates[self.sparse]['I'], gates[self.sparse]['I'], gates[self.sparse]['I']], 
+        key = f't_xiii_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
+        gate = get_triple_operator(key, 
+                                    [full_gates['X'], full_gates['I'], full_gates['I'], full_gates['I']], 
                                     self._index, control._index, target._index, target.num_qubits)
         
         if not apply:
@@ -1499,9 +1370,9 @@ class Qubit:
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(control, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(control, fidelity)
+            depolarization_error(target, fidelity)
     
     def QXNOR(self, control: Qubit, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1517,9 +1388,9 @@ class Qubit:
             /
         """
         
-        key = f'{self.sparse}_t_xiix_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
-        gate = get_triple_operator(key, target.sparse, 
-                                    [gates[self.sparse]['X'],gates[self.sparse]['I'], gates[self.sparse]['I'], gates[self.sparse]['X']], 
+        key = f't_xiix_{target.num_qubits}_{self._index}_{control._index}_{target._index}'
+        gate = get_triple_operator(key, 
+                                    [full_gates['X'], full_gates['I'], full_gates['I'], full_gates['X']], 
                                     self._index, control._index, target._index, target.num_qubits)
         
         if not apply:
@@ -1527,9 +1398,9 @@ class Qubit:
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(control, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(control, fidelity)
+            depolarization_error(target, fidelity)
     
     def CCU(self, control: Qubit, target: Qubit, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1546,8 +1417,8 @@ class Qubit:
             /
         """
         
-        gate = get_triple_operator('', target.sparse, 
-                                        [gates[self.sparse]['I'], gates[self.sparse]['I'], gates[self.sparse]['I'], gate],
+        gate = get_triple_operator('', 
+                                        [full_gates['I'], full_gates['I'], full_gates['I'], gate],
                                         self._index, control._index, target._index, target.num_qubits)
         
         if not apply:
@@ -1556,9 +1427,9 @@ class Qubit:
         target.state = dot(target.state, gate)
         
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(control, self.sparse, fidelity)
-            depolarization_error(target, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(control, fidelity)
+            depolarization_error(target, fidelity)
     
     def CSWAP(self, target1: Qubit, target2: Qubit, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1582,9 +1453,9 @@ class Qubit:
             return combine_gates([t2_t1, t1_t2, t2_t1])
         
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target1, target1.sparse, fidelity)
-            depolarization_error(target2, target2.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target1, fidelity)
+            depolarization_error(target2, fidelity)
     
     def exp_pauli(self, theta: float, gates: List[int], fidelity: float=1., apply: bool=True) -> None:
         
@@ -1600,8 +1471,8 @@ class Qubit:
             /
         """
         
-        identity_seq = tensor_operator([gates[self.sparse]['I']] * len(gates))
-        pauli_gates = [gates[self.sparse]['I'], gates[self.sparse]['X'], gates[self.sparse]['Y'], gates[self.sparse]['Z']]
+        identity_seq = tensor_operator([full_gates['I']] * len(gates))
+        pauli_gates = [full_gates['I'], full_gates['X'], full_gates['Y'], full_gates['Z']]
         pauli_seq = tensor_operator([pauli_gates[gate] for gate in gates])
         gate = np.cos(theta/2) * identity_seq - 1j * np.sin(theta/2) * pauli_seq
         
@@ -1610,7 +1481,7 @@ class Qubit:
         
         self.state = dot(self.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
     
     def bell_state(self, target: Qubit, bell_state: int=0, fidelity: float=1., apply: bool=True) -> None:
         
@@ -1630,16 +1501,16 @@ class Qubit:
         if not (0 <= bell_state <= 3):
             raise ValueError('Bell state should be between 0 and 3')
         
-        key = f'{self.sparse}_bs_{bell_state}_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_bell_operator(key, target.sparse, bell_state, self._index, target._index, target.num_qubits)
+        key = f'bs_{bell_state}_{target.num_qubits}_{self._index}_{target._index}'
+        gate = get_bell_operator(key, bell_state, self._index, target._index, target.num_qubits)
         
         if not apply:
             return gate
         
         target.state = dot(target.state, gate)
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
-            depolarization_error(target, target.sparse, fidelity)
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
     
     def measure(self, basis: str='z', fid_0: float=1., fid_1: float=1.) -> int:
         
@@ -1663,20 +1534,17 @@ class Qubit:
         
         P0 = np.array([[np.sqrt(fid_0), 0], [0, np.sqrt(1 - fid_1)]])
         P1 = np.array([[np.sqrt(1 - fid_0), 0], [0, np.sqrt(fid_1)]])
-        if self.sparse:
-            P0 = sp.csr_matrix([[np.sqrt(fid_0), 0], [0, np.sqrt(1 - fid_1)]])
-            P1 = sp.csr_matrix([[np.sqrt(1 - fid_0), 0], [0, np.sqrt(fid_1)]])
         
-        key = f'{self.sparse}_s_m0_{fid_0}_{fid_1}_{self.num_qubits}_{self._index}'
-        measure_0 = get_single_operator(key, self.sparse, P0, self._index, self.num_qubits)
+        key = f's_m0_{fid_0}_{fid_1}_{self.num_qubits}_{self._index}'
+        measure_0 = get_single_operator(key, P0, self._index, self.num_qubits)
         prob = np.real(np.trace(np.dot(measure_0, self.state)))
         
         if np.random.uniform(0, 1) <= prob:
             self.state = dot(self.state, measure_0) / prob
             return 0
         else:
-            key = f'{self.sparse}_s_m1_{fid_0}_{fid_1}_{self.num_qubits}_{self._index}'
-            measure_1 = get_single_operator(key, self.sparse, P1, self._index, self.num_qubits)
+            key = f's_m1_{fid_0}_{fid_1}_{self.num_qubits}_{self._index}'
+            measure_1 = get_single_operator(key, P1, self._index, self.num_qubits)
             self.state = dot(self.state, measure_1) / (1 - prob)
             return 1
 
@@ -1702,7 +1570,7 @@ class Qubit:
             self.X()
         
         if fidelity < 1.:
-            depolarization_error(self, self.sparse, fidelity)
+            depolarization_error(self, fidelity)
 
     def bsm(self, target: Qubit, basis_0: str='z', basis_1: str='z', fid_0: float=1., fid_1: float=1.) -> int:
         
@@ -1720,8 +1588,8 @@ class Qubit:
             res (int): measurement result
         """
         
-        key = f'{self.sparse}_bsm_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_bsm_operator(key, target.sparse, self._index, target._index, target.num_qubits)
+        key = f'bsm_{target.num_qubits}_{self._index}_{target._index}'
+        gate = get_bsm_operator(key, self._index, target._index, target.num_qubits)
         target.state = dot(target.state, gate)
         
         return 2 * self.measure(basis=basis_0, fid_0=fid_0, fid_1=fid_1) + target.measure(basis=basis_1, fid_0=fid_0, fid_1=fid_1)
@@ -1785,8 +1653,8 @@ class Qubit:
         if direction:
             q_1, q_2 = q_2, q_1
         
-        key = f'{q_2.sparse}_d_{purification_gates[gate].lower()}_{q_2.num_qubits}_{q_1._index}_{q_2._index}'
-        gate_f = get_double_operator(key, q_2.sparse, gates[q_1.sparse][purification_gates[gate]], q_1._index, q_2._index, q_2.num_qubits)
+        key = f'd_{purification_gates[gate].lower()}_{q_2.num_qubits}_{q_1._index}_{q_2._index}'
+        gate_f = get_double_operator(key, full_gates[purification_gates[gate]], q_1._index, q_2._index, q_2.num_qubits)
         q_2.state = dot(q_2.state, gate_f)
         
         return target.measure(basis)
@@ -1817,11 +1685,10 @@ class QSystem:
     Attr:
         _num_qubits (int): number of qubits in the qsystem
         _qubits (list): qubits in the qsystem
-        _sparse (bool): whether the representation of the density matrix is sparse or not
         _state (np.array): density matrix of qsystem
     """
     
-    def __init__(self, num_qubits: int=1, fidelity: float=1., sparse: bool=0) -> None:
+    def __init__(self, num_qubits: int=1, fidelity: float=1.) -> None:
         
         """
         Instantiates the qubit state for a qubit system, initializes to the zero state
@@ -1829,23 +1696,29 @@ class QSystem:
         Args:
             num_qubits (int): number of qubits in the system
             fidelity (float): fidelity of the initial quantum system
-            sparse (bool): sparsity of quantum system
             
         Returns:
             /
         """
+
+        if isinstance(fidelity, float):
+            fidelity = [fidelity] * num_qubits
+        
+        if len(fidelity) != num_qubits:
+            raise ValueError('There should be a fidelity for all qubits')
+        
+        if not all([0 <= fid <= 1. for fid in fidelity]):
+            raise ValueError('Fidelities should be between 0 and 1')
         
         self._num_qubits: int = num_qubits
         self._qubits: List[Qubit] = [Qubit(self, i) for i in range(self._num_qubits)]
-        self._sparse: bool = sparse
-        
-        init_state = np.array([[fidelity, 0], [0, 1 - fidelity]], dtype=np.complex128)
-        if sparse:
-            init_state = sp.csr_matrix([[fidelity, 0], [0, 1 - fidelity]], dtype=np.complex128)
+            
+        init_state = [np.array([[fid, 0], [0, 1 - fid]]) for fid in fidelity]
 
-        self._state: Union[np.array, sp.csr_matrix] = init_state
         if self._num_qubits > 1:
-            self._state: Union[np.array, sp.csr_matrix] = tensor_operator(sparse, np.array([init_state] * self._num_qubits))
+            self._state: np.array = tensor_operator(init_state)
+        else:
+            self._state: np.array = init_state[0]
     
     def __len__(self) -> int:
         
