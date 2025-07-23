@@ -55,7 +55,7 @@ class Simulation:
             logging.basicConfig(filename=self._logging_path, level=logging.DEBUG)
     
     @staticmethod
-    def create_qsystem(num_qubits: int=1, fidelity: float=1., sparse: bool=0) -> QSystem:
+    def create_qsystem(num_qubits: int=1, fidelity: float=1.) -> QSystem:
     
         """
         Creates a QSystem with the given properties
@@ -69,7 +69,7 @@ class Simulation:
             qsystem (QSystem): QSystem with the given properties
         """
         
-        return QSystem(num_qubits, fidelity, sparse)
+        return QSystem(num_qubits, fidelity)
     
     def add_host(self, host: Host) -> None:
         
