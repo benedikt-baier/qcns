@@ -2,7 +2,7 @@ import os
 import logging
 import asyncio as asc
 from heapq import heappop, heappush
-from typing import List, Awaitable
+from typing import List, Dict, Awaitable
 
 from qcns.python.components.simulation.event import Event
 from qcns.python.components.qubit.qubit import QSystem
@@ -37,7 +37,7 @@ class Simulation:
         """
         
         self._event_queue: List[Event] = []
-        self._hosts: List[Host] = []
+        self._hosts: Dict[Host] = {}
         self._num_hosts: int = 0
         self._sim_end_time: float = end_time
         self._logging_path: str = logging_path
@@ -83,7 +83,7 @@ class Simulation:
             /
         """
         
-        self._hosts.append(host)
+        self._hosts[host.id] = host
     
     def set_end_time(self, end_time: float) -> None:
         
@@ -131,7 +131,6 @@ class Simulation:
         for host in self._hosts.values():
             host.reset()
         self._num_hosts = len(self._hosts)
-        
         if self._logging_path:
             with open(self._logging_path, 'w'):
                 pass
@@ -248,8 +247,6 @@ class Simulation:
         Returns:
             /
         """
-        
-        self._hosts = {host.id: host for host in self._hosts}
         
         if end_time > 0.:
             self.set_end_time(end_time)
