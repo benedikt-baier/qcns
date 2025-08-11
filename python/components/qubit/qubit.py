@@ -147,13 +147,13 @@ def get_single_operator(_gate: np.array, _index: int, _num_qubits: int) -> np.ar
         return tensor_operator(operator_l)
 
     if _index == 0:
-        return kronecker_product(_gate, full_gates['I'](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128))
+        return kronecker_product(_gate, np.eye(2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128))
         
     if _index == _num_qubits - 1:
-        return kronecker_product(full_gates['I'](2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128), _gate)
+        return kronecker_product(np.eye(2**(_num_qubits - 1), 2**(_num_qubits - 1), dtype=np.complex128), _gate)
     
-    left_array = full_gates['I'](2**_index, 2**_index, dtype=np.complex128)
-    right_array = full_gates['I'](2**(_num_qubits - _index - 1), 2**(_num_qubits - _index - 1), dtype=np.complex128)
+    left_array = np.eye(2**_index, 2**_index, dtype=np.complex128)
+    right_array = np.eye(2**(_num_qubits - _index - 1), 2**(_num_qubits - _index - 1), dtype=np.complex128)
     
     return kronecker_product(left_array, kronecker_product(_gate, right_array))
 
@@ -185,12 +185,12 @@ def get_double_operator(_gate: np.array, _c_index: int, _t_index: int, _t_num_qu
     
     proj1 = gate_dict[index_1]
     if left_index:
-        proj1 = kronecker_product(full_gates['I'](2**left_index, 2**left_index, dtype=np.complex128), proj1)
+        proj1 = kronecker_product(np.eye(2**left_index, 2**left_index, dtype=np.complex128), proj1)
     if middle_index:
-        proj1 = kronecker_product(proj1, full_gates['I'](2**middle_index, 2**middle_index, dtype=np.complex128))
+        proj1 = kronecker_product(proj1, np.eye(2**middle_index, 2**middle_index, dtype=np.complex128))
     proj1 = kronecker_product(proj1, gate_dict[index_2])
     if right_index:
-        proj1 = kronecker_product(proj1, full_gates['I'](2**right_index, 2**right_index, dtype=np.complex128))
+        proj1 = kronecker_product(proj1, np.eye(2**right_index, 2**right_index, dtype=np.complex128))
     
     return proj0 + proj1
 
@@ -221,7 +221,7 @@ def get_triple_operator(_gate_l: np.array, _c1_index: int, _c2_index: int, _t_in
     gate_list = [[0] * 7 for _ in range(4)]
     
     for i in range(4):
-        gate_list[i][::2] = [full_gates['I'](2**(index), 2**(index), dtype=np.complex128) if index else None for index in indices]
+        gate_list[i][::2] = [np.eye(2**(index), 2**(index), dtype=np.complex128) if index else None for index in indices]
         gate_list[i][1::2] = [gate_dict[index_1][i], gate_dict[index_2][i], gate_dict[index_3][i]]
         gate_list[i] = [gate for gate in gate_list[i] if gate is not None]
     

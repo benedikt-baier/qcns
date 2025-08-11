@@ -243,7 +243,7 @@ class RandomDepolarizationError:
         
         pass
     
-    def apply(self, _qubit: Qubit) -> None:
+    def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
         """
         Applies the Error to qubits
@@ -297,7 +297,7 @@ class RandomDephasingError:
         
         pass
     
-    def apply(self, _qubit: Qubit) -> None:
+    def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
         """
         Applies the Error to qubits
@@ -353,7 +353,7 @@ class RandomError:
         
         pass
     
-    def apply(self, _qubit: Qubit) -> None:
+    def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
         """
         Applies the Error to qubits
@@ -408,7 +408,7 @@ class SystematicDepolarizationError:
         
         pass
     
-    def apply(self, _qubit: Qubit) -> None:
+    def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
         """
         Applies the Error to qubits
@@ -461,7 +461,7 @@ class SystematicDephasingError:
         
         pass
     
-    def apply(self, _qubit: Qubit) -> None:
+    def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
         """
         Applies the Error to qubits
@@ -517,7 +517,7 @@ class SystematicError:
         
         pass
     
-    def apply(self, _qubit: Qubit) -> None:
+    def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
         """
         Applies the Error to qubits
