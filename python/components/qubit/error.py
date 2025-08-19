@@ -1,11 +1,9 @@
 import numpy as np
-import copy
-from typing import Union, Dict
 
 from qcns.python.components.qubit.qubit import Qubit, dot, get_single_operator
 
 __all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError',
-           'SystematicDephasingError', 'SystematicError', 'DepolarizationMemoryError', 'DephasingMemoryError', 'TimeDependentMemoryError']
+           'SystematicDephasingError', 'SystematicError']
 
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),

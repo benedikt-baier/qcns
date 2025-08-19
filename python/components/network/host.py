@@ -14,7 +14,7 @@ from qcns.python.components.hardware.memory import QuantumMemory
 from qcns.python.components.connection import SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
 from qcns.python.components.network.qprogram import QProgram  
 
-__all__ = ['Host']
+__all__ = ['Host', 'IF_entanglement_swapping', 'IF_fidelity_improvement', 'FF_entanglement_swapping', 'FF_fidelity_improvement']
 
 class QuantumError:
     pass
@@ -1880,3 +1880,83 @@ class Host:
         """
         
         return self._connections['memory'][host][store].remove_offset(index)
+
+def _IF(IF: int) -> float:
+    
+    """
+    Conversion function for an Integer Fidelity (IF) for use in the fidelity formulas for entanglement swapping and fidelity improvement
+    
+    Args:
+        IF (int): integer representation of a fidelity
+        
+    Returns:
+        _IF (float): converted integer fidelity
+    """
+    
+    return (2 ** (8 * IF / 255)).astype(np.float32)
+
+def IF_entanglement_swapping(IF_1: int, IF_2: int) -> int:
+    
+    """
+    Computes the integer fidelity for entanglement swapping based on two input integer fidelities
+    
+    Args:
+        IF_1 (int): first integer fidelity
+        IF_2 (int): second integer fidelity
+        
+    Returns:
+        _IF (int): output integer fidelity
+    """
+    
+    IF_1 = _IF(IF_1)
+    IF_2 = _IF(IF_2)
+    
+    return np.ceil(31.875 * np.log2(IF_1 + IF_2 - 1 - 2 / 765 * (IF_1 - 1) * (IF_2 - 1))).astype(np.uint8)
+
+def IF_fidelity_improvement(IF_g: int, IF_b: int) -> int:
+    
+    """
+    Computes the integer fidelity of the fidelity improvement for a GHZ and BP
+    
+    Args:
+        IF_g (int): integer fidelity of the GHZ
+        IF_b (int): integer fidelity of the BP
+        
+    Returns:
+        _IF (int): output integer fidelity
+    """
+    
+    IF_g = _IF(IF_g)
+    IF_b = _IF(IF_b)
+    
+    return np.ceil(31.875 * np.log2((327679 + 584456 * IF_g + 454151 * IF_b - 761 * IF_g * IF_b) / (1368844 - 1534 * IF_g - 1789 * IF_b + 4 * IF_g * IF_b))).astype(np.uint8)
+
+def FF_entanglement_swapping(fid_1: float, fid_2: float) -> float:
+    
+    """
+    Computes the float fidelity for the entanglement swapping
+    
+    Args:
+        fid_1 (float): first float fidelity
+        fid_2 (float): second float fidelity
+        
+    Returns:
+        _FF (float): output float fidelity
+    """
+    
+    return (4 * fid_1 * fid_2 - fid_1 - fid_2 + 1) / 3
+
+def FF_fidelity_improvement(fid_g: float, fid_b: float) -> float:
+    
+    """
+    Computes the float fidelity of the fidelity improvement with a GHZ and BP
+    
+    Args:
+        fid_g (float): float fidelity of GHZ
+        fid_b (float): float fidelity of BP
+        
+    Returns:
+        _FF (float): output fidelity
+    """
+    
+    return (22 * fid_g * fid_b - fid_g - fid_b + 1) / (16 * fid_g * fid_b - 4 * fid_g - 2 * fid_b + 11)
