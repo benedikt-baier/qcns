@@ -114,7 +114,7 @@ class QChannel:
             return None
         
         for error in self._errors:
-            _qubit = error.apply(_qubit)
+            _qubit = error.apply(_qubit, self._sending_time)
         
         return _qubit
 

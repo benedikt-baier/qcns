@@ -230,12 +230,6 @@ class Host:
             
         if not isinstance(receiver_channel_errors, list):
             receiver_channel_errors = [receiver_channel_errors]
-            
-        for com_error in sender_channel_errors:
-            com_error.add_signal_time(sender_length + receiver_length)
-        
-        for com_error in receiver_channel_errors:
-            com_error.add_signal_time(sender_length + receiver_length)
         
         connection_s_r = SingleQubitConnection(self, host.id, self._sim, sender_source, sender_num_sources, sender_length + receiver_length, 
                                                sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, sender_channel_errors)

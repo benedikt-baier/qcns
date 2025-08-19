@@ -37,37 +37,25 @@ class DepolarizationError:
         
         self._depolar_time: float = depolar_time
         
-    def add_signal_time(self, _length: float) -> None:
+    def apply(self, _qubit: Qubit, _time: float) -> None:
         
         """
-        Adds the signal time to calculate Depolarization probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
-
-        depolar_prob = np.exp(-(_length * (5e-6)) / self._depolar_time)
-        
-        self._gate_e0: np.array = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
-        self._gate_e1: np.array = np.sqrt(1 - depolar_prob) * full_gates['P01']
-        
-    def apply(self, _qubit: Qubit) -> None:
-        
-        """
-        Applies the Error to the qubits
+        Applies the Error to Qubit
         
         Args:
             _qubit (Qubit): qubit to apply error to
+            _time (float): time qubit is in storage
             
         Returns:
             /
         """
-
-        gate_e0 = get_single_operator('', self._gate_e0, _qubit._index, _qubit.num_qubits)
-        gate_e1 = get_single_operator('', self._gate_e1, _qubit._index, _qubit.num_qubits)
+        
+        depolar_prob = np.exp(-_time / self._depolar_time)
+        gate_e0 = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
+        gate_e1 = np.sqrt(1 - depolar_prob) * full_gates['P01']
+        
+        gate_e0 = get_single_operator('', gate_e0, _qubit._index, _qubit.num_qubits)
+        gate_e1 = get_single_operator('', gate_e1, _qubit._index, _qubit.num_qubits)
         _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
         
         return _qubit
@@ -97,37 +85,26 @@ class DephasingError:
         
         self._dephase_time: float = dephase_time
         
-    def add_signal_time(self, _length: float) -> None:
+    def apply(self, _qubit: Qubit, _time: float) -> None:
         
         """
-        Adds the signal time to calculate Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
-        
-        self._dephase_prob: float = 0.5 * (1 - np.exp(-(_length * (5e-6)) / self._dephase_time))
-        self._dephase_prob_inv: float = 1 - self._dephase_prob
-        
-    def apply(self, _qubit: Qubit) -> None:
-        
-        """
-        Applies the Error to the qubits
+        Applies the Error to Qubit
         
         Args:
             _qubit (Qubit): qubit to apply error to
+            _time (float): time qubit is in storage
             
         Returns:
             /
         """
-
+        
+        dephase_prob = 0.5 * (1 - np.exp(-_time / self._dephase_time))
+        dephase_prob_inv = 1 - dephase_prob
+         
         key = f's_z_{_qubit.num_qubits}_{_qubit._index}'
         gate_z = get_single_operator(key, full_gates['Z'], _qubit._index, _qubit.num_qubits)
-        _qubit.state = self._dephase_prob_inv * _qubit.state + self._dephase_prob * dot(_qubit.state, gate_z)
-
+        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
+        
         return _qubit
 
 class TimeDependentError:
@@ -163,46 +140,34 @@ class TimeDependentError:
         self._depolar_time: float = depolar_time
         self._dephase_time: float = dephase_time
         
-    def add_signal_time(self, _length: float) -> None:
+    def apply(self, _qubit: Qubit, _time: float) -> None:
         
         """
-        Adds the signal time to calculate Depolarization and Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
- 
-        signal_time = _length * (5e-6)
-        
-        depolar_prob = np.exp(-(signal_time / self._depolar_time))
-        self._gate_e0: np.array = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
-        self._gate_e1: np.array = np.sqrt(1 - depolar_prob) * full_gates['P01']
-        
-        self._dephase_prob: float = 0.5 * (1 - np.exp(-signal_time * (1 / self._dephase_time - 1 / (2 * self._depolar_time))))
-        self._dephase_prob_inv: float = 1 - self._dephase_prob
-        
-    def apply(self, _qubit: Qubit) -> None:
-        
-        """
-        Applies the Error to qubits
+        Applies the Error to Qubit
         
         Args:
             _qubit (Qubit): qubit to apply error to
+            _time (float): time qubit is in storage
             
         Returns:
             /
         """
+
+        depolar_prob = np.exp(-_time / self._depolar_time)
+        
+        gate_e0 = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
+        gate_e1 = np.sqrt(1 - depolar_prob) * full_gates['P01']
+        
+        dephase_prob = 0.5 * (1 - np.exp(-_time * (1/self._dephase_time - 1/(2 * self._depolar_time))))
+        dephase_prob_inv = 1 - dephase_prob
         
         key = f's_z_{_qubit.num_qubits}_{_qubit._index}'
-        gate_e0 = get_single_operator('', self._gate_e0, _qubit._index, _qubit.num_qubits)
-        gate_e1 = get_single_operator('', self._gate_e1, _qubit._index, _qubit.num_qubits)
+        gate_e0 = get_single_operator('', gate_e0, _qubit._index, _qubit.num_qubits)
+        gate_e1 = get_single_operator('', gate_e1, _qubit._index, _qubit.num_qubits)
         gate_z = get_single_operator(key, full_gates['Z'], _qubit._index, _qubit.num_qubits)
         
-        state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
-        _qubit.state = self._dephase_prob_inv * state + self._dephase_prob * dot(state, gate_z)
+        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
+        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
         
         return _qubit
         
@@ -228,20 +193,6 @@ class RandomDepolarizationError:
         """
         
         self._variance: float = variance
-        
-    def add_signal_time(self, _length: float=0.0) -> None:
-        
-        """
-        Adds the signal time to calculate Depolarization and Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
-        
-        pass
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -282,20 +233,6 @@ class RandomDephasingError:
         """
         
         self._variance: float = variance
-        
-    def add_signal_time(self, _length: float=0.0) -> None:
-        
-        """
-        Adds the signal time to calculate Depolarization and Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
-        
-        pass
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -338,20 +275,6 @@ class RandomError:
         
         self._x_variance: float = x_variance
         self._z_variance: float = z_variance
-        
-    def add_signal_time(self, _length: float=0.0) -> None:
-        
-        """
-        Adds the signal time to calculate Depolarization and Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
-        
-        pass
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -393,20 +316,6 @@ class SystematicDepolarizationError:
         """
         
         self._theta: float = np.random.normal(0, variance)
-        
-    def add_signal_time(self, _length: float=0.0) -> None:
-        
-        """
-        Adds the signal time to calculate Depolarization and Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
-        
-        pass
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -446,20 +355,6 @@ class SystematicDephasingError:
         """
         
         self._theta: float = np.random.normal(0, variance)
-        
-    def add_signal_time(self, _length: float=0.0) -> None:
-        
-        """
-        Adds the signal time to calculate Depolarization and Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            
-        Returns:
-            /
-        """
-        
-        pass
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -501,21 +396,6 @@ class SystematicError:
         
         self._theta_x: float = np.random.normal(0, x_variance)
         self._theta_z: float = np.random.normal(0, z_variance)
-        
-    def add_signal_time(self, _length: float=0.0) -> None:
-        
-        """
-        Adds the signal time to calculate Depolarization and Dephasing probability
-        
-        Args:
-            _length (float): length of fiber
-            _attenuation_coefficient (float): attenuation coefficient of fiber
-            
-        Returns:
-            /
-        """
-        
-        pass
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -531,156 +411,5 @@ class SystematicError:
         
         _qubit.Rx(self._theta_x)
         _qubit.Rz(self._theta_z)
-        
-        return _qubit
-
-class DepolarizationMemoryError:
-    
-    """
-    Represents a Depolarization Error in Memory
-    
-    Attr:
-        _depolar_time (float): depolarization time
-    """
-    
-    def __init__(self, depolar_time: float=1e-3) -> None:
-        
-        """
-        Initializes a Depolarization Error in Memory
-        
-        Args:
-            depolar_time (float): depolarization time
-            
-        Returns:
-            /
-        """
-        
-        self._depolar_time: float = depolar_time
-
-    def apply(self, _qubit: Qubit, _time: float) -> None:
-        
-        """
-        Applies the Error to Qubit
-        
-        Args:
-            _qubit (Qubit): qubit to apply error to
-            _time (float): time qubit is in storage
-            
-        Returns:
-            /
-        """
-        
-        depolar_prob = np.exp(-_time / self._depolar_time)
-        gate_e0 = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
-        gate_e1 = np.sqrt(1 - depolar_prob) * full_gates['P01']
-        
-        gate_e0 = get_single_operator('', gate_e0, _qubit._index, _qubit.num_qubits)
-        gate_e1 = get_single_operator('', gate_e1, _qubit._index, _qubit.num_qubits)
-        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
-        
-        return _qubit
-
-class DephasingMemoryError:
-    
-    """
-    Represents a Depolarization Error in Memory
-    
-    Attr:
-        _dephase_time (float): dephasing time
-    """
-    
-    def __init__(self, dephase_time: float=1e-3) -> None:
-        
-        """
-        Initializes a Depolarization Error in Memory
-        
-        Args:
-            dephase_time (float): depolarization time
-            
-        Returns:
-            /
-        """
-        
-        self._dephase_time: float = dephase_time
-
-    def apply(self, _qubit: Qubit, _time: float) -> None:
-        
-        """
-        Applies the Error to Qubit
-        
-        Args:
-            _qubit (Qubit): qubit to apply error to
-            _time (float): time qubit is in storage
-            
-        Returns:
-            /
-        """
-        
-        dephase_prob = 0.5 * (1 - np.exp(-_time / self._dephase_time))
-        dephase_prob_inv = 1 - dephase_prob
-         
-        key = f's_z_{_qubit.num_qubits}_{_qubit._index}'
-        gate_z = get_single_operator(key, full_gates['Z'], _qubit._index, _qubit.num_qubits)
-        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
-        
-        return _qubit
-
-class TimeDependentMemoryError:
-    
-    """
-    Represents a Time Dependent Errors in Memories
-    
-    Attr:
-        _depolar_time (float): depolarization time
-        _dephase_time (float): dephasing time
-    """
-    
-    def __init__(self, depolar_time: float=1e-3, dephase_time: float=1e-3) -> None:
-        
-        """
-        Initializes a Time Dependent Errors in Memories
-        
-        Args:
-            depolar_time (float): depolarization time
-            dephase_time (float): dephasing time
-            
-        Returns:
-            /
-        """
-        
-        if dephase_time >= 2 * depolar_time:
-            raise ValueError('Depolarization Rate has to be greater than Dephasing Rate')
-        
-        self._depolar_time: float = depolar_time
-        self._dephase_time: float = dephase_time
-        
-    def apply(self, _qubit: Qubit, _time: float) -> None:
-        
-        """
-        Applies the Error to Qubit
-        
-        Args:
-            _qubit (Qubit): qubit to apply error to
-            _time (float): time qubit is in storage
-            
-        Returns:
-            /
-        """
-
-        depolar_prob = np.exp(-_time / self._depolar_time)
-        
-        gate_e0 = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
-        gate_e1 = np.sqrt(1 - depolar_prob) * full_gates['P01']
-        
-        dephase_prob = 0.5 * (1 - np.exp(-_time * (1/self._dephase_time - 1/(2*self._depolar_time))))
-        dephase_prob_inv = 1 - dephase_prob
-        
-        key = f's_z_{_qubit.num_qubits}_{_qubit._index}'
-        gate_e0 = get_single_operator('', gate_e0, _qubit._index, _qubit.num_qubits)
-        gate_e1 = get_single_operator('', gate_e1, _qubit._index, _qubit.num_qubits)
-        gate_z = get_single_operator(key, full_gates['Z'], _qubit._index, _qubit.num_qubits)
-        
-        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
-        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
         
         return _qubit
