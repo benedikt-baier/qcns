@@ -1,8 +1,16 @@
 
 import numpy as np
-from typing import List, Tuple, Any
+from typing import List, Tuple, Union, Any
 
-__all__ = ['L1_Protocol', 'L2_Protocol', 'L3_Protocol', 'L4_Protocol', 'L7_Protocol']
+__all__ = ['L1_Protocol', 'L2_Protocol', 'L3_Protocol', 'L4_Protocol', 'L7_Protocol', '_convert_fidelity_IR', '_invert_IR_fidelity']
+
+def _convert_fidelity_IR(_fidelity: float | np.array) -> int | np.array:
+    
+    return np.ceil(31.875 * np.log2(511 - 510 * _fidelity)).astype(np.uint8)
+
+def _invert_IR_fidelity(_IR: int | np.array) -> float | np.array:
+    
+    return ((511 - 2 ** (_IR / 31.875)) / 510).astype(np.float32)
 
 class L1_Protocol:
     
@@ -739,7 +747,7 @@ class L3_Protocol:
         _header_length (int): header length
     """
     
-    def __init__(self, _src: int, _dst: int, _requested: int, _needed: int) -> None:
+    def __init__(self, _src: int, _dst: int, _requested: int, _needed: int, _fidelity: float | List[float]) -> None:
         
         """
         Initializes the L3 Protocol Header
@@ -766,15 +774,31 @@ class L3_Protocol:
         if self._requested > 0 and self._needed < 1:
             self._needed = self._requested
              
+        self._success: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte         
+    
         self._x_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
         self._z_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
+        
+        if isinstance(_fidelity, float):
+            _fidelity = [_fidelity] * self._needed
+
+        if len(_fidelity) != self._needed:
+            raise ValueError(f'Fidelity array must be of length {self._needed}, got {len(_fidelity)}')
+
+        _fidelity = np.array(_fidelity, dtype=np.float32)
+        
+        if np.any(_fidelity < 0.5) or np.any(_fidelity > 1):
+            raise ValueError(f'Fidelity values must be in the range [0.5, 1]')
+        
+        self._threshold: np.array = _convert_fidelity_IR(_fidelity) # 256 byte
+        self._fidelity: np.array = np.zeros(self._needed, dtype=np.uint8) # 256 byte
         
         self._mode: int = 1 # 2 bit
         self._hop_count: int = 0 # 1byte
         
         self._protocol: int = 0 # 1byte
         self._next_protocol: int = 0 # 1byte
-        self._header_length: int = 810
+        self._header_length: int = 5146
     
     def __len__(self) -> int:
         
@@ -1108,6 +1132,36 @@ class L3_Protocol:
         self._hop_count = hop_count
     
     @property
+    def success(self) -> np.array:
+        
+        """
+        Returns the success array
+        
+        Args:
+            /
+            
+        Returns:
+            success (np.array): success array
+        """
+    
+        return self._success
+    
+    @success.setter
+    def success(self, _success: np.array) -> None:
+        
+        """
+        Sets the success array
+        
+        Args:
+            _success (np.array): success array
+            
+        Returns:
+            /
+        """
+        
+        self._success = _success
+    
+    @property
     def es_result(self) -> Tuple[np.array, np.array]:
         
         """
@@ -1122,23 +1176,8 @@ class L3_Protocol:
         
         return self._x_count, self._z_count
     
-    @es_result.setter
-    def es_result(self, _es_result: Tuple[np.array, np.array]) -> None:
-        
-        """
-        Sets the X and Z array
-        
-        Args:
-            _es_result (tuple): X and Z array
-            
-        Returns:
-            /
-        """
-        
-        self._x_count, self._z_count = _es_result
-        self._needed = len(self._x_count)
-        
-    def update_es(self, _res: int, _idx: int) -> None:
+    @es_result.setter  
+    def es_result(self, _res: int, _idx: int) -> None:
         
         """
         Updates the X and Z array at the index with the result
@@ -1174,6 +1213,204 @@ class L3_Protocol:
         
         self._x_count[_idx] = 0
         self._z_count[_idx] = 0
+    
+    @property
+    def x_count(self) -> np.array:
+        
+        """
+        Returns the X count array
+        
+        Args:
+            /
+            
+        Returns:
+            x_count (np.array): X count array
+        """
+        
+        return self._x_count
+    
+    @x_count.setter
+    def x_count(self, _res: int, _idx: int) -> None:
+    
+        """
+        Updates the X count array at the index with the result
+        
+        Args:
+            _res (int): result to update X count array
+            _idx (int): index to update X count array
+            
+        Returns:
+            /
+        """
+        
+        self._x_count[_idx] = np.logical_not(self._x_count[_idx], _res)
+    
+    @property
+    def z_count(self) -> np.array:
+        
+        """
+        Returns the Z count array
+        
+        Args:
+            /
+            
+        Returns:
+            z_count (np.array): Z count array
+        """
+        
+        return self._z_count
+    
+    @z_count.setter
+    def z_count(self, _res: int, _idx: int) -> None:
+    
+        """
+        Updates the Z count array at the index with the result
+        
+        Args:
+            _res (int): result to update Z count array
+            _idx (int): index to update Z count array
+            
+        Returns:
+            /
+        """
+
+        self._z_count[_idx] = np.logical_not(self._z_count[_idx], _res)
+    
+    @property
+    def threshold(self) -> np.array:
+        
+        """
+        Returns the fidelity threshold array
+        
+        Args:
+            /
+            
+        Returns:
+            threshold (np.array): fidelity threshold for all needed qubits
+        """
+        
+        return self._threshold
+    
+    @threshold.setter
+    def threshold(self, _threshold: int, _idx: int) -> None:
+    
+        """
+        Sets the fidelity threshold for the given index
+        
+        Args:
+            _threshold (int): new threshold value
+            _idx (int): index of the threshold
+            
+        Returns:
+            /
+        """
+    
+        if _threshold < 0 or _threshold > 255:
+            raise ValueError(f'Fidelity must be in the range [0, 255], got {_threshold}')
+        
+        self._threshold[_idx] = _threshold
+    
+    @property
+    def fidelity(self) -> np.array:
+    
+        """"
+        Returns the fidelity array
+        
+        Args:
+            /
+            
+        Returns:
+            _fidelity (np.array): fidelity array
+        """
+    
+        return self._fidelity
+    
+    @fidelity.setter
+    def fidelity(self, _fidelity: int, _idx: int) -> None:
+    
+        """
+        Sets the fidelity at a given index
+        
+        Args:
+            _fidelity (int): new fidelity value
+            _idx (int): index of the fidelity
+            
+        Returns:
+            /
+        """
+    
+        if _fidelity < 0 or _fidelity > 255:
+            raise ValueError(f'Fidelity must be in the range [0, 255], got {_fidelity}')
+        
+        self._fidelity[_idx] = _fidelity
+    
+    @property
+    def decoded_threshold(self) -> np.array:
+    
+        """
+        Returns the float representation of the fidelity threshold array
+        
+        Args:
+            /
+            
+        Returns:
+            _threshold (np.array): float representation of the fidelity threshold array
+        """
+    
+        return _invert_IR_fidelity(self._threshold)
+    
+    @decoded_threshold.setter
+    def decoded_threshold(self, _threshold: float, _idx: int) -> None:
+    
+        """
+        Sets the float representation of the fidelity threshold array at the given index
+        
+        Args:
+            _threshold (float): new threshold value
+            _idx (int): index of the threshold
+            
+        Returns:
+            /
+        """
+    
+        if _threshold < 0.5 or _threshold > 1:
+            raise ValueError(f'Fidelity must be in the range [0.5, 1], got {_threshold}')
+        
+        self._threshold[_idx] = _convert_fidelity_IR(_threshold)
+    
+    @property
+    def decoded_fidelity(self) -> np.array:
+    
+        """
+        Returns the float representation of the fidelity array
+        
+        Args:
+            /
+            
+        Returns:
+            _fidelity (np.array): fidelity array
+        """
+    
+        return _invert_IR_fidelity(self._fidelity)
+    
+    @decoded_fidelity.setter
+    def decoded_fidelity(self, _fidelity: float, _idx: int) -> None:
+        
+        """
+        Sets the float representation of a fidelity as the given index
+        
+        Args:
+            _fidelity (float): float representation of fidelity
+            _idx (int): index of the fidelity
+            
+        Returns:
+            /
+        """
+    
+        if _fidelity < 0.5 or _fidelity > 1:
+            raise ValueError(f'Fidelity must be in the range [0.5, 1], got {_fidelity}')
+        
+        self._fidelity[_idx] = _convert_fidelity_IR(_fidelity)
     
     @property
     def protocol(self) -> int:
