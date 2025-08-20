@@ -4,11 +4,11 @@ from typing import List, Tuple, Union, Any
 
 __all__ = ['L1_Protocol', 'L2_Protocol', 'L3_Protocol', 'L4_Protocol', 'L7_Protocol', '_convert_fidelity_IR', '_invert_IR_fidelity']
 
-def _convert_fidelity_IR(_fidelity: float | np.array) -> int | np.array:
+def _convert_fidelity_IR(_fidelity: float | np.ndarray) -> int | np.ndarray:
     
     return np.ceil(31.875 * np.log2(511 - 510 * _fidelity)).astype(np.uint8)
 
-def _invert_IR_fidelity(_IR: int | np.array) -> float | np.array:
+def _invert_IR_fidelity(_IR: int | np.ndarray) -> float | np.ndarray:
     
     return ((511 - 2 ** (_IR / 31.875)) / 510).astype(np.float32)
 
@@ -1176,8 +1176,7 @@ class L3_Protocol:
         
         return self._x_count, self._z_count
     
-    @es_result.setter  
-    def es_result(self, _res: int, _idx: int) -> None:
+    def update_es(self, _res: int, _idx: int) -> None:
         
         """
         Updates the X and Z array at the index with the result
