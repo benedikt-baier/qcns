@@ -1330,9 +1330,6 @@ class FockStateConnection:
 
         self._creation_functions = {0: self.failure_creation, 1: self.success_creation}
         
-        print(self._success_prob)
-        print(self._state)
-        
     def success_creation(self, _sender_time: float, _receiver_time: float) -> None:
         
         """
