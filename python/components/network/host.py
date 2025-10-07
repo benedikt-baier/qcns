@@ -3,23 +3,24 @@ import traceback
 import numpy as np
 import asyncio as asc
 from functools import partial
-from typing import List, Dict, Set, Union, Any
+from typing import List, Dict, Set, Any
 
-from qcns.python.components.simulation import Simulation
+from qcns.python.components.simulation.simulation import Simulation
 from qcns.python.components.simulation.event import StopEvent, SendEvent, ReceiveEvent, GateEvent, WaitEvent
 from qcns.python.components.qubit.qubit import Qubit, combine_state, remove_qubits
-from qcns.python.components.connection.channel import PChannel
+from qcns.python.components.hardware.connection import *
+from qcns.python.components.connection.channel import QChannel, PChannel
 from qcns.python.components.packet import Packet
-from qcns.python.components.hardware.memory import QuantumMemory
-from qcns.python.components.connection import SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
-from qcns.python.components.network.qprogram import QProgram  
+from qcns.python.components.hardware.memory import PhysicalQuantumMemory, LogicalQuantumMemory, PQM_Model, LQM_Model
+from qcns.python.components.connection.connection import PChannel_Model, SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
+from qcns.python.components.network.qprogram import QProgram, QProgram_Model
 
 __all__ = ['Host', 'IF_entanglement_swapping', 'IF_fidelity_improvement', 'FF_entanglement_swapping', 'FF_fidelity_improvement']
 
 class QuantumError:
     pass
 
-_GATE_DURATION = {'X': 5e-6, 'Y': 5e-6, 'Z': 3e-6, 'H': 6e-6, 'S': 2e-6, 'T': 1e-6, 'bsm': 1e-5, 'prob_bsm': 1e-5, 'CNOT': 12e-5, 'measure': 1e-6}
+_GATE_DURATION = {'X': 5e-6, 'Y': 5e-6, 'Z': 3e-6, 'H': 6e-6, 'T': 1e-6, 'bsm': 1e-5, 'prob_bsm': 1e-5, 'CNOT': 12e-5, 'measure': 1e-6}
 
 _GATE_PARAMETERS = {'prob_bsm_p': 0.57, 'prob_bsm_a': 0.57}
 
@@ -61,9 +62,8 @@ class Host:
         stop (bool): stop flag for infinitly running hosts  
     """
     
-    def __init__(self, node_id: int, sim: Simulation, stop: bool=True, l1_qprogram: QProgram=QProgram(), l2_qprogram: QProgram=QProgram(), l3_qprogram: QProgram=QProgram(),
-                 l4_qprogram: QProgram=QProgram(), l7_qprogram: QProgram=QProgram(), gate_duration: Dict[str, float]=_GATE_DURATION, 
-                 gate_parameters: Dict[str, float]=_GATE_PARAMETERS, pulse_duration: float=10**(-11)) -> None:
+    def __init__(self, node_id: int, sim: Simulation, stop: bool=True, qprograms: QProgram_Model=QProgram_Model(), gate_duration: Dict[str, float]=_GATE_DURATION, 
+                 gate_parameters: Dict[str, float]=_GATE_PARAMETERS) -> None:
         
         """
         Initializes a Host
@@ -88,35 +88,21 @@ class Host:
         self._node_id: int = node_id
         self._sim: Simulation = sim
         
-        self._qprograms: Dict[int, QProgram] = {layer: qprogram for layer, qprogram in {L1: l1_qprogram, L2: l2_qprogram, L3: l3_qprogram, L4: l4_qprogram, L7: l7_qprogram}.items() if qprogram.layer}
+        self._qprograms: Dict[int, QProgram] = qprograms._qprograms
         
-        if not all([layer == qprogram.layer for layer, qprogram in self._qprograms.items()]):
-            raise ValueError('Cannot have a quantum program without the program of the previous layer')
-        
-        for layer, qprogram in self._qprograms.items():
-            qprogram.host = self
-            
-            if (layer - 1) in self._qprograms:
-                qprogram.prev_protocol = self._qprograms[layer - 1]
-            if (layer + 1) in self._qprograms:
-                qprogram.next_protocol = self._qprograms[layer + 1]
-            
-            if not (layer + 1):
-                pass
-        
-        self._pulse_duration: float = pulse_duration
         self._gates: Dict[str, Qubit] = {k: v for k, v in Qubit.__dict__.items() if not k.startswith(('__', 'f'))}
         self._gate_duration: Dict[str, float] = gate_duration
         self._gate_parameters: Dict[str, float] = gate_parameters
         
-        self._connections: Dict[str, Dict[str, Any]] = {'sqs': {}, 'eqs': {}, 'packet': {}, 'memory': {}}
+        self._channels: Dict[str, Dict[str, Any]] = {'qc': {}, 'pc': {}}
+        self._connections: Dict[str, Dict[str, Any]] = {'sqs': {}, 'eqs': {}}
+        self._memory: Dict[str, Any] = {}
         self._neighbors: Set[int] = set()
         
-        self._time: float = 0.
-        
-        self._layer_results: Dict[int, Dict[int, Dict[int, List[np.array]]]] = {}
-        
+        self._layer_results: Dict[int, Dict[int, Dict[int, List[np.ndarray]]]] = {}
         self._packets: Dict[int, Dict[int, Dict[int, List[Packet]]]] = {}
+        
+        self._time: float = 0.
         
         self._resume: asc.Event = asc.Event()
         self.stop: bool = stop
@@ -178,15 +164,12 @@ class Host:
         self._resume.clear()
         
         for neighbor in self.neighbors:
-            self._connections['memory'][neighbor][SEND].discard_qubits()
-            self._connections['memory'][neighbor][RECEIVE].discard_qubits()
+            self._memory[neighbor][SEND].discard_qubits()
+            self._memory[neighbor][RECEIVE].discard_qubits()
             self._layer_results[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
             self._packets[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
         
-    def set_sqs_connection(self, host: Host, sender_source: str='perfect', receiver_source: str='perfect',
-                           sender_num_sources: int=-1, receiver_num_sources: int=-1,
-                           sender_length: float=0., sender_attenuation: float=-0.016, sender_in_coupling_prob: float=1., sender_out_coupling_prob: float=1., sender_lose_qubits: bool=False, sender_channel_errors: List[QuantumError]=None,
-                           receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_in_coupling_prob: float=1., receiver_out_coupling_prob: float=1., receiver_lose_qubits: bool=False, receiver_channel_errors: List[QuantumError]=None) -> None:
+    def set_sqs_connection(self, host: Host, sender_config: SQC_Model=SQC_Model(), receiver_config: SQC_Model=SQC_Model()) -> None:
         
         """
         Sets up a single qubit source connection
@@ -214,40 +197,22 @@ class Host:
             /
         """
         
-        if sender_length < 0. or receiver_length < 0.:
-            raise ValueError('Length of connection cannot be negative')
-        
         self._neighbors.add(host.id)
         host._neighbors.add(self.id)
-            
-        if sender_channel_errors is None:
-            sender_channel_errors = []
-        if receiver_channel_errors is None:
-            receiver_channel_errors = []
-            
-        if not isinstance(sender_channel_errors, list):
-            sender_channel_errors = [sender_channel_errors]
-            
-        if not isinstance(receiver_channel_errors, list):
-            receiver_channel_errors = [receiver_channel_errors]
         
-        connection_s_r = SingleQubitConnection(self, host.id, self._sim, sender_source, sender_num_sources, sender_length + receiver_length, 
-                                               sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, sender_channel_errors)
-        connection_r_s = SingleQubitConnection(host, self.id, self._sim, receiver_source, receiver_num_sources, sender_length + receiver_length, 
-                                               receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, receiver_channel_errors)
+        connection_s_r = SingleQubitConnection(self, host.id, self._sim, sender_config)
+        connection_r_s = SingleQubitConnection(host, self.id, self._sim, receiver_config)
         
-        self._connections['sqs'][host.id] = {SEND: connection_s_r, RECEIVE: connection_r_s._channel}
-        host._connections['sqs'][self.id] = {SEND: connection_r_s, RECEIVE: connection_s_r._channel}
+        self._connections['sqs'][host.id] = connection_s_r
+        host._connections['sqs'][self.id] = connection_r_s
+        
+        channel_s_r = QChannel(sender_config._qchannel_model, sender_config._channel_errors)
+        channel_r_s = QChannel(receiver_config._qchannel_model, receiver_config._channel_errors)
+        
+        self._channels['qc'][host.id] = {SEND: channel_s_r, RECEIVE: channel_r_s}
+        host._channels['qc'][self.id] = {SEND: channel_r_s, RECEIVE: channel_s_r}
     
-    def set_eqs_connection(self, host: Host, sender_type: str='sr', sender_model: str='perfect', 
-                           receiver_type: str='sr', receiver_model: str='perfect',
-                           sender_source: str='perfect', receiver_source: str='perfect', 
-                           sender_detector: str='perfect', receiver_detector: str='perfect',
-                           sender_num_sources: int=-1, receiver_num_sources: int=-1,
-                           sender_length: float=0., sender_attenuation: float=-0.016, sender_in_coupling_prob: float=1., sender_out_coupling_prob: float=1., sender_lose_qubits: bool=False,
-                           receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_in_coupling_prob: float=1., receiver_out_coupling_prob: float=1., receiver_lose_qubits: bool=False,
-                           sender_memory_mode: str='lifo', sender_memory_size: int=-1, sender_efficiency: float=1., sender_memory_errors: List[QuantumError]=None, 
-                           receiver_memory_mode: str='lifo', receiver_memory_size: int=-1, receiver_efficiency: float=1., receiver_memory_errors: List[QuantumError]=None) -> None:
+    def set_eqs_connection(self, host: Host, sender_connection_config: EQC_Model=L3C_Model(), receiver_connection_config: EQC_Model=L3C_Model(), sender_memory_config: PQM_Model | LQM_Model=LQM_Model(), receiver_memory_config: PQM_Model | LQM_Model=LQM_Model()) -> None:
         
         """
         Sets up a heralded entangled qubit connection between this host and another host
@@ -287,81 +252,52 @@ class Host:
             /
         """
         
-        if sender_length < 0. or receiver_length < 0.:
-            raise ValueError('Length of connection cannot be negative')
-        
+        if sender_connection_config._connection_type not in ['sr', 'tps', 'bsm', 'fs', 'l3c']:
+            raise ValueError('Connection should a well known entanglement generation method')
+        if receiver_connection_config._connection_type not in ['sr', 'tps', 'bsm', 'fs', 'l3c']:
+            raise ValueError('Connection should a well known entanglement generation method')
+        if not (isinstance(sender_memory_config, PQM_Model) or isinstance(sender_memory_config, LQM_Model)):
+            raise ValueError('Memory should be either physical or logical')
+        if not (isinstance(receiver_memory_config, PQM_Model) or isinstance(receiver_memory_config, LQM_Model)):
+            raise ValueError('Memory should be either physical or logical')
+            
         self._neighbors.add(host.id)
         host._neighbors.add(self.id)
         
-        if sender_memory_errors is None:
-            sender_memory_errors = []
-        if receiver_memory_errors is None:
-            receiver_memory_errors = []
-            
-        if not isinstance(sender_memory_errors, list):
-            sender_memory_errors = [sender_memory_errors]
-            
-        if not isinstance(receiver_memory_errors, list):
-            receiver_memory_errors = [receiver_memory_errors]
+        connections = {'sr': SenderReceiverConnection, 'tps': TwoPhotonSourceConnection, 'bsm': BellStateMeasurementConnection, 'fs': FockStateConnection, 'l3c': L3Connection}
+        memories = {'pqm': PhysicalQuantumMemory, 'lqm': LogicalQuantumMemory}
         
-        sender_memory_send = QuantumMemory(sender_memory_mode, sender_memory_size, sender_efficiency, sender_memory_errors)
-        sender_memory_receive = QuantumMemory(receiver_memory_mode, -1, sender_efficiency, sender_memory_errors)
-        receiver_memory_send = QuantumMemory(receiver_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
-        receiver_memory_receive = QuantumMemory(sender_memory_mode, -1, receiver_efficiency, receiver_memory_errors)
+        sender_memory_send = memories[sender_memory_config._memory_type](sender_memory_config)
+        sender_memory_receive = memories[sender_memory_config._memory_type](receiver_memory_config)
+        receiver_memory_send = memories[receiver_memory_config._memory_type](receiver_memory_config)
+        receiver_memory_receive = memories[receiver_memory_config._memory_type](sender_memory_config)
         
-        if sender_type == 'sr':
-            connection_s_r = SenderReceiverConnection(self, host.id, self._sim, sender_model, sender_source, receiver_detector, sender_num_sources,
-                                                      sender_length + receiver_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                                      sender_memory_send, receiver_memory_receive)
+        sender_memory_receive._size = -1
+        receiver_memory_receive._size = -1
         
-        if sender_type == 'tps':
-            connection_s_r = TwoPhotonSourceConnection(self, host.id, self._sim, sender_model, sender_source, sender_detector, receiver_detector, sender_num_sources, 
-                                                       sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                                       receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                                       sender_memory_send, receiver_memory_receive)
-        
-        if sender_type == 'bsm':
-            connection_s_r = BellStateMeasurementConnection(self, host.id, self._sim, sender_model, sender_source, receiver_source, sender_detector, receiver_detector, sender_num_sources, 
-                                                            sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                                            receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                                            sender_memory_send, receiver_memory_receive)
-            
-        if sender_type == 'fs':
-            connection_s_r = FockStateConnection(self, host.id, self._sim, sender_model, sender_source, receiver_source, sender_detector, receiver_detector, sender_num_sources, 
-                                                            sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                                            receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                                            sender_memory_send, receiver_memory_receive)
-        
-        if receiver_type == 'sr':
-            connection_r_s = SenderReceiverConnection(host, self.id, self._sim, receiver_model, receiver_source, sender_detector, receiver_num_sources,
-                                                      sender_length + receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                                      receiver_memory_send, sender_memory_receive)
-            
-        if receiver_type == 'tps':
-            connection_r_s = TwoPhotonSourceConnection(host, self.id, self._sim, receiver_model, receiver_source, receiver_detector, sender_detector, receiver_num_sources,
-                                                       receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                                       sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                                       receiver_memory_send, sender_memory_receive)
-        
-        if receiver_type == 'bsm':
-            connection_r_s = BellStateMeasurementConnection(host, self.id, self._sim, receiver_model, receiver_source, sender_source, receiver_detector, sender_detector, receiver_num_sources, 
-                                                            receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                                            sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                                            receiver_memory_send, sender_memory_receive)
-            
-        if receiver_type == 'fs':
-            connection_r_s = FockStateConnection(host, self.id, self._sim, receiver_model, receiver_source, sender_source, receiver_detector, sender_detector, receiver_num_sources, 
-                                                            receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                                            sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                                            receiver_memory_send, sender_memory_receive)
+        connection_s_r = connections[sender_connection_config._connection_type](self, host.id, self._sim, sender_memory_send, receiver_memory_receive, sender_connection_config)
+        connection_r_s = connections[receiver_connection_config._connection_type](host, self.id, self._sim, receiver_memory_send, sender_memory_receive, receiver_connection_config)
         
         self._connections['eqs'][host.id] = connection_s_r
         host._connections['eqs'][self.id] = connection_r_s
         
-        self._connections['memory'][host.id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
-        host._connections['memory'][self.id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
-    
-    def set_pconnection(self, host: Host, length: float=0.) -> None:
+        self._memory[host.id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
+        host._memory[self.id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
+        
+        if sender_connection_config._connection_type in ['sr', 'l3c']:
+            sender_pchannel = sender_connection_config._pchannel
+            
+        if sender_connection_config._connection_type in ['tps', 'bsm', 'fs']:
+            sender_pchannel = PChannel_Model(sender_connection_config._sender_pchannel._length + sender_connection_config._receiver_pchannel._length, 0.5 * (sender_connection_config._sender_pchannel._data_rate + sender_connection_config._receiver_pchannel._data_rate))
+        
+        if receiver_connection_config._connection_type in ['sr', 'l3c']:
+            receiver_pchannel = receiver_connection_config._pchannel
+        if receiver_connection_config._connection_type in ['tps', 'bsm', 'fs']:
+            receiver_pchannel = PChannel_Model(receiver_connection_config._sender_pchannel._length + receiver_connection_config._receiver_pchannel._length, 0.5 * (receiver_connection_config._sender_pchannel._data_rate + receiver_connection_config._receiver_pchannel._data_rate))
+        
+        self.set_packet_connection(host, sender_pchannel, receiver_pchannel)
+
+    def set_packet_connection(self, host: Host, sender_config: PChannel_Model=PChannel_Model(), receiver_config: PChannel_Model=PChannel_Model()) -> None:
         
         """
         Sets up a packet connection between this host an another
@@ -374,17 +310,14 @@ class Host:
             /
         """
         
-        if length < 0.:
-            raise ValueError('Length of connection cannot be negative')
-        
         self._neighbors.add(host.id)
         host._neighbors.add(self.id)
         
-        channel_s = PChannel(length)
-        channel_r = PChannel(length)
+        channel_s_r = PChannel(sender_config)
+        channel_r_s = PChannel(receiver_config)
         
-        self._connections['packet'][host.id] = {SEND: channel_s, RECEIVE: channel_r}
-        host._connections['packet'][self.id] = {SEND: channel_r, RECEIVE: channel_s}
+        self._channels['pc'][host.id] = {SEND: channel_s_r, RECEIVE: channel_r_s}
+        host._channels['pc'][self.id] = {SEND: channel_r_s, RECEIVE: channel_s_r}
     
         self._layer_results[host.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
         host._layer_results[self.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
@@ -392,148 +325,7 @@ class Host:
         self._packets[host.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
         host._packets[self.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
     
-    def set_connection(self, host: Host, sender_type: str='sr', sender_model: str='perfect', 
-                        receiver_type: str='sr', receiver_model: str='perfect',
-                        sp_sender_source: str='perfect', sp_receiver_source: str='perfect',
-                        he_sender_source: str='perfect', he_receiver_source: str='perfect', 
-                        sender_detector: str='perfect', receiver_detector: str='perfect',
-                        sp_sender_num_sources: int=-1, sp_receiver_num_sources: int=-1,
-                        he_sender_num_sources: int=-1, he_receiver_num_sources: int=-1,
-                        sender_length: float=0., sender_attenuation: float=-0.016, sender_in_coupling_prob: float=1., sender_out_coupling_prob: float=1., sender_lose_qubits: bool=False, sender_channel_errors: List[QuantumError]=None,
-                        receiver_length: float=0., receiver_attenuation: float=-0.016, receiver_in_coupling_prob: float=1., receiver_out_coupling_prob: float=1., receiver_lose_qubits: bool=False, receiver_channel_errors: List[QuantumError]=None,
-                        sender_memory_mode: str='lifo', sender_memory_size: int=-1, sender_efficiency: float=1., sender_memory_errors: List[QuantumError]=None, 
-                        receiver_memory_mode: str='lifo', receiver_memory_size: int=-1, receiver_efficiency: float=1., receiver_memory_errors: List[QuantumError]=None) -> None:
-        
-        """
-        Sets a single photon source connection, an entangled photon source connection and a packet connection
-        
-        Args:
-            host (Host): other host to establish connection with
-            sender_type (str): type of entanglement connection from sender to receiver
-            sender_model (str): model of photon source at sender
-            receiver_type (str): type of entanglement connection from receiver to sender
-            receiver_model (str): model of photon source at receiver
-            sp_sender_source (str): model for single photon source at sender
-            sp_receiver_source (str): model for single photon source at receiver
-            he_sender_source (str): model of sender sided heralded photon source 
-            he_receiver_source (str): model of receiver sided heralded photon source
-            sender_detector (str): model of sender sided photon detector
-            receiver_detector (str): model of receiver sided photon detector
-            sp_sender_num_sources (int): number of single photon sources at sender side
-            sp_receiver_num_sources (int): number of single photon sources at receiver
-            he_sender_num_sources (int): number of heralded photon sources at sender
-            he_receiver_num_sources (int): number of heralded photon sources at receiver
-            sender_length (float): length from sender to receiver
-            sender_attenuation (float): sender attenuation coefficient
-            sender_in_coupling_prob (float): probability of coupling qubit into fiber
-            sender_out_coupling_prob (float): probability of coupling qubit out of fiber
-            sender_lose_qubits (bool): whether to lose qubits of sender channel
-            sender_channel_errors (list): list of errors on sender channel
-            receiver_length (float): length from receiver to sender
-            receiver_attenuation (float): receiver attenuation coefficient
-            receiver_in_coupling_prob (float): probability of coupling qubit into fiber
-            receiver_out_coupling_prob (float): probability of coupling qubit out of fiber
-            receiver_lose_qubits (bool): whether to lose qubits of receiver channel
-            receiver_channel_errors (list): list of errors on receiver channel
-            sender_memory_size (int): size of sender memory
-            sender_efficiency (float): efficiency of sender memory
-            sender_memory_errors (list): list of memory errors at sender
-            receiver_memory_size (int): size of receiver memory
-            receiver_efficiency (float): efficiency of receiver memory
-            receiver_memory_errors (list): list of memory errors at receiver
-            
-        Returns:
-            /
-        """
-        
-        self._neighbors.add(host.id)
-        host._neighbors.add(self.id)
-        
-        self.set_sqs_connection(host, sp_sender_source, sp_receiver_source, sp_sender_num_sources, sp_receiver_num_sources,
-                                sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, sender_channel_errors, 
-                                receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, receiver_channel_errors)
-        self.set_eqs_connection(host, sender_type, sender_model, 
-                                receiver_type, receiver_model, 
-                                he_sender_source, he_receiver_source, 
-                                sender_detector, receiver_detector, 
-                                he_sender_num_sources, he_receiver_num_sources,
-                                sender_length, sender_attenuation, sender_in_coupling_prob, sender_out_coupling_prob, sender_lose_qubits, 
-                                receiver_length, receiver_attenuation, receiver_in_coupling_prob, receiver_out_coupling_prob, receiver_lose_qubits, 
-                                sender_memory_mode, sender_memory_size, sender_efficiency, sender_memory_errors, 
-                                receiver_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
-        self.set_pconnection(host, sender_length + receiver_length)
-    
-    def set_l3_connection(self, host: Host, length: float=0.,
-                          sender_num_sources: int=-1, sender_source_duration: float=0.,
-                          sender_success_probability: float=1., sender_fidelity: float=1., sender_fidelity_variance: float=0.,
-                          receiver_num_sources: int=-1, receiver_source_duration: float=0.,
-                          receiver_success_probability: float=1., receiver_fidelity: float=1., receiver_fidelity_variance: float=0.,
-                          sender_memory_mode: str='lifo', sender_memory_size: int=-1, sender_efficiency: float=1., sender_memory_errors: List[QuantumError]=None, 
-                          receiver_memory_mode: str='lifo', receiver_memory_size: int=-1, receiver_efficiency: float=1., receiver_memory_errors: List[QuantumError]=None) -> None:
-        
-        """
-        Sets an abstract L3 Connection between this host and other host
-        
-        Args:
-            host (Host): host to set up connection with
-            length (float): length of connection
-            sender_num_sources (int): number of sources at the sender
-            sender_source_duration (float): duration of the source at the sender
-            sender_success_probability (float): probability to successfully have entanglement between this host and other host
-            sender_fidelity (float): fidelity of the entanglement between this host and other host
-            sender_fidelity_variance (float): variance of the fidelity between this host and other host
-            receiver_num_sources (int): number of sources at the receiver
-            receiver_source_duration (float): duration of the source at the receiver
-            receiver_success_probability (float): probability to successfully have entanglement between other host and this host
-            receiver_fidelity (float): fidelity of the entanglement between other host and this host
-            receiver_fidelity_variance (float): variance of the fidelity between other host and this host
-            sender_memory_mode (str): mode how to extract qubits at sender, fifo or lifo
-            sender_memory_size (int): memory size of this host
-            sender_efficiency (float): efficiency of the memory of this host
-            sender_memory_errors (list): errors to apply to qubits in memory of this host
-            receiver_memory_mode (str): mode how to extract qubits at receiver, fifo or lifo
-            receiver_memory_size (int): memory size of other host
-            receiver_efficiency (float): efficiency of the memory of other host
-            receiver_memory_errors (list): errors to apply to qubits in memory of other host
-            
-        Returns:
-            /
-        """
-        
-        if length < 0.:
-            raise ValueError('Length of connection cannot be negative')
-        
-        self._neighbors.add(host.id)
-        host._neighbors.add(self.id)
-        
-        if sender_memory_errors is None:
-            sender_memory_errors = []
-        if receiver_memory_errors is None:
-            receiver_memory_errors = []
-        
-        if not isinstance(sender_memory_errors, list):
-            sender_memory_errors = [sender_memory_errors]
-            
-        if not isinstance(receiver_memory_errors, list):
-            receiver_memory_errors = [receiver_memory_errors]
-        
-        sender_memory_send = QuantumMemory(sender_memory_mode, sender_memory_size, sender_efficiency, sender_memory_errors)
-        sender_memory_receive = QuantumMemory(receiver_memory_mode, -1, sender_efficiency, sender_memory_errors)
-        receiver_memory_send = QuantumMemory(receiver_memory_mode, receiver_memory_size, receiver_efficiency, receiver_memory_errors)
-        receiver_memory_receive = QuantumMemory(sender_memory_mode, -1, receiver_efficiency, receiver_memory_errors)
-        
-        connection_s_r = L3Connection(self, host.id, self._sim, length, sender_num_sources, sender_source_duration, sender_success_probability, sender_fidelity, sender_fidelity_variance, sender_memory_send, receiver_memory_receive)
-        connection_r_s = L3Connection(host, self.id, self._sim, length, receiver_num_sources, receiver_source_duration, receiver_success_probability, receiver_fidelity, receiver_fidelity_variance, receiver_memory_send, sender_memory_receive)
-        
-        self._connections['eqs'][host.id] = connection_s_r
-        host._connections['eqs'][self.id] = connection_r_s
-        
-        self._connections['memory'][host.id] = {SEND: sender_memory_send, RECEIVE: sender_memory_receive}
-        host._connections['memory'][self.id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
-        
-        self.set_pconnection(host, length)
-    
-    async def attempt_qubit(self, receiver: int, num_requested: int=1, estimate: bool=True) -> None:
+    def attempt_qubit(self, receiver: int, num_requested: int=1, estimate: bool=True) -> None:
         
         """
         Attempts to create the number of requested qubits, can estimate the number of needed qubits
@@ -555,7 +347,7 @@ class Host:
         
         self._connections['sqs'][receiver][SEND].attempt_qubit(_num_needed)
 
-    async def create_qubit(self, receiver: int, num_requested: int=1) -> None:
+    def create_qubit(self, receiver: int, num_requested: int=1) -> None:
         
         """
         Creates the number of requested qubits, no matter how long it takes
@@ -572,7 +364,7 @@ class Host:
         
         self._connections['sqs'][receiver][SEND].create_qubit(num_requested)
     
-    async def attempt_bell_pairs(self, receiver: int, num_requested: int=1, estimate: bool=False) -> None:
+    def attempt_bell_pairs(self, receiver: int, num_requested: int=1, estimate: bool=False) -> None:
         
         """
         Attempts to create the number of requested bell pairs, can estimate the number of needed qubits based on success probability
@@ -587,7 +379,7 @@ class Host:
         """
         
         if num_requested < 1:
-            raise ValueError('Attempting 0 qubits')
+            raise ValueError('Requesting 0 qubits')
         
         self._sim.schedule_event(SendEvent(self._time, self.id))
         
@@ -606,7 +398,7 @@ class Host:
         
         self._connections['eqs'][receiver].attempt_bell_pairs(num_requested, _num_needed)
     
-    async def create_bell_pairs(self, receiver: int, num_requested: int=1) -> None:
+    def create_bell_pairs(self, receiver: int, num_requested: int=1) -> None:
         
         """
         Creates the number of requested qubits, no matter how long it takes
@@ -632,7 +424,7 @@ class Host:
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
     
-    def apply_gate(self, gate: str, *args: List[Any], combine: bool=False, remove: bool=False) -> Union[int, None]:
+    def apply_gate(self, gate: str, *args: List[Any], combine: bool=False, remove: bool=False) -> int| None:
         
         """
         Applys a gate to qubits
@@ -644,7 +436,7 @@ class Host:
             remove (bool): to remove qubits
             
         Returns:
-            res (int/np.array/None): result of the gate
+            res (int/np.ndarray/None): result of the gate
         """
         
         self._time += self._gate_duration.get(gate, 5e-6)
@@ -685,7 +477,7 @@ class Host:
         self._time += self._gate_duration.get(gate, 5e-6)
         self._sim.schedule_event(GateEvent(self._time, self.id))
         
-        _qubit_src, _qubit_dst = self._connections['memory'][host][store].purify(index_src, index_dst, self._time)
+        _qubit_src, _qubit_dst = self._memory[host][store].purify(index_src, index_dst, self._time)
         
         combine_state([_qubit_src, _qubit_dst])
         
@@ -693,11 +485,11 @@ class Host:
         
         remove_qubits([_qubit_dst])
         
-        self._connections['memory'][host][store].store_qubit(L2, _qubit_src, -1, self._time)
+        self._memory[host][store].store_qubit(L2, _qubit_src, -1, self._time)
         
         return _res
     
-    async def send_qubit(self, receiver: int, qubit: Qubit) -> None:
+    def send_qubit(self, receiver: int, qubit: Qubit) -> None:
         
         """
         Sends a qubit to the specified receiver
@@ -710,13 +502,12 @@ class Host:
             /
         """
         
-        
         self._sim.schedule_event(SendEvent(self._time, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._time + self._connections['sqs'][receiver][SEND]._channel._sending_time, receiver))
+        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['qc'][receiver][SEND]._propagation_time, receiver))
         
-        self._connections['sqs'][receiver][SEND].put(qubit)
+        self._channels['qc'][receiver][SEND].put(qubit)
     
-    async def receive_qubit(self, sender: int=None, time_out: float=None) -> Union[Qubit, None]:
+    async def receive_qubit(self, sender: int=None, time_out: float=None) -> Qubit | None:
         
         """
         Waits until a qubit is received
@@ -735,13 +526,13 @@ class Host:
             return None
         
         if sender is not None:
-            return self._connections['sqs'][sender][RECEIVE].get()
+            return self._channels['qc'][sender][RECEIVE].get()
         
         for _sender in self.neighbors:
-            if not self._connections['sqs'][_sender][RECEIVE].empty():
-                return self._connections['sqs'][_sender][RECEIVE].get()
+            if not self._channels['qc'][_sender][RECEIVE].empty():
+                return self._channels['qc'][_sender][RECEIVE].get()
          
-    async def send_packet(self, _packet: Packet) -> None:
+    def send_packet(self, _packet: Packet) -> None:
         
         """
         Sends a packet to the specified receiver in the packet
@@ -753,13 +544,13 @@ class Host:
             /
         """
         
-        self._time += len(_packet) * self._pulse_duration
+        self._time += self._channels['pc'][_packet.l2_dst][SEND]._sending_time(len(_packet))
         self._sim.schedule_event(SendEvent(self._time, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._time + self._connections['packet'][_packet.l2_dst][SEND]._signal_time, _packet.l2_dst))
+        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['pc'][_packet.l2_dst][SEND]._propagation_time, _packet.l2_dst))
         
-        self._connections['packet'][_packet.l2_dst][SEND].put(_packet)
+        self._channels['pc'][_packet.l2_dst][SEND].put(_packet)
         
-    async def receive_packet(self, sender: int=None, time_out: float=None) -> Union[Packet, None]:
+    async def receive_packet(self, sender: int=None, time_out: float=None) -> Packet | None:
         
         """
         Receives a packet
@@ -778,11 +569,11 @@ class Host:
             return None
         
         if sender is not None:
-            return self._connections['packet'][sender][RECEIVE].get()
+            return self._channels['pc'][sender][RECEIVE].get()
         
         for _sender in self.neighbors:
-            if not self._connections['packet'][_sender][RECEIVE].empty():
-                return self._connections['packet'][_sender][RECEIVE].get()
+            if not self._channels['pc'][_sender][RECEIVE].empty():
+                return self._channels['pc'][_sender][RECEIVE].get()
     
     def wait(self, duration: float) -> None:
         
@@ -918,7 +709,7 @@ class Host:
             has_space (bool): whether number of qubits fit into memory
         """
         
-        return self._connections['memory'][host][store].has_space(num_qubits)
+        return self._memory[host][store].has_space(num_qubits)
     
     def remaining_space(self, host: int, store: int) -> int:
         
@@ -933,7 +724,7 @@ class Host:
             remaining_space (int): remaining size of the memory
         """
         
-        return self._connections['memory'][host][store].remaining_space()
+        return self._memory[host][store].remaining_space()
     
     def memory_size(self, host: int, store: int) -> int:
         
@@ -948,7 +739,7 @@ class Host:
             memory_size (int): size of the memory
         """
         
-        return self._connections['memory'][host][store].size
+        return self._memory[host][store].size
     
     def change_memory_size(self, host: int, store: int, size: int) -> None:
         
@@ -964,7 +755,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].change_size(size)
+        self._memory[host][store].change_size(size)
     
     def l0_num_qubits(self, host: int, store: int) -> int:
         
@@ -979,7 +770,7 @@ class Host:
             l0_num_qubits (int): number of qubits in the L0 store
         """
         
-        return self._connections['memory'][host][store].num_qubits(L0)
+        return self._memory[host][store].num_qubits(L0)
     
     def l1_num_qubits(self, host: int, store: int) -> int:
         
@@ -994,7 +785,7 @@ class Host:
             l1_num_qubits (int): number of qubits in the L1 store
         """
         
-        return self._connections['memory'][host][store].num_qubits(L1)
+        return self._memory[host][store].num_qubits(L1)
     
     def l2_num_qubits(self, host: int, store: int) -> int:
         
@@ -1009,7 +800,7 @@ class Host:
             l2_num_qubits (int): number of qubits in the L2 store
         """
         
-        return self._connections['memory'][host][store].num_qubits(L2)
+        return self._memory[host][store].num_qubits(L2)
     
     def l3_num_qubits(self, host: int, store: int) -> int:
         
@@ -1024,7 +815,7 @@ class Host:
             l3_num_qubits (int): number of qubits in the L3 store
         """
         
-        return self._connections['memory'][host][store].num_qubits(L3)
+        return self._memory[host][store].num_qubits(L3)
     
     def l0_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -1041,7 +832,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubit(L0, qubit, index, self._time)
+        self._memory[host][store].store_qubit(L0, qubit, index, self._time)
         
     def l1_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -1058,7 +849,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubit(L1, qubit, index, self._time)
+        self._memory[host][store].store_qubit(L1, qubit, index, self._time)
         
     def l2_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -1075,7 +866,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubit(L2, qubit, index, self._time)
+        self._memory[host][store].store_qubit(L2, qubit, index, self._time)
         
     def l3_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
@@ -1092,9 +883,9 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].store_qubit(L3, qubit, index, self._time)
+        self._memory[host][store].store_qubit(L3, qubit, index, self._time)
         
-    def l0_retrieve_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
+    def l0_retrieve_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
         
         """
         Retrieves a qubit from the L0 store
@@ -1108,9 +899,9 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L0, index, self._time)
+        return self._memory[host][store].retrieve_qubit(L0, index, self._time)
     
-    def l1_retrieve_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
+    def l1_retrieve_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
         
         """
         Retrieves a qubit from the L1 store
@@ -1124,9 +915,9 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L1, index, self._time)
+        return self._memory[host][store].retrieve_qubit(L1, index, self._time)
     
-    def l2_retrieve_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
+    def l2_retrieve_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
         
         """
         Retrieves a qubit from the L2 store
@@ -1140,9 +931,9 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L2, index, self._time)
+        return self._memory[host][store].retrieve_qubit(L2, index, self._time)
     
-    def l3_retrieve_qubit(self, host: int, store: int, index: int=None, offset_index: int=None) -> Union[Qubit, None]:
+    def l3_retrieve_qubit(self, host: int, store: int, index: int=None, offset_index: int=None) -> Qubit | None:
         
         """
         Retrieves a qubit from the L3 store
@@ -1157,9 +948,9 @@ class Host:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._connections['memory'][host][store].retrieve_qubit(L3, index, self._time, offset_index)
+        return self._memory[host][store].retrieve_qubit(L3, index, self._time, offset_index)
     
-    def l0_peek_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
+    def l0_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
         
         """
         Looks at the qubit without retrieving it from the L0 memory
@@ -1173,9 +964,9 @@ class Host:
             _qubit (Qubit/None): peeked at qubit
         """
         
-        return self._connections['memory'][host][store].peek_qubit(L0, index)
+        return self._memory[host][store].peek_qubit(L0, index)
     
-    def l1_peek_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
+    def l1_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
         
         """
         Looks at the qubit without retrieving it from the L1 memory
@@ -1189,9 +980,9 @@ class Host:
             qubit (Qubit/None): peeked at qubit
         """
         
-        return self._connections['memory'][host][store].peek_qubit(L1, index)
+        return self._memory[host][store].peek_qubit(L1, index)
     
-    def l2_peek_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
+    def l2_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
         
         """
         Looks at the qubit without retrieving it from the L2 memory
@@ -1205,9 +996,9 @@ class Host:
             qubit (Qubit/None): peeked at qubit
         """
         
-        return self._connections['memory'][host][store].peek_qubit(L2, index)
+        return self._memory[host][store].peek_qubit(L2, index)
     
-    def l3_peek_qubit(self, host: int, store: int, index: int=None) -> Union[Qubit, None]:
+    def l3_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
         
         """
         Looks at the qubit without retrieving it from the L3 memory
@@ -1221,7 +1012,7 @@ class Host:
             qubit (Qubit/None): peeked at qubit
         """
         
-        return self._connections['memory'][host][store].peek_qubit(L3, index)
+        return self._memory[host][store].peek_qubit(L3, index)
     
     def l0_move_qubits_l1(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -1237,7 +1028,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].move_qubits(L0, L1, indices)
+        self._memory[host][store].move_qubits(L0, L1, indices)
         
     def l1_move_qubits_l2(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -1253,7 +1044,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].move_qubits(L1, L2, indices)
+        self._memory[host][store].move_qubits(L1, L2, indices)
     
     def l1_move_qubits_l3(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -1269,7 +1060,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].move_qubits(L1, L3, indices)
+        self._memory[host][store].move_qubits(L1, L3, indices)
     
     def l2_move_qubits_l3(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -1285,7 +1076,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].move_qubits(L2, L3, indices)
+        self._memory[host][store].move_qubits(L2, L3, indices)
 
     def l3_move_qubits_l1(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -1301,7 +1092,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].move_qubits(L3, L1, indices)
+        self._memory[host][store].move_qubits(L3, L1, indices)
     
     def l3_remove_qubits(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -1317,7 +1108,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].move_qubits(L3, L3, indices)
+        self._memory[host][store].move_qubits(L3, L3, indices)
       
     def l0_discard_qubits(self, host: int, store: int) -> None:
         
@@ -1332,7 +1123,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].discard_qubits(L0)
+        self._memory[host][store].discard_qubits(L0)
         
     def l1_discard_qubits(self, host: int, store: int) -> None:
         
@@ -1347,7 +1138,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].discard_qubits(L1)
+        self._memory[host][store].discard_qubits(L1)
         
     def l2_discard_qubits(self, host: int, store: int) -> None:
         
@@ -1362,7 +1153,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].discard_qubits(L2)
+        self._memory[host][store].discard_qubits(L2)
         
     def l3_discard_qubits(self, host: int, store: int) -> None:
         
@@ -1377,7 +1168,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].discard_qubits(L3)
+        self._memory[host][store].discard_qubits(L3)
     
     def discard_all_qubits(self, host: int, store: int) -> None:
         
@@ -1392,7 +1183,7 @@ class Host:
             /
         """
         
-        self._connections['memory'][host][store].discard_qubits()
+        self._memory[host][store].discard_qubits()
     
     def l2_num_purification(self, host: int, store: int) -> int:
         
@@ -1423,7 +1214,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L0, index, self._time)
+        return self._memory[host][store].estimate_fidelity(L0, index, self._time)
     
     def l1_estimate_fidelity(self, host: int, store: int, index: int=None) -> float:
         
@@ -1439,7 +1230,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L1, index, self._time)
+        return self._memory[host][store].estimate_fidelity(L1, index, self._time)
     
     def l2_estimate_fidelity(self, host: int, store: int, index: int=None) -> float:
         
@@ -1455,7 +1246,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L2, index, self._time)
+        return self._memory[host][store].estimate_fidelity(L2, index, self._time)
     
     def l3_estimate_fidelity(self, host: int, store: int, index: int=None) -> float:
         
@@ -1471,7 +1262,7 @@ class Host:
             fidelity (float): estimated fidelity
         """
         
-        return self._connections['memory'][host][store].estimate_fidelity(L3, index, self._time)
+        return self._memory[host][store].estimate_fidelity(L3, index, self._time)
     
     def l1_check_results(self, host: int, store: int) -> bool:
         
@@ -1568,7 +1359,7 @@ class Host:
         
         self._layer_results[packet.l2_dst][store][L2].append(packet.l2_success)
         
-    def l1_retrieve_result(self, host: int, store: int) -> np.array:
+    def l1_retrieve_result(self, host: int, store: int) -> np.ndarray:
         
         """
         Retrieves the first result in the L1 store
@@ -1578,12 +1369,12 @@ class Host:
             store (int): SEND or RECEIVE store
             
         Returns:
-            res (np.array): L1 result
+            res (np.ndarray): L1 result
         """
         
         return self._layer_results[host][store][L1].pop(0)
     
-    def l2_retrieve_result(self, host: int, store: int) -> np.array:
+    def l2_retrieve_result(self, host: int, store: int) -> np.ndarray:
         
         """
         Retrieves the first result in the L2 store
@@ -1593,12 +1384,12 @@ class Host:
             store (int): SEND or RECEIVE store
             
         Returns:
-            res (np.array): L2 result
+            res (np.ndarray): L2 result
         """
         
         return self._layer_results[host][store][L2].pop(0)
     
-    def l1_compare_results(self, packet: Packet) -> np.array:
+    def l1_compare_results(self, packet: Packet) -> np.ndarray:
         
         """
         Compares the L1 results of the packet with the result in storage
@@ -1607,13 +1398,13 @@ class Host:
             packet (Packet): packet to compare results of
             
         Returns:
-            res (np.array): result of the comparison
+            res (np.ndarray): result of the comparison
         """
         
         stor_res = self.l1_retrieve_result(packet.l2_src, not packet.l1_ack)
         return np.logical_and(packet.l1_success, stor_res)
     
-    def l2_compare_results(self, packet: Packet) -> np.array:
+    def l2_compare_results(self, packet: Packet) -> np.ndarray:
         
         """
         Compares the L1 results of the packet with the result in storage
@@ -1622,7 +1413,7 @@ class Host:
             packet (Packet): packet to compare results of
             
         Returns:
-            res (np.array): result of the comparison
+            res (np.ndarray): result of the comparison
         """
         
         stor_res = self.l2_retrieve_result(packet.l2_src, not packet.l2_ack)
@@ -1758,7 +1549,7 @@ class Host:
             l3_num_packets (int): number of packets in L3 store
         """
         
-        return len(self._packets[host][store][int])
+        return len(self._packets[host][store][L3])
     
     def l1_store_packet(self, host: int, store: int, packet: Packet) -> None:
         
@@ -1863,7 +1654,7 @@ class Host:
             /
         """
         
-        return self._connections['memory'][host][store].add_offset(offset)
+        return self._memory[host][store].add_offset(offset)
     
     def l3_remove_offset(self, host: int, store: int, index: int=0) -> None:
         
@@ -1879,7 +1670,71 @@ class Host:
             /
         """
         
-        return self._connections['memory'][host][store].remove_offset(index)
+        return self._memory[host][store].remove_offset(index)
+
+    def l0_retrieve_time_stamp(self, host: int, store: int, index: int=None) -> float | None:
+        
+        """
+        Retrieves the time stamp of a qubit in L0 memory
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): SEND or RECEIVE store
+            index (int): index to retrieve from
+            
+        Returns:
+            time_stamp (float/None): time stamp of qubit
+        """
+        
+        return self._memory[host][store].retrieve_time_stamp(L0, index)
+    
+    def l1_retrieve_time_stamp(self, host: int, store: int, index: int=None) -> float | None:
+        
+        """
+        Retrieves the time stamp of a qubit in L1 memory
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): SEND or RECEIVE store
+            index (int): index to retrieve from
+            
+        Returns:
+            time_stamp (float/None): time stamp of qubit
+        """
+        
+        return self._memory[host][store].retrieve_time_stamp(L1, index)
+    
+    def l2_retrieve_time_stamp(self, host: int, store: int, index: int=None) -> float | None:
+        
+        """
+        Retrieves the time stamp of a qubit in L2 memory
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): SEND or RECEIVE store
+            index (int): index to retrieve from
+            
+        Returns:
+            time_stamp (float/None): time stamp of qubit
+        """
+        
+        return self._memory[host][store].retrieve_time_stamp(L2, index)
+    
+    def l3_retrieve_time_stamp(self, host: int, store: int, index: int=None) -> float | None:
+        
+        """
+        Retrieves the time stamp of a qubit in L3 memory
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): SEND or RECEIVE store
+            index (int): index to retrieve from
+            
+        Returns:
+            time_stamp (float/None): time stamp of qubit
+        """
+        
+        return self._memory[host][store].retrieve_time_stamp(L3, index)
 
 def _IF(IF: int) -> float:
     

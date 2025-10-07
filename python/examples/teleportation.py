@@ -61,12 +61,12 @@ class Receiver(qcns.Host):
         
 def main():
 
-    sim = qcns.Simulation()
+    sim = qcns.Simulation(logging_path='./debug.log')
     
     sender = Sender(0, sim)
     receiver = Receiver(1, sim)
 
-    sender.set_l3_connection(receiver, 1)
+    sender.set_eqs_connection(receiver)
     
     sim.run()
     

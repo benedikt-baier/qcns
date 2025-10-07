@@ -66,14 +66,14 @@ class Receiver(qcns.Host):
         
 def main():
 
-    sim = qcns.Simulation()
+    sim = qcns.Simulation(logging_path='./debug.log')
     
     router = Router(0, sim)
     sender = Sender(1, sim)
     receiver = Receiver(2, sim)
 
-    router.set_l3_connection(sender, 1)
-    router.set_l3_connection(receiver, 1)
+    router.set_eqs_connection(sender)
+    router.set_eqs_connection(receiver)
     
     sim.run()
     

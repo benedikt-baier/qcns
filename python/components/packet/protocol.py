@@ -50,7 +50,7 @@ class L1_Protocol:
         if self._requested > 0 and not self._needed:
             self._needed = self._requested
         
-        self._success: np.array = np.zeros(self._needed, dtype=np.bool_) # 2^8 bits = 32 byte
+        self._success: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 2^8 bits = 32 byte
         self._ack: int = 0 # 1 bit
         self._ps: int = 0 # 1 bit
         
@@ -249,7 +249,7 @@ class L1_Protocol:
         return self._success
     
     @success.setter
-    def success(self, _success: np.array) -> None:
+    def success(self, _success: np.ndarray) -> None:
         
         """
         Sets the success array
@@ -396,7 +396,7 @@ class L2_Protocol:
         if self._requested > 0 and self._needed < 1:
             self._needed = self._requested
         
-        self._success: np.array = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32 byte
+        self._success: np.ndarray = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32 byte
         self._ack: int = 0 # 1 bit
         
         self._protocol: int = 0 # 1byte
@@ -625,7 +625,7 @@ class L2_Protocol:
         return self._success
 
     @success.setter
-    def success(self, _success: np.array) -> None:
+    def success(self, _success: np.ndarray) -> None:
         
         """
         Sets the success array
@@ -774,10 +774,10 @@ class L3_Protocol:
         if self._requested > 0 and self._needed < 1:
             self._needed = self._requested
              
-        self._success: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte         
+        self._success: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 32 byte         
     
-        self._x_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
-        self._z_count: np.array = np.zeros(self._needed, dtype=np.bool_) # 32 byte
+        self._x_count: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 32 byte
+        self._z_count: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 32 byte
         
         if isinstance(_fidelity, float):
             _fidelity = [_fidelity] * self._needed
@@ -790,8 +790,8 @@ class L3_Protocol:
         if np.any(_fidelity < 0.5) or np.any(_fidelity > 1):
             raise ValueError(f'Fidelity values must be in the range [0.5, 1]')
         
-        self._threshold: np.array = _convert_fidelity_IR(_fidelity) # 256 byte
-        self._fidelity: np.array = np.zeros(self._needed, dtype=np.uint8) # 256 byte
+        self._threshold: np.ndarray = _convert_fidelity_IR(_fidelity) # 256 byte
+        self._fidelity: np.ndarray = np.zeros(self._needed, dtype=np.uint8) # 256 byte
         
         self._mode: int = 1 # 2 bit
         self._hop_count: int = 0 # 1byte
@@ -1147,7 +1147,7 @@ class L3_Protocol:
         return self._success
     
     @success.setter
-    def success(self, _success: np.array) -> None:
+    def success(self, _success: np.ndarray) -> None:
         
         """
         Sets the success array
@@ -1512,7 +1512,7 @@ class L4_Protocol:
         if self._requested > 0 and self._needed < 1:
             self._needed = self._requested
             
-        self._success: np.array = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32byte
+        self._success: np.ndarray = np.zeros(int(np.floor(self._needed/2)), dtype=np.bool_) # 32byte
         self._ack: int = 0 # 1 bit
         
         self._protocol: int = 0 # 1byte
@@ -1741,7 +1741,7 @@ class L4_Protocol:
         return self._success
     
     @success.setter
-    def success(self, _success: np.array) -> None:
+    def success(self, _success: np.ndarray) -> None:
         
         """
         Sets the success array directly
@@ -1873,7 +1873,7 @@ class L7_Protocol:
         
         self._requested: int = _requested # 1byte
         
-        self._success: np.array = np.zeros(self._requested, dtype=np.bool_) # 32byte
+        self._success: np.ndarray = np.zeros(self._requested, dtype=np.bool_) # 32byte
         
         self._protocol: int = 0 # 1byte
         self._header_length: int = 272

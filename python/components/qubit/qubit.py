@@ -1,5 +1,5 @@
 import numpy as np
-from functools import wraps, partial, reduce
+from functools import wraps, reduce
 from typing import List, Union, Callable
 
 __all__ = ['Qubit', 'QSystem', 'tensor_operator', 'dot', 'get_single_operator', 'depolarization_error', 'combine_state', 'combine_gates', 'remove_qubits']
@@ -62,7 +62,7 @@ def cache(func: Callable) -> Callable:
         return _cache[key]
     return wrapper
 
-def kronecker_product(_op_1: np.array, _op_2: np.array) -> np.array:
+def kronecker_product(_op_1: np.ndarray, _op_2: np.ndarray) -> np.array:
     
     """
     Computes the kronecker product of two full 2d matrices
@@ -78,7 +78,7 @@ def kronecker_product(_op_1: np.array, _op_2: np.array) -> np.array:
     _op = _op_1[:, None, :, None] * _op_2[None, :, None, :]
     return _op.reshape(_op_1.shape[0] * _op_2.shape[0], _op_1.shape[1] * _op_2.shape[1])
 
-def tensor_operator(_operator_l: np.array) -> np.array:
+def tensor_operator(_operator_l: np.ndarray) -> np.array:
     
     """
     Creates the tensor operator out of a operator list
@@ -92,7 +92,7 @@ def tensor_operator(_operator_l: np.array) -> np.array:
 
     return reduce(kronecker_product, _operator_l)
 
-def dot(_state: np.array, _gate: np.array) -> np.array:
+def dot(_state: np.ndarray, _gate: np.ndarray) -> np.array:
     
     """
     Performs the linalg dot for quantum gates
@@ -107,7 +107,7 @@ def dot(_state: np.array, _gate: np.array) -> np.array:
     
     return _gate.dot(_state).dot(_gate.conj().T)
 
-def sqrt_matrix(_state: np.array) -> np.array:
+def sqrt_matrix(_state: np.ndarray) -> np.array:
     
     """
     Calculates the square root of a matrix
@@ -123,7 +123,7 @@ def sqrt_matrix(_state: np.array) -> np.array:
     return dot(np.diag(np.sqrt(np.abs(evs))), vecs)
 
 @cache
-def get_single_operator(_gate: np.array, _index: int, _num_qubits: int) -> np.array:
+def get_single_operator(_gate: np.ndarray, _index: int, _num_qubits: int) -> np.array:
 
     """
     Creates the tensor operator for a single qubit gate
@@ -158,7 +158,7 @@ def get_single_operator(_gate: np.array, _index: int, _num_qubits: int) -> np.ar
     return kronecker_product(left_array, kronecker_product(_gate, right_array))
 
 @cache
-def get_double_operator(_gate: np.array, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
+def get_double_operator(_gate: np.ndarray, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
     
     """
     Creates the tensor operator for a controlled qubit gate
@@ -195,7 +195,7 @@ def get_double_operator(_gate: np.array, _c_index: int, _t_index: int, _t_num_qu
     return proj0 + proj1
 
 @cache
-def get_triple_operator(_gate_l: np.array, _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
+def get_triple_operator(_gate_l: np.ndarray, _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
     
     """
     Generates the operator for a 3 qubit gate
@@ -483,7 +483,7 @@ class Qubit:
         return self._qsystem._state
     
     @state.setter
-    def state(self, state: np.array) -> None:
+    def state(self, state: np.ndarray) -> None:
         
         """
         Sets the state of QSystem
@@ -987,7 +987,7 @@ class Qubit:
         if fidelity < 1.:
             depolarization_error(self, fidelity)
     
-    def custom_single_gate(self, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
+    def custom_single_gate(self, gate: np.ndarray, fidelity: float=1., apply: bool=True) -> None:
         
         """
         Applies a custom gate to the qubit
@@ -1156,7 +1156,7 @@ class Qubit:
             depolarization_error(self, fidelity)
             depolarization_error(target, fidelity)
     
-    def CU(self, target: Qubit, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
+    def CU(self, target: Qubit, gate: np.ndarray, fidelity: float=1., apply: bool=True) -> None:
         
         """
         Applies a custom gate to a target qubit, with this qubit as the controll qubit
@@ -1402,7 +1402,7 @@ class Qubit:
             depolarization_error(control, fidelity)
             depolarization_error(target, fidelity)
     
-    def CCU(self, control: Qubit, target: Qubit, gate: np.array, fidelity: float=1., apply: bool=True) -> None:
+    def CCU(self, control: Qubit, target: Qubit, gate: np.ndarray, fidelity: float=1., apply: bool=True) -> None:
         
         """
         Applies a custom unitary gate to controled by this qubit and control qubit
@@ -1620,7 +1620,7 @@ class Qubit:
         
         return _PROB_BSM_MAPPING[gate][res]
 
-    def custom_gate(self, gate: np.array) -> None:
+    def custom_gate(self, gate: np.ndarray) -> None:
         
         """
         Applies a custom gate to the qubit
@@ -1659,7 +1659,7 @@ class Qubit:
         
         return target.measure(basis)
 
-    def fidelity(self, _op: np.array) -> float:
+    def fidelity(self, _op: Qubit | np.ndarray) -> float:
 
         """
         Computes the quantum fidelity of this qubit state and a operator
@@ -1675,7 +1675,7 @@ class Qubit:
             _op = _op.state
         
         _sqrt_mat = sqrt_matrix(self.state)
-        return float((np.real(np.trace(sqrt_matrix(np.dot(_sqrt_mat, np.dot(_op, _sqrt_mat)))))**2))
+        return float(np.clip((np.real(np.trace(sqrt_matrix(np.dot(_sqrt_mat, np.dot(_op, _sqrt_mat)))))**2), 0, 1))
         
 class QSystem:
     
@@ -1716,9 +1716,9 @@ class QSystem:
         init_state = [np.array([[fid, 0], [0, 1 - fid]]) for fid in fidelity]
 
         if self._num_qubits > 1:
-            self._state: np.array = tensor_operator(init_state)
+            self._state: np.ndarray = tensor_operator(init_state)
         else:
-            self._state: np.array = init_state[0]
+            self._state: np.ndarray = init_state[0]
     
     def __len__(self) -> int:
         
@@ -1762,7 +1762,7 @@ class QSystem:
         """
     
     @state.setter
-    def state(self, _state: np.array) -> None:
+    def state(self, _state: np.ndarray) -> None:
         
         """
         Sets the state of the QSystem
@@ -1807,7 +1807,7 @@ class QSystem:
         
         return self._qubits[_index]
     
-    def fidelity(self, _op: np.array) -> float:
+    def fidelity(self, _op: np.ndarray) -> float:
 
         """
         Computes the quantum fidelity of this qubit state and a operator

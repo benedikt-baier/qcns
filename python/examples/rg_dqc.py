@@ -129,8 +129,8 @@ def main():
     sender = Sender(1, sim, [qsys.qubit(0), qsys.qubit(1)])
     receiver = Receiver(2, sim, [qsys.qubit(2), qsys.qubit(3)])
 
-    router.set_l3_connection(sender, 1)
-    router.set_l3_connection(receiver, 1)
+    router.set_eqs_connection(sender)
+    router.set_eqs_connection(receiver)
     
     sim.run()
     
