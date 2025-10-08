@@ -24,6 +24,11 @@ _GATE_DURATION = {'X': 5e-6, 'Y': 5e-6, 'Z': 3e-6, 'H': 6e-6, 'T': 1e-6, 'bsm': 
 
 _GATE_PARAMETERS = {'prob_bsm_p': 0.57, 'prob_bsm_a': 0.57}
 
+_PROB_BSM_MAPPING = {0: {0: 0, 1: 1, 2: 2, 3: 3}, 
+                    1: {0: 1, 1: 0, 2: 3, 3: 2}, 
+                    2: {0: 2, 1: 3, 2: 0, 3: 1}, 
+                    3: {0: 3, 1: 2, 2: 1, 3: 0}}
+
 SEND = 0
 RECEIVE = 1
 GATE = 2
@@ -424,7 +429,7 @@ class Host:
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
     
-    def apply_gate(self, gate: str, *args: List[Any], combine: bool=False, remove: bool=False) -> int| None:
+    def apply_gate(self, gate: str, *args: List[Any], fidelity: float=1., apply: bool=True, success_prob: float=1., false_prob: float=0., combine: bool=False, remove: bool=False) -> int | None:
         
         """
         Applys a gate to qubits
@@ -439,22 +444,60 @@ class Host:
             res (int/np.ndarray/None): result of the gate
         """
         
+        if not apply:
+            return self._gates[gate](*args, apply=False)
+        
         self._time += self._gate_duration.get(gate, 5e-6)
         self._sim.schedule_event(GateEvent(self._time, self.id))
         
-        if combine and gate in ['CNOT', 'CY', 'CZ', 'CH', 'CPHASE', 'CU', 'SWAP', 'bell_state', 'bsm', 'prob_bsm']:
-            combine_state(args[:2])
-        if combine and gate in ['TOFFOLI', 'CCU', 'CSWAP']:
-            combine_state(args[:3])
-        
-        res = self._gates[gate](*args)
-        
-        if remove and gate == 'measure':
-            remove_qubits(args[:1])
-        if remove and gate in ['bsm', 'prob_bsm']:
+        if gate in ['CNOT', 'CX', 'CY', 'CZ', 'CPHASE', 'CU', 'SWAP', 'iSWAP', 'bell_state', 'bsm']:
             remove_qubits(args[:2])
+        if gate in ['QAND', 'QOR', 'QXOR', 'QNAND', 'QNOR', 'QXNOR', 'CCU', 'CSWAP']:
+            remove_qubits(args[:3])
         
-        return res
+        prob = np.random.uniform(0, 1)
+        if prob < success_prob:
+            event = 0
+        elif prob < success_prob + false_prob:
+            event = 1
+        else:
+            event = 2
+           
+        def __S(self, gate: str, fidelity: float, remove: bool, args: List[Any]):
+            
+            res = self._gates[gate](*args, fidelity)
+            
+            if remove and gate == 'measure':
+                remove_qubits(args[:1])
+            if remove and gate in ['bsm']:
+                remove_qubits(args[:2])
+                
+            return res
+        
+        def __F(self, gate: str, fidelity: float, remove: bool, args: List[Any]):
+            
+            if gate in ['X', 'Y', 'Z', 'H', 'SX', 'SY', 'SZ', 'T', 'K', 'iSX', 'iSY', 'iSZ', 'iK', 'iT', 'Rx', 'Ry', 'Rz', 'PHASE', 'general_rotation', 'exp_pauli', 'custom_single_gate', 'measure']:
+                remove_qubits(args[:1])
+            if gate in ['CNOT', 'CX', 'CY', 'CZ', 'CPHASE', 'CU', 'SWAP', 'iSWAP', 'bell_state', 'bsm']:
+                remove_qubits(args[:2])
+            if gate in ['QAND', 'QOR', 'QXOR', 'QNAND', 'QNOR', 'QXNOR', 'CCU', 'CSWAP']:
+                remove_qubits(args[:3])
+        
+        def __N(self, gate: str, fidelity: float, remove: bool, args: List[Any]):
+            
+            if gate not in ['measure', 'bsm']:
+                return None
+            
+            if remove and gate == 'measure':
+                remove_qubits(args[:1])
+                return np.random.randint(0, 2)
+            if remove and gate == 'bsm':
+                remove_qubits(args[:2])
+                return np.random.randint(0, 4)
+
+        event_dict = {0: __S, 1: __F, 2: __N}
+        
+        return event_dict[event](self, gate, fidelity, remove, args)
     
     def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
         

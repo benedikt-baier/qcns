@@ -26,11 +26,6 @@ full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
 
 purification_gates = {'CNOT': 'X', 'CY': 'Y', 'CZ': 'Z', 'CH': 'H'}
 
-_PROB_BSM_MAPPING = {0: {0: 0, 1: 1, 2: 2, 3: 3}, 
-                    1: {0: 1, 1: 0, 2: 3, 3: 2}, 
-                    2: {0: 2, 1: 3, 2: 0, 3: 1}, 
-                    3: {0: 3, 1: 2, 2: 1, 3: 0}}
-
 class Qubit:
     pass
 
@@ -334,7 +329,7 @@ def depolarization_error(_qubit: Qubit, _fidelity: float) -> None:
     key_z = f's_z_{_qubit.num_qubits}_{_qubit._index}'
     
     gate_x = get_single_operator(key_x, full_gates['X'], _qubit._index, _qubit.num_qubits)    
-    gate_y = get_single_operator(key_y, full_gates['y'], _qubit._index, _qubit.num_qubits)
+    gate_y = get_single_operator(key_y, full_gates['Y'], _qubit._index, _qubit.num_qubits)
     gate_z = get_single_operator(key_z, full_gates['Z'], _qubit._index, _qubit.num_qubits)
         
     _qubit.state = _fidelity * _qubit.state + ((1 - _fidelity) / 3) * (dot(_qubit.state, gate_x) + dot(_qubit.state, gate_y) + dot(_qubit.state, gate_z))
@@ -1594,33 +1589,7 @@ class Qubit:
         
         return 2 * self.measure(basis=basis_0, fid_0=fid_0, fid_1=fid_1) + target.measure(basis=basis_1, fid_0=fid_0, fid_1=fid_1)
 
-    def prob_bsm(self, target: Qubit, success_prob: float=0.57, fid_0: float=1., fid_1: float=1.) -> int:
-        
-        """
-        Applies a probabilistic bell state measurement to the qubits
-        
-        Args:
-            q_src (Qubit): source qubit
-            q_dst (Qubit): target qubit
-            success_prob (float): success probability of measurement
-            
-        Returns:
-            res (int): result of the bell state measurement
-        """
-        
-        res = self.bsm(target, fid_0, fid_1)
-        prob_res = np.random.uniform(0, 1)
-        gate = 0
-        if 2 * success_prob < 2 * prob_res <= (success_prob + 1):
-            gate = 1
-        elif 2 * (success_prob + 1) < 4 * prob_res <= (success_prob + 3):
-            gate = 2
-        elif 4 * prob_res > (success_prob + 3):
-            gate = 3
-        
-        return _PROB_BSM_MAPPING[gate][res]
-
-    def custom_gate(self, gate: np.ndarray) -> None:
+    def custom_gate(self, gate: np.ndarray, fidelity: float=1., apply:bool=True) -> None:
         
         """
         Applies a custom gate to the qubit
@@ -1632,7 +1601,13 @@ class Qubit:
             /
         """
         
+        if not apply:
+            return gate
+        
         self.state = dot(self.state, gate)
+        
+        if fidelity < 1.:
+            depolarization_error(self, fidelity)
 
     def purification(self, target: Qubit, direction: bool=0, gate: str='CNOT', basis: str='Z') -> int:
         
