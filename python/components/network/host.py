@@ -451,9 +451,9 @@ class Host:
         self._sim.schedule_event(GateEvent(self._time, self.id))
         
         if gate in ['CNOT', 'CX', 'CY', 'CZ', 'CPHASE', 'CU', 'SWAP', 'iSWAP', 'bell_state', 'bsm']:
-            remove_qubits(args[:2])
+            combine_state(args[:2])
         if gate in ['QAND', 'QOR', 'QXOR', 'QNAND', 'QNOR', 'QXNOR', 'CCU', 'CSWAP']:
-            remove_qubits(args[:3])
+            combine_state(args[:3])
         
         prob = np.random.uniform(0, 1)
         if prob < success_prob:
