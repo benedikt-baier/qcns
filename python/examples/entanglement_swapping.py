@@ -12,7 +12,7 @@ class Router(qcns.Host):
         
     async def run(self):
         
-        await self.attempt_bell_pairs(2, 1)
+        self.attempt_bell_pairs(2, 1)
         
         packet = await self.receive_packet()
         
@@ -24,12 +24,12 @@ class Router(qcns.Host):
         qubit_src = self.l3_retrieve_qubit(packet.l2_src, 1)
         qubit_dst = self.l3_retrieve_qubit(packet.l2_dst, 0)
         
-        res = self.apply_gate('bsm', qubit_src, qubit_dst, combine=True, remove=True)
+        res = self.apply_gate('bsm', qubit_src, qubit_dst)
         
         packet.l3_update_es(res)
         packet.l2_src = 0
         
-        await self.send_packet(packet)
+        self.send_packet(packet)
 
 class Sender(qcns.Host):
     
@@ -38,11 +38,11 @@ class Sender(qcns.Host):
         
     async def run(self):
         
-        await self.attempt_bell_pairs(0, 1)
+        self.attempt_bell_pairs(0, 1)
         
         packet = qcns.Packet(1, 0, l3_src=1, l3_dst=2, l3_needed=1)
         
-        await self.send_packet(packet)
+        self.send_packet(packet)
 
 class Receiver(qcns.Host):
     
@@ -63,6 +63,7 @@ class Receiver(qcns.Host):
             
         if packet.l3_es_result[1][0]:
             self.apply_gate('Z', qubit)
+
         
 def main():
 

@@ -12,7 +12,7 @@ class Sender(qcns.Host):
         
     async def run(self):
         
-        await self.attempt_bell_pairs(1, 1)
+        self.attempt_bell_pairs(1, 1)
         
         data_qubit = qcns.QSystem(1).qubits
         
@@ -23,12 +23,12 @@ class Sender(qcns.Host):
         
         com_qubit = self.l3_retrieve_qubit(1, 0)
         
-        res = self.apply_gate('bsm', data_qubit, com_qubit, combine=True, remove=True)
+        res = self.apply_gate('bsm', data_qubit, com_qubit)
         
         packet = qcns.Packet(0, 1, 0, 1, l3_needed=1, payload=[angle_x, angle_z])
         packet.l3_update_es(res)
         
-        await self.send_packet(packet)
+        self.send_packet(packet)
 
 class Receiver(qcns.Host):
     

@@ -449,10 +449,12 @@ class QuantumMemory:
 
 class PhysicalQuantumMemory(QuantumMemory):
     
-    def __init__(self, model: PQM_Model=PQM_Model()) -> None:
+    def __init__(self, model: PQM_Model) -> None:
         super(PhysicalQuantumMemory, self).__init__(model._size, model._extraction_mode, model._efficiency)
         
-        self._errors: List[QuantumError] = model._errors
+        self._errors: List[QuantumError] = model._memory_errors
+        if self._errors is None:
+            self._errors = []
     
     def retrieve_qubit(self, _store: int, _index: int, _time: float, _offset_index: int=None) -> Qubit | None:
     
@@ -493,7 +495,7 @@ class PhysicalQuantumMemory(QuantumMemory):
     
 class LogicalQuantumMemory(QuantumMemory):
     
-    def __init__(self, model: LQM_Model=LQM_Model()):
+    def __init__(self, model: LQM_Model) -> None:
         super(LogicalQuantumMemory, self).__init__(model._size, model._extraction_mode, model._efficiency)
         
         self._code_length: int = model._code_length
@@ -501,7 +503,13 @@ class LogicalQuantumMemory(QuantumMemory):
         self._z_errors: int = model._z_errors
         
         self._depolarization_time: float = model._depolarization_time
+        if self._depolarization_time is None:
+            self._depolarization_time: float = np.inf
+        
         self._dephasing_time: float = model._dephasing_time
+        if self._dephasing_time is None:
+            self._dephasing_time: float = np.inf
+            
         self._measurement_error_rate: float = model._measurement_error_rate
         self._extraction_error_rate: float = model._extraction_error_rate
         self._x_error_rate: float = model._x_error_rate

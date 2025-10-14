@@ -15,7 +15,7 @@ class Router(qcns.Host):
     async def run(self):
         
         # await self.attempt_bell_pairs(1, 1)
-        await self.attempt_bell_pairs(2, 1)
+        self.attempt_bell_pairs(2, 1)
         
         while 1:
         
@@ -36,7 +36,7 @@ class Router(qcns.Host):
                 
             packet.l2_src = self.id
             
-            await self.send_packet(packet)
+            self.send_packet(packet)
 
 class Sender(qcns.Host):
     
@@ -45,28 +45,28 @@ class Sender(qcns.Host):
         
         self.qubits = {q._index: q for q in qubits}
     
-    async def send_request(self):
+    def send_request(self):
         
         data_qubit = self.qubits.pop(1)
         
         com_qubit = self.l3_retrieve_qubit(0, 0)
         
-        res = self.apply_gate('bsm', data_qubit, com_qubit, combine=True, remove=True)
+        res = self.apply_gate('bsm', data_qubit, com_qubit)
         
         packet = qcns.Packet(self.id, 0, l3_src=self.id, l3_dst=2, l3_requested=1, payload=[1])
         
         packet.l3_update_es(res, 0)
         
-        await self.send_packet(packet)
+        self.send_packet(packet)
 
     async def run(self):
         
-        await self.attempt_bell_pairs(0, 1)
+        self.attempt_bell_pairs(0, 1)
         
         self.apply_gate('H', self.qubits[0])
         self.apply_gate('CNOT', self.qubits[0], self.qubits[1])
         
-        await self.send_request()
+        self.send_request()
 
 class Receiver(qcns.Host):
     
@@ -111,8 +111,7 @@ class Receiver(qcns.Host):
         
         self.apply_gate('CNOT', self.qubits[1], self.qubits[2])
         self.apply_gate('CNOT', self.qubits[2], self.qubits[3])
-
-        
+       
 def main():
 
     sim = qcns.Simulation(logging_path='./debug.log')

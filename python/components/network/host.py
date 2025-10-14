@@ -429,7 +429,7 @@ class Host:
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
     
-    def apply_gate(self, gate: str, *args: List[Any], fidelity: float=1., apply: bool=True, success_prob: float=1., false_prob: float=0., combine: bool=False, remove: bool=False) -> int | None:
+    def apply_gate(self, gate: str, *args: List[Any], fidelity: float=1., apply: bool=True, success_prob: float=1., false_prob: float=0., combine: bool=True, remove: bool=True) -> int | None:
         
         """
         Applys a gate to qubits
@@ -450,9 +450,9 @@ class Host:
         self._time += self._gate_duration.get(gate, 5e-6)
         self._sim.schedule_event(GateEvent(self._time, self.id))
         
-        if gate in ['CNOT', 'CX', 'CY', 'CZ', 'CPHASE', 'CU', 'SWAP', 'iSWAP', 'bell_state', 'bsm']:
+        if combine and gate in ['CNOT', 'CX', 'CY', 'CZ', 'CPHASE', 'CU', 'SWAP', 'iSWAP', 'bell_state', 'bsm']:
             combine_state(args[:2])
-        if gate in ['QAND', 'QOR', 'QXOR', 'QNAND', 'QNOR', 'QXNOR', 'CCU', 'CSWAP']:
+        if combine and gate in ['QAND', 'QOR', 'QXOR', 'QNAND', 'QNOR', 'QXNOR', 'CCU', 'CSWAP']:
             combine_state(args[:3])
         
         prob = np.random.uniform(0, 1)

@@ -1523,7 +1523,7 @@ class L3Connection:
         self._sim: Simulation = _sim
         
         self._source_duration: float = _model._duration
-        self._propagation_time: float = _model._channel._length * 5e-6
+        self._propagation_time: float = _model._qchannel._length * 5e-6
         self._success_prob: float = _model._success_prob * _sender_memory._efficiency * _receiver_memory._efficiency
         self._fidelity_variance: float = _model._fidelity_variance
         
@@ -1589,7 +1589,7 @@ class L3Connection:
         if self._num_sources + 1 and self._num_sources < _needed:
             _num_tries = int(np.ceil(_needed / self._num_sources))
 
-        _time_samples = np.zeros(_needed) + self._sender._time + self._sending_time
+        _time_samples = np.zeros(_needed) + self._sender._time + self._propagation_time
         _success_samples = np.random.uniform(0, 1, _needed) < self._success_prob
         
         if self._num_sources + 1:
@@ -1600,7 +1600,7 @@ class L3Connection:
         
         packet.l1_success = _success_samples
         
-        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._sending_time + (_num_tries - 1) * self._source_duration, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._propagation_time + (_num_tries - 1) * self._source_duration, self._receiver_id))
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet)
     
     def create_bell_pairs(self, _requested: int=1) -> None:
@@ -1617,7 +1617,7 @@ class L3Connection:
         
         packet = Packet(self._sender.id, self._receiver_id, _requested, _requested)
         
-        _time_samples = np.zeros(_requested + self._num_sources + 1) + self._sender._time + self._sending_time
+        _time_samples = np.zeros(_requested + self._num_sources + 1) + self._sender._time + self._propagation_time
         
         _num_successfull = 0
         _current_try = 0
@@ -1635,5 +1635,5 @@ class L3Connection:
         
         packet.l1_success = np.ones(_requested, dtype=np.bool_)
         
-        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._sending_time + (_current_try - 1) * self._source_duration, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._propagation_time + (_current_try - 1) * self._source_duration, self._receiver_id))
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet)

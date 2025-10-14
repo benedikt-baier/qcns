@@ -334,6 +334,6 @@ def dqc_apply_circuit(host: Host, circuit: List[List[Any]], qubits: Dict[int, Qu
     if apply:
         return
     
-    gate = combine_gates(0, gates)
+    gate = combine_gates(gates)
     
     host.apply_gate('custom_gate', next(iter(qubits.values())), gate)
