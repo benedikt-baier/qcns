@@ -5,7 +5,7 @@ import numpy as np
 
 import qcns
 
-class Sender(qcns.Host):
+class Sender(qcns.Node):
     
     def __init__(self, node_id, sim):
         super(Sender, self).__init__(node_id, sim)
@@ -18,7 +18,7 @@ class Sender(qcns.Host):
         
         print(packet)
 
-class Receiver(qcns.Host):
+class Receiver(qcns.Node):
     
     def __init__(self, node_id, sim):
         super(Receiver, self).__init__(node_id, sim)

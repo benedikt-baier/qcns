@@ -16,7 +16,7 @@ L3 = 3
 L4 = 4
 L7 = 5
 
-class Host:
+class Node:
     
     pass
 
@@ -30,7 +30,7 @@ class QProgram:
     Represents a generic Quantum Program to run
     
     Attrs:
-        _host (Host): host on which the program runs
+        _host (Node): host on which the program runs
         _layer (int): identifier on which layer the qprogram runs
         _prev_protocol (QProgram): protocol of the previous layer
         _next_protocol (QProgram): protocol of the next layer
@@ -42,20 +42,20 @@ class QProgram:
         Initializes a generic Quantum Program
         
         Args:
-            host (Host): host on which the program runs
+            host (Node): host on which the program runs
             
         Returns:
             /
         """
         
-        self._host: Host = None
+        self._host: Node = None
         self._layer: int = 0
         
         self._prev_protocol: QProgram = None
         self._next_protocol: QProgram = None
         
     @property
-    def host(self) -> Host:
+    def host(self) -> Node:
         
         """
         Property to access host more easily
@@ -64,19 +64,19 @@ class QProgram:
             /
             
         Returns:
-            host (Host): host on which the program runs
+            host (Node): host on which the program runs
         """
         
         return self._host
     
     @host.setter
-    def host(self, host: Host) -> None:
+    def host(self, host: Node) -> None:
         
         """
         Sets the host for the qprogram
         
         Args:
-            host (Host): host the qprogram runs on
+            host (Node): host the qprogram runs on
             
         Returns:
             /
@@ -191,7 +191,7 @@ class L1_EGP(QProgram):
         Initializes the L1 Entanglement Generation Protocol (EGP)
         
         Args:
-            host (Host): host the program runs on
+            host (Node): host the program runs on
             eg_mode (str): mode of the entanglement generation
             rap_mode (str): mode of allocation of qubits
             

@@ -1,6 +1,6 @@
 name = 'network'
 
-from .host import *
+from .node import *
 from .client import *
 from .server import *
 from .router import *

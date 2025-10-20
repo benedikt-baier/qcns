@@ -5,7 +5,7 @@ import numpy as np
 
 import qcns
 
-class Router(qcns.Host):
+class Router(qcns.Node):
     
     def __init__(self, _id, _sim):
         super(Router, self).__init__(_id, _sim, False)
@@ -38,7 +38,7 @@ class Router(qcns.Host):
             
             self.send_packet(packet)
 
-class Sender(qcns.Host):
+class Sender(qcns.Node):
     
     def __init__(self, _id, _sim, qubits):
         super(Sender, self).__init__(_id, _sim)
@@ -68,7 +68,7 @@ class Sender(qcns.Host):
         
         self.send_request()
 
-class Receiver(qcns.Host):
+class Receiver(qcns.Node):
     
     def __init__(self, _id, _sim, qubits):
         super(Receiver, self).__init__(_id, _sim)

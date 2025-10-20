@@ -4,7 +4,7 @@ import networkx as nx
 
 from typing import List, Dict, Tuple, Union, Callable, Any
 
-from qcns.python.components.network.host import Host
+from qcns.python.components.network.host import Node
 from qcns.python.components.simulation.simulation import Simulation
 
 __all__ = []
@@ -258,7 +258,7 @@ def get_access_routers(graph: nx.Graph, clients: List[Union[str, int]]) -> Dict[
     
     return {client: list(graph.neighbors(client))[0] for client in clients}
 
-def set_connection(graph: nx.Graph, nodes: List[Host]) -> None:
+def set_connection(graph: nx.Graph, nodes: List[Node]) -> None:
     
     """
     Sets a connection between all nodes based on the graph
@@ -274,7 +274,7 @@ def set_connection(graph: nx.Graph, nodes: List[Host]) -> None:
     for (src, dst), data in graph.edges(data=True):
         nodes[src].set_connection(dst, **data)
 
-def set_l3_connection(graph: nx.Graph, nodes: List[Host]) -> None:
+def set_l3_connection(graph: nx.Graph, nodes: List[Node]) -> None:
     
     """
     Sets a L3 connection between all nodes based on the graph
@@ -292,10 +292,10 @@ def set_l3_connection(graph: nx.Graph, nodes: List[Host]) -> None:
 
 CONNECTION_DICT = {'l1': set_connection, 'l3': set_l3_connection}
 
-def create_topology(graph_name: str, num_routers: int, router: Host, *args: List[Any], num_clients: int=0, client: Host=None, 
+def create_topology(graph_name: str, num_routers: int, router: Node, *args: List[Any], num_clients: int=0, client: Node=None, 
                     node_attributes: Dict[int, Dict[str, Any]]=None, link_attributes: Dict[Tuple[int, int], Dict[str, Any]]=None, 
                     routing_metric: Union[str, Callable]=None, connection_type: str='l3', traffic_type: str='single', max_qubits: Union[int, List[int]]=1, 
-                    **kwargs: Dict[str, Any]) -> Tuple[Simulation, List[Host], List[Host]]:
+                    **kwargs: Dict[str, Any]) -> Tuple[Simulation, List[Node], List[Node]]:
     
     """
     Creates a topology for the simulation based on a graph and node and link attributes
@@ -303,10 +303,10 @@ def create_topology(graph_name: str, num_routers: int, router: Host, *args: List
     Args:
         graph_name (str): name of the core graph to create
         num_routers (int): number of routers in the graph, acts as num_nodes in core graph
-        router (Host): router class to use
+        router (Node): router class to use
         *args (list): list of arguments needed for the graph creation
         num_clients (int): number of clients in the periphery graph
-        client (Host): client class to use
+        client (Node): client class to use
         node_attributes (dict): dictonary of node attributes
         link_attributes (dict): dictonary of link attributes
         routing_metric (str/func): routing metric for the routing table

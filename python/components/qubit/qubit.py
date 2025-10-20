@@ -71,9 +71,10 @@ def kronecker_product(_op_1: np.ndarray, _op_2: np.ndarray) -> np.array:
     """
 
     _op = _op_1[:, None, :, None] * _op_2[None, :, None, :]
+    
     return _op.reshape(_op_1.shape[0] * _op_2.shape[0], _op_1.shape[1] * _op_2.shape[1])
 
-def tensor_operator(_operator_l: np.ndarray) -> np.array:
+def tensor_operator(_operator_l: np.ndarray) -> np.ndarray:
     
     """
     Creates the tensor operator out of a operator list
@@ -87,7 +88,7 @@ def tensor_operator(_operator_l: np.ndarray) -> np.array:
 
     return reduce(kronecker_product, _operator_l)
 
-def dot(_state: np.ndarray, _gate: np.ndarray) -> np.array:
+def dot(_state: np.ndarray, _gate: np.ndarray) -> np.ndarray:
     
     """
     Performs the linalg dot for quantum gates
@@ -102,7 +103,7 @@ def dot(_state: np.ndarray, _gate: np.ndarray) -> np.array:
     
     return _gate.dot(_state).dot(_gate.conj().T)
 
-def sqrt_matrix(_state: np.ndarray) -> np.array:
+def sqrt_matrix(_state: np.ndarray) -> np.ndarray:
     
     """
     Calculates the square root of a matrix

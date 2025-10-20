@@ -14,7 +14,7 @@ from qcns.python.components.simulation import Simulation
 
 __all__ = ['SingleQubitConnection', 'SenderReceiverConnection', 'TwoPhotonSourceConnection', 'BellStateMeasurementConnection', 'FockStateConnection', 'L3Connection']
 
-class Host:
+class Node:
     pass
 
 class QuantumError:
@@ -64,8 +64,8 @@ class SingleQubitConnection:
     Represents a Single Qubit Connection
     
     Attr:
-        _sender (Host): sender of connection
-        _receiver (Host): receiver of connection
+        _sender (Node): sender of connection
+        _receiver (Node): receiver of connection
         _num_sources (int): number of available sources
         _source (SinglePhotonSource): sender photon source of connection
         _channel (QChannel): quantum channel of connection
@@ -75,14 +75,14 @@ class SingleQubitConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _model: SQC_Model=SQC_Model()) -> None:
+    def __init__(self, _sender: Node, _receiver: int, _sim: Simulation, _model: SQC_Model=SQC_Model()) -> None:
         
         """
         Initializes a Single Qubit Connection
         
         Args:
-            _sender (Host): sender of connection
-            _receiver (Host): receiver of connection
+            _sender (Node): sender of connection
+            _receiver (Node): receiver of connection
             _sim (Simulation): simulation object
             _sender_source (str): name of model to use for single photon source
             _num_sources (int): number of available sources
@@ -97,7 +97,7 @@ class SingleQubitConnection:
             /
         """
         
-        self._sender: Host = _sender
+        self._sender: Node = _sender
         self._receiver_id: int = _receiver
         self._num_sources: int = _model._num_sources
         self._source: SinglePhotonSource = _model._source_model
@@ -210,8 +210,8 @@ class SenderReceiverConnection:
     Represents a sender receiver connection
     
     Attr:
-        _sender (Host): sender of connection
-        _receiver (Host): receiver of connection
+        _sender (Node): sender of connection
+        _receiver (Node): receiver of connection
         _num_sources (int): number of available sources
         _state_transfer_fidelity (float): fidelity of transfering the state from the photon to the atom
         _source_duration (float): duration of the photon source
@@ -226,15 +226,15 @@ class SenderReceiverConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
+    def __init__(self, _sender: Node, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
                  _model: SRC_Model) -> None:
         
         """
         Initializes a sender receiver connection
         
         Args:
-            _sender (Host): sender of connection
-            _receiver (Host): receiver of connection
+            _sender (Node): sender of connection
+            _receiver (Node): receiver of connection
             _sim (Simulation): simulation object
             _connection_model (str): model to use for connection
             _sender_source (str): model to use for sender source
@@ -252,7 +252,7 @@ class SenderReceiverConnection:
             /
         """
         
-        self._sender: Host = _sender
+        self._sender: Node = _sender
         self._receiver_id: int = _receiver
         self._num_sources: int = _model._num_sources
 
@@ -428,8 +428,8 @@ class TwoPhotonSourceConnection:
     Represents a Two Photon Source Connection
     
     Attr:
-        _sender (Host): sender of connection
-        _receiver (Host): receiver of connection
+        _sender (Node): sender of connection
+        _receiver (Node): receiver of connection
         _num_sources (int): number of available sources
         _sender_state_transfer_fidelity (float): fidelity of transfering the state from the photon to the atom at the sender
         _receiver_state_transfer_fidelity (float): fidelity of transfering the state from the photon to the atom at the receiver
@@ -450,7 +450,7 @@ class TwoPhotonSourceConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
+    def __init__(self, _sender: Node, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
                  _model: TPSC_Model) -> None:
 
         self._sender = _sender
@@ -718,8 +718,8 @@ class BellStateMeasurementConnection:
     Represents a Bell State Measurement Connection
     
     Attr:
-        _sender (Host): sender of connection
-        _receiver (Host): receiver of connection
+        _sender (Node): sender of connection
+        _receiver (Node): receiver of connection
         _num_sources (int): number of available sources
         _sender_source_duration (float): duration of the sender source
         _receiver_source_duration (float): duration of the receiver source
@@ -740,15 +740,15 @@ class BellStateMeasurementConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
+    def __init__(self, _sender: Node, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
                  _model: BSMC_Model) -> None:
         
         """
         Initializes a Bell State Measurement Connection
         
         Args:
-            _sender (Host): sender of connection
-            _receiver (Host): receiver of connection
+            _sender (Node): sender of connection
+            _receiver (Node): receiver of connection
             _sim (Simulation): simulation object
             _connection_model (str): model to use for connection
             _sender_source (str): model to use for atom photon source at sender
@@ -773,7 +773,7 @@ class BellStateMeasurementConnection:
             /
         """
         
-        self._sender: Host = _sender
+        self._sender: Node = _sender
         self._receiver_id: int = _receiver
         self._num_sources: int = _model._num_sources
 
@@ -1082,8 +1082,8 @@ class FockStateConnection:
     Represents a Fock state connection
     
     Attrs:
-        _sender (Host): sender of connection
-        _receiver (Host): receiver of connection
+        _sender (Node): sender of connection
+        _receiver (Node): receiver of connection
         _num_sources (int): number of available sources
         _visibility (float): visibility/indistinguishability of arriving photons
         _coherent_phase (float): phase of the emitted atom photon state
@@ -1109,15 +1109,15 @@ class FockStateConnection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
+    def __init__(self, _sender: Node, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
                  _model: FSC_Model) -> None:
         
         """
         Initializes a Fock state connection
         
         Args:
-            _sender (Host): sender of connection
-            _receiver (Host): receiver of connection
+            _sender (Node): sender of connection
+            _receiver (Node): receiver of connection
             _sim (Simulation): simulation object
             _connection_model (str): model to use for connection
             _sender_source (str): model to use for atom photon source at sender
@@ -1142,7 +1142,7 @@ class FockStateConnection:
             /
         """
         
-        self._sender: Host = _sender
+        self._sender: Node = _sender
         self._receiver_id: int = _receiver
         self._num_sources: int = _model._num_sources
 
@@ -1481,8 +1481,8 @@ class L3Connection:
     Represents a Layer 3 connection
     
     Attrs:
-        _sender (Host): sender of connection
-        _receiver (Host): receiver of connection
+        _sender (Node): sender of connection
+        _receiver (Node): receiver of connection
         _num_sources (int): number of sources available
         _sim (Simulation): Simulation connection lives in
         _source_duration (float): duration of the source
@@ -1495,15 +1495,15 @@ class L3Connection:
         _creation_functions (dict): function to call whether sending or receiving was successful
     """
     
-    def __init__(self, _sender: Host, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
+    def __init__(self, _sender: Node, _receiver: int, _sim: Simulation, _sender_memory: QuantumMemory, _receiver_memory: QuantumMemory,
                  _model: L3C_Model) -> None:
         
         """
         Initializes a L3 connection
         
         Args:
-            _sender (Host): sender of connection
-            _receiver (Host): receiver of connection
+            _sender (Node): sender of connection
+            _receiver (Node): receiver of connection
             _sim (Simulation): simulation connection lives in
             _num_sources (int): number of sources available
             _length (float): length of connection
@@ -1517,7 +1517,7 @@ class L3Connection:
             /
         """
         
-        self._sender: Host = _sender
+        self._sender: Node = _sender
         self._receiver_id: int = _receiver
         self._num_sources: int = _model._num_sources
         self._sim: Simulation = _sim

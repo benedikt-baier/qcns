@@ -15,7 +15,7 @@ from qcns.python.components.hardware.memory import PhysicalQuantumMemory, Logica
 from qcns.python.components.connection.connection import PChannel_Model, SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
 from qcns.python.components.network.qprogram import QProgram, QProgram_Model
 
-__all__ = ['Host', 'IF_entanglement_swapping', 'IF_fidelity_improvement', 'FF_entanglement_swapping', 'FF_fidelity_improvement']
+__all__ = ['Node', 'IF_entanglement_swapping', 'IF_fidelity_improvement', 'FF_entanglement_swapping', 'FF_fidelity_improvement']
 
 class QuantumError:
     pass
@@ -40,14 +40,14 @@ L3 = 3
 L4 = 4
 L7 = 5
 
-class Host:
+class Node:
     
     pass
 
-class Host:
+class Node:
     
     """
-    Represents a Host
+    Represents a Node
     
     Attr:
         _node_id (int): ID of node
@@ -71,12 +71,12 @@ class Host:
                  gate_parameters: Dict[str, float]=_GATE_PARAMETERS) -> None:
         
         """
-        Initializes a Host
+        Initializes a Node
         
         Args:
-            node_id (int): ID of Host
+            node_id (int): ID of Node
             sim (Simulation): Simulation
-            stop (bool): whether the Host has a finite number of events
+            stop (bool): whether the Node has a finite number of events
             l1_qprogram (QProgram): Program handling L1 packets
             l2_qprogram (QProgram): Program handling L2 packets
             l3_qprogram (QProgram): Program handling L3 packets
@@ -118,7 +118,7 @@ class Host:
     async def run(self):
         
         """
-        Run function of Host, should be overwritten
+        Run function of Node, should be overwritten
         
         Args:
             /
@@ -149,7 +149,7 @@ class Host:
             if self.stop:
                 self._sim.schedule_event(StopEvent(self.id))
         except Exception as e:
-            logging.error(f'Host {self.id} has Exception')
+            logging.error(f'Node {self.id} has Exception')
             logging.error(traceback.format_exc())
             self._sim.stop_simulation()
     
@@ -174,13 +174,13 @@ class Host:
             self._layer_results[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
             self._packets[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
         
-    def set_sqs_connection(self, host: Host, sender_config: SQC_Model=SQC_Model(), receiver_config: SQC_Model=SQC_Model()) -> None:
+    def set_sqs_connection(self, host: Node, sender_config: SQC_Model=SQC_Model(), receiver_config: SQC_Model=SQC_Model()) -> None:
         
         """
         Sets up a single qubit source connection
         
         Args:
-            host (Host): other host to establish connection with
+            host (Node): other host to establish connection with
             sender_source (str): name of sender sided source to use
             receiver_source (str): name of receiver sided source to use
             sender_num_sources (int): number of sources at sender side
@@ -217,13 +217,13 @@ class Host:
         self._channels['qc'][host.id] = {SEND: channel_s_r, RECEIVE: channel_r_s}
         host._channels['qc'][self.id] = {SEND: channel_r_s, RECEIVE: channel_s_r}
     
-    def set_eqs_connection(self, host: Host, sender_connection_config: EQC_Model=L3C_Model(), receiver_connection_config: EQC_Model=L3C_Model(), sender_memory_config: PQM_Model | LQM_Model=LQM_Model(), receiver_memory_config: PQM_Model | LQM_Model=LQM_Model()) -> None:
+    def set_eqs_connection(self, host: Node, sender_connection_config: EQC_Model=L3C_Model(), receiver_connection_config: EQC_Model=L3C_Model(), sender_memory_config: PQM_Model | LQM_Model=LQM_Model(), receiver_memory_config: PQM_Model | LQM_Model=LQM_Model()) -> None:
         
         """
         Sets up a heralded entangled qubit connection between this host and another host
         
         Args:
-            host (Host): other host to establish connection with
+            host (Node): other host to establish connection with
             sender_type (str): type of entanglement connection from sender to receiver
             sender_model (str): model of photon source at sender
             receiver_type (str): type of entanglement connection from receiver to sender
@@ -302,13 +302,13 @@ class Host:
         
         self.set_packet_connection(host, sender_pchannel, receiver_pchannel)
 
-    def set_packet_connection(self, host: Host, sender_config: PChannel_Model=PChannel_Model(), receiver_config: PChannel_Model=PChannel_Model()) -> None:
+    def set_packet_connection(self, host: Node, sender_config: PChannel_Model=PChannel_Model(), receiver_config: PChannel_Model=PChannel_Model()) -> None:
         
         """
         Sets up a packet connection between this host an another
         
         Args:
-            host (Host): host to set up connection with
+            host (Node): host to set up connection with
             length (float): length of connection
             
         Returns:
