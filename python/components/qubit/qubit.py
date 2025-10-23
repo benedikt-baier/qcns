@@ -119,7 +119,7 @@ def sqrt_matrix(_state: np.ndarray) -> np.ndarray:
     return dot(np.diag(np.sqrt(np.abs(evs))), vecs)
 
 @cache
-def get_single_operator(_gate: np.ndarray, _index: int, _num_qubits: int) -> np.array:
+def get_single_operator(_gate: np.ndarray, _index: int, _num_qubits: int) -> np.ndarray:
 
     """
     Creates the tensor operator for a single qubit gate
@@ -154,7 +154,7 @@ def get_single_operator(_gate: np.ndarray, _index: int, _num_qubits: int) -> np.
     return kronecker_product(left_array, kronecker_product(_gate, right_array))
 
 @cache
-def get_double_operator(_gate: np.ndarray, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
+def get_double_operator(_gate: np.ndarray, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.ndarray:
     
     """
     Creates the tensor operator for a controlled qubit gate
@@ -191,7 +191,7 @@ def get_double_operator(_gate: np.ndarray, _c_index: int, _t_index: int, _t_num_
     return proj0 + proj1
 
 @cache
-def get_triple_operator(_gate_l: np.ndarray, _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
+def get_triple_operator(_gate_l: np.ndarray, _c1_index: int, _c2_index: int, _t_index: int, _t_num_qubits: int) -> np.ndarray:
     
     """
     Generates the operator for a 3 qubit gate
@@ -224,7 +224,7 @@ def get_triple_operator(_gate_l: np.ndarray, _c1_index: int, _c2_index: int, _t_
     return tensor_operator(gate_list[0]) + tensor_operator(gate_list[1]) + tensor_operator(gate_list[2]) + tensor_operator(gate_list[3])
     
 @cache
-def get_bell_operator(_bell_state: int, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
+def get_bell_operator(_bell_state: int, _c_index: int, _t_index: int, _t_num_qubits: int) -> np.ndarray:
     
     """
     Generates the bell operator
@@ -256,7 +256,7 @@ def get_bell_operator(_bell_state: int, _c_index: int, _t_index: int, _t_num_qub
         return cnot_gate.dot(h_gate).dot(x_gate_c).dot(x_gate_t)
 
 @cache
-def get_bsm_operator(_c_index: int, _t_index: int, _t_num_qubits: int) -> np.array:
+def get_bsm_operator(_c_index: int, _t_index: int, _t_num_qubits: int) -> np.ndarray:
     
     """
     Generates the bsm operator
@@ -276,7 +276,7 @@ def get_bsm_operator(_c_index: int, _t_index: int, _t_num_qubits: int) -> np.arr
     return h_gate.dot(cnot_gate) 
 
 @cache
-def get_swap_operator(_index_1: int, _index_2: int, _num_qubits: int) -> np.array:
+def get_swap_operator(_index_1: int, _index_2: int, _num_qubits: int) -> np.ndarray:
     
     """
     Generates the swap operator
@@ -364,7 +364,7 @@ def combine_state(q_l: List[Qubit]) -> QSystem:
 
     return qsys_n
 
-def combine_gates(gate_l: List[np.array]) -> np.array:
+def combine_gates(gate_l: List[np.ndarray]) -> np.ndarray:
     
     """
     Combines multiple gates into one gate
@@ -1725,7 +1725,7 @@ class QSystem:
         return str(self._state)
     
     @property
-    def state(self) -> np.array:
+    def state(self) -> np.ndarray:
         
         """
         Returns the full state of the QSystem

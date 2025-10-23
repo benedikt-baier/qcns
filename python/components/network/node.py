@@ -429,7 +429,7 @@ class Node:
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
     
-    def apply_gate(self, gate: str, *args: List[Any], fidelity: float=1., apply: bool=True, success_prob: float=1., false_prob: float=0., combine: bool=True, remove: bool=True) -> int | None:
+    def apply_gate(self, gate: str, *args: List[Any], apply: bool=True, success_prob: float=1., false_prob: float=0., combine: bool=True, remove: bool=True) -> int | None:
         
         """
         Applys a gate to qubits
@@ -463,18 +463,18 @@ class Node:
         else:
             event = 2
            
-        def __S(self, gate: str, fidelity: float, remove: bool, args: List[Any]):
+        def __S(self, gate: str, remove: bool, args: List[Any]):
             
-            res = self._gates[gate](*args, fidelity)
+            res = self._gates[gate](*args)
             
             if remove and gate == 'measure':
                 remove_qubits(args[:1])
-            if remove and gate in ['bsm']:
+            if remove and gate == 'bsm':
                 remove_qubits(args[:2])
                 
             return res
         
-        def __F(self, gate: str, fidelity: float, remove: bool, args: List[Any]):
+        def __F(self, gate: str, remove: bool, args: List[Any]):
             
             if gate in ['X', 'Y', 'Z', 'H', 'SX', 'SY', 'SZ', 'T', 'K', 'iSX', 'iSY', 'iSZ', 'iK', 'iT', 'Rx', 'Ry', 'Rz', 'PHASE', 'general_rotation', 'exp_pauli', 'custom_single_gate', 'measure']:
                 remove_qubits(args[:1])
@@ -483,7 +483,7 @@ class Node:
             if gate in ['QAND', 'QOR', 'QXOR', 'QNAND', 'QNOR', 'QXNOR', 'CCU', 'CSWAP']:
                 remove_qubits(args[:3])
         
-        def __N(self, gate: str, fidelity: float, remove: bool, args: List[Any]):
+        def __N(self, gate: str, remove: bool, args: List[Any]):
             
             if gate not in ['measure', 'bsm']:
                 return None
@@ -497,7 +497,7 @@ class Node:
 
         event_dict = {0: __S, 1: __F, 2: __N}
         
-        return event_dict[event](self, gate, fidelity, remove, args)
+        return event_dict[event](self, gate, remove, args)
     
     def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
         
