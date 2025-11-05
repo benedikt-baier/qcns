@@ -51,6 +51,7 @@ class QChannel:
         self._sending_time: float = _length * 5e-6
         self._lose_prob: float = 10 ** (_length * _attenuation_coefficient)
         self._in_coupling_prob: float = _in_coupling_prob
+        self._out_coupling_prob: float = _out_coupling_prob
         self._out_prob: float = self._lose_prob * _out_coupling_prob
         self._errors: List[QuantumError] = _errors
         if _errors is None:
