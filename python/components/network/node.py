@@ -301,8 +301,7 @@ class Node:
         host._memory[self.id] = {SEND: receiver_memory_send, RECEIVE: receiver_memory_receive}
         
         if sender_connection_config._connection_type in ['sr', 'l3c']:
-            sender_pchannel = sender_connection_config._pchannel
-            
+            sender_pchannel = sender_connection_config._pchannel 
         if sender_connection_config._connection_type in ['tps', 'bsm', 'fs']:
             sender_pchannel = PChannel_Model(sender_connection_config._sender_pchannel._length + sender_connection_config._receiver_pchannel._length, 0.5 * (sender_connection_config._sender_pchannel._data_rate + sender_connection_config._receiver_pchannel._data_rate))
         
