@@ -4,7 +4,7 @@ import networkx as nx
 
 from typing import List, Dict, Tuple, Union, Callable, Any
 
-from qcns.python.components.network.host import Node
+from qcns.python.components.network.node import Node
 from qcns.python.components.simulation.simulation import Simulation
 
 __all__ = []
