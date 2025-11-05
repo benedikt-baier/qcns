@@ -5,7 +5,7 @@ import numpy as np
 
 import qcns
 
-class Router(qcns.Host):
+class Router(qcns.Node):
     
     def __init__(self, _id, _sim):
         super(Router, self).__init__(_id, _sim, False)
@@ -15,7 +15,7 @@ class Router(qcns.Host):
     async def run(self):
         
         # await self.attempt_bell_pairs(1, 1)
-        await self.attempt_bell_pairs(2, 1)
+        self.attempt_bell_pairs(2, 1)
         
         while 1:
         
@@ -30,15 +30,15 @@ class Router(qcns.Host):
                 qubit_src = self.l3_retrieve_qubit(packet.l2_src, 1)
                 qubit_dst = self.l3_retrieve_qubit(packet.l2_dst, 0)
                 
-                res = self.apply_gate('bsm', qubit_src, qubit_dst, combine=True, remove=True)
+                res = self.apply_gate('bsm', qubit_src, qubit_dst)
                 
                 packet.l3_update_es(res)
                 
             packet.l2_src = self.id
             
-            await self.send_packet(packet)
+            self.send_packet(packet)
 
-class Sender(qcns.Host):
+class Sender(qcns.Node):
     
     def __init__(self, _id, _sim, qubits):
         super(Sender, self).__init__(_id, _sim)
@@ -51,15 +51,15 @@ class Sender(qcns.Host):
         
         com_qubit = self.l3_retrieve_qubit(0, 0)
         
-        self.apply_gate('CNOT', data_qubit, com_qubit, combine=True)
+        self.apply_gate('CNOT', data_qubit, com_qubit)
         
-        res = self.apply_gate('measure', com_qubit, remove=True)
+        res = self.apply_gate('measure', com_qubit)
         
         packet = qcns.Packet(self.id, 0, l3_src=self.id, l3_dst=2, l3_requested=1, payload=[2, 'CNOT'])
         
         packet.l3_update_es(res)
         
-        await self.send_packet(packet)
+        self.send_packet(packet)
         
         packet = await self.receive_packet()
         
@@ -71,14 +71,14 @@ class Sender(qcns.Host):
 
     async def run(self):
         
-        await self.attempt_bell_pairs(0, 1)
+        self.attempt_bell_pairs(0, 1)
         
         self.apply_gate('H', self.qubits[0])
         self.apply_gate('CNOT', self.qubits[0], self.qubits[1])
         
         await self.send_request()
 
-class Receiver(qcns.Host):
+class Receiver(qcns.Node):
     
     def __init__(self, _id, _sim, qubits):
         super(Receiver, self).__init__(_id, _sim)
@@ -108,7 +108,7 @@ class Receiver(qcns.Host):
         packet.l3_switch_src_dst()
         packet.l2_switch_src_dst()
         
-        await self.send_packet(packet)
+        self.send_packet(packet)
     
     async def run(self):
         
@@ -129,8 +129,8 @@ def main():
     sender = Sender(1, sim, [qsys.qubit(0), qsys.qubit(1)])
     receiver = Receiver(2, sim, [qsys.qubit(2), qsys.qubit(3)])
 
-    router.set_l3_connection(sender, 1)
-    router.set_l3_connection(receiver, 1)
+    router.set_eqs_connection(sender)
+    router.set_eqs_connection(receiver)
     
     sim.run()
     

@@ -3,7 +3,7 @@ import networkx as nx
 
 from typing import List, Dict
 
-from qcns.python.components.network import Host
+from qcns.python.components.network.node import Node
 from qcns.python.components.simulation import Simulation
 from qcns.python.components.network.qprogram import *
 
@@ -16,7 +16,7 @@ L3 = 3
 L4 = 4
 L7 = 5
 
-class Router(Host):
+class Router(Node):
     
     """
     Class for a Router in a Network
