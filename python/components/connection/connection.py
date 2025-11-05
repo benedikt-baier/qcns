@@ -765,8 +765,8 @@ class BellStateMeasurementConnection:
         
         self._sim: Simulation = _sim
         
-        _sender_arrival_prob = _sender_source._emission_prob * _sender_channel._in_coupling_prob * _sender_channel._out_coupling_prob * _sender_detector._efficiency
-        _receiver_arrival_prob = _receiver_source._emission_prob * _receiver_channel._in_coupling_prob * _receiver_channel._out_coupling_prob * _receiver_detector._efficiency
+        _sender_arrival_prob = _sender_source._emission_prob * _sender_channel._in_coupling_prob * _sender_channel._out_prob * _sender_detector._efficiency
+        _receiver_arrival_prob = _receiver_source._emission_prob * _receiver_channel._in_coupling_prob * _receiver_channel._out_prob * _receiver_detector._efficiency
         
         if _sender_lose_qubits:
             _sender_arrival_prob *= _sender_channel._lose_prob
@@ -882,8 +882,7 @@ class BellStateMeasurementConnection:
         
         packet_r.l1_set_ack()
         packet_s.l1_protocol = 3
-        packet_r.l1_protocol = 3
-        
+        packet_r.l1_protocol = 3        
         self._sim.schedule_event(ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender.id))
         self._sim.schedule_event(ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver_id))
         self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
