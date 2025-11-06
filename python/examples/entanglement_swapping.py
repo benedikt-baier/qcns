@@ -5,14 +5,14 @@ import numpy as np
 
 import qcns
 
-class Router(qcns.Node):
+class Router(qcns.Host):
     
     def __init__(self, _id, _sim):
         super(Router, self).__init__(_id, _sim)
         
     async def run(self):
         
-        self.attempt_bell_pairs(2, 1)
+        await self.attempt_bell_pairs(2, 1)
         
         packet = await self.receive_packet()
         
@@ -24,27 +24,27 @@ class Router(qcns.Node):
         qubit_src = self.l3_retrieve_qubit(packet.l2_src, 1)
         qubit_dst = self.l3_retrieve_qubit(packet.l2_dst, 0)
         
-        res = self.apply_gate('bsm', qubit_src, qubit_dst)
+        res = self.apply_gate('bsm', qubit_src, qubit_dst, combine=True, remove=True)
         
         packet.l3_update_es(res)
         packet.l2_src = 0
         
-        self.send_packet(packet)
+        await self.send_packet(packet)
 
-class Sender(qcns.Node):
+class Sender(qcns.Host):
     
     def __init__(self, _id, _sim):
         super(Sender, self).__init__(_id, _sim)
         
     async def run(self):
         
-        self.attempt_bell_pairs(0, 1)
+        await self.attempt_bell_pairs(0, 1)
         
         packet = qcns.Packet(1, 0, l3_src=1, l3_dst=2, l3_needed=1)
         
-        self.send_packet(packet)
+        await self.send_packet(packet)
 
-class Receiver(qcns.Node):
+class Receiver(qcns.Host):
     
     def __init__(self, _id, _sim):
         super(Receiver, self).__init__(_id, _sim)
@@ -63,18 +63,17 @@ class Receiver(qcns.Node):
             
         if packet.l3_es_result[1][0]:
             self.apply_gate('Z', qubit)
-
         
 def main():
 
-    sim = qcns.Simulation(logging_path='./debug.log')
+    sim = qcns.Simulation()
     
     router = Router(0, sim)
     sender = Sender(1, sim)
     receiver = Receiver(2, sim)
 
-    router.set_eqs_connection(sender)
-    router.set_eqs_connection(receiver)
+    router.set_l3_connection(sender, 1)
+    router.set_l3_connection(receiver, 1)
     
     sim.run()
     

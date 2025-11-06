@@ -4,7 +4,6 @@ from queue import Queue
 from typing import List, Union
 
 from qcns.python.components.qubit.qubit import remove_qubits
-from qcns.python.components.hardware.connection import QChannel_Model, PChannel_Model
 
 __all__ = ['QChannel', 'PChannel']
 
@@ -32,7 +31,7 @@ class QChannel:
         _channel (queue): queue representing the channel
     """
     
-    def __init__(self, _model: QChannel_Model, _errors: List[QuantumError]) -> None:
+    def __init__(self, _length: float=0., _attenuation_coefficient: float=-0.016, _in_coupling_prob: float=1., _out_coupling_prob: float=1., _errors: List[QuantumError]=None) -> None:
         
         """
         Initializes a quantum channel
@@ -48,19 +47,15 @@ class QChannel:
             /
         """
         
-<<<<<<< HEAD
         self._length: float = _length
         self._sending_time: float = _length * 5e-6
         self._lose_prob: float = 10 ** (_length * _attenuation_coefficient)
         self._in_coupling_prob: float = _in_coupling_prob
         self._out_coupling_prob: float = _out_coupling_prob
         self._out_prob: float = self._lose_prob * _out_coupling_prob
-=======
-        self._propagation_time: float = _model._length * 5e-6
-        self._in_coupling: float = _model._in_coupling
-        self._out_prob: float = 10 ** (_model._length * _model._attenuation) * _model._out_coupling
->>>>>>> cc4b6cd1f586147bb62977684007664fa14949b8
         self._errors: List[QuantumError] = _errors
+        if _errors is None:
+            self._errors = []
         self._channel: Queue = Queue()
     
     def empty(self) -> bool:
@@ -89,14 +84,14 @@ class QChannel:
             /
         """
         
-        if np.random.uniform(0, 1) > self._in_coupling:
+        if np.random.uniform(0, 1) > self._in_coupling_prob:
             remove_qubits([_qubit])
             self._channel.put_nowait(None)
             return
         
         self._channel.put_nowait(_qubit)
 
-    def get(self) -> Qubit | None:
+    def get(self) -> Union[Qubit, None]:
         
         """
         Receives a qubit from the channel
@@ -132,7 +127,7 @@ class PChannel:
         _channel (queue): queue representing the channel
     """
     
-    def __init__(self, _model: PChannel_Model) -> None:
+    def __init__(self, _length: float=0.) -> None:
         
         """
         Initializesa packet channel
@@ -144,8 +139,7 @@ class PChannel:
             /
         """
         
-        self._propagation_time: float = _model._length * 5e-6
-        self._data_rate: float = _model._data_rate
+        self._signal_time: float = _length * (5e-6)
         self._channel: Queue = Queue()
     
     def empty(self) -> bool:
@@ -161,13 +155,6 @@ class PChannel:
         """
         
         return self._channel.empty()
-    
-    def _sending_time(self, _packet_length: float) -> float:
-        
-        if self._data_rate < 0:
-            return 0.
-        
-        return _packet_length / self._data_rate
     
     def put(self, _packet: Packet) -> None:
         

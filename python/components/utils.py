@@ -10,7 +10,7 @@ import scipy.sparse as sp
 from typing import List, Dict, Any
 
 from qcns.python.components.qubit import combine_gates
-from qcns.python.components.network.node import Node
+from qcns.python.components.network.host import Host
 
 class Qubit:
     pass
@@ -294,7 +294,7 @@ def apply_circuit(circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: boo
     
     next(iter(qubits)).custom_gate(gate)
     
-def dqc_apply_circuit(node: Node, circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
+def dqc_apply_circuit(host: Host, circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
     
     if not circuit:
         return
@@ -334,6 +334,6 @@ def dqc_apply_circuit(node: Node, circuit: List[List[Any]], qubits: Dict[int, Qu
     if apply:
         return
     
-    gate = combine_gates(gates)
+    gate = combine_gates(0, gates)
     
-    node.apply_gate('custom_gate', next(iter(qubits.values())), gate)
+    host.apply_gate('custom_gate', next(iter(qubits.values())), gate)
