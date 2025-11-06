@@ -797,23 +797,85 @@ class BellStateMeasurementConnection:
         self._receiver_memory: QuantumMemory = _receiver_memory
 
         self._sim: Simulation = _sim
+
+        _s_p0, _s_p1, _s_p2 = _sender_source._pmf[:3]
+        _r_p0, _r_p1, _r_p2 = _receiver_source._pmf[:3]
+
+        _sender_eta = self._sender_memory._efficiency * _sender_channel._in_coupling * 10 ** (-_sender_channel._attenuation * _sender_channel._length / 10.0) * _sender_channel._out_coupling
+        _receiver_eta = self._receiver_memory._efficiency * _receiver_channel._in_coupling * 10 ** (-_receiver_channel._attenuation * _receiver_channel._length / 10.0) * _receiver_channel._out_coupling
+        _sender_efficiency = _sender_detector._efficiency
+        _sender_dark = _sender_detector._dark_count
+        _receiver_efficiency = _receiver_detector._efficiency
+        _receiver_dark = _receiver_detector._dark_count
         
-        _sender_arrival_prob = _sender_source._emission_prob * _sender_channel._in_coupling_prob * _sender_channel._out_coupling_prob * _sender_detector._efficiency
-        _receiver_arrival_prob = _receiver_source._emission_prob * _receiver_channel._in_coupling_prob * _receiver_channel._out_coupling_prob * _receiver_detector._efficiency
+        _sender_arrival_0 = _s_p0 + _s_p1 * _sender_source._visibility * (1 - _sender_eta) + _s_p2 * _sender_source._visibility * (1 - _sender_eta) ** 2
+        _sender_arrival_1 = _s_p1 * _sender_source._visibility * _sender_eta + _s_p2 * _sender_source._visibility * 2 * _sender_eta * (1 - _sender_eta)
+        _sender_arrival_2 = _s_p2 * _sender_source._visibility * _sender_eta ** 2
         
-        if _sender_lose_qubits:
-            _sender_arrival_prob *= _sender_channel._lose_prob
+        _receiver_arrival_0 = _r_p0 + _r_p1 * _receiver_source._visibility * (1 - _receiver_eta) + _r_p2 * _receiver_source._visibility * (1 - _receiver_eta) ** 2
+        _receiver_arrival_1 = _r_p1 * _receiver_source._visibility * _receiver_eta + _r_p2 * _receiver_source._visibility * 2 * _receiver_eta * (1 - _receiver_eta)
+        _receiver_arrival_2 = _r_p2 * _receiver_source._visibility * _receiver_eta ** 2
+        
+        _p_00 = _sender_arrival_0 * _receiver_arrival_0
+        _p_01 = _sender_arrival_0 * _receiver_arrival_1
+        _p_10 = _sender_arrival_1 * _receiver_arrival_0
+        _p_11 = _sender_arrival_1 * _receiver_arrival_1
+        _p_02 = _sender_arrival_0 * _receiver_arrival_2
+        _p_20 = _sender_arrival_2 * _receiver_arrival_0
+        _p_12 = _sender_arrival_1 * _receiver_arrival_2
+        _p_21 = _sender_arrival_2 * _receiver_arrival_1
+        _p_22 = _sender_arrival_2 * _receiver_arrival_2
+        
+        def __TD_rate(_eta, _k, _dark_count):
             
-        if _receiver_lose_qubits:
-            _receiver_arrival_prob *= _receiver_channel._lose_prob
+            if _k == 0:
+                return _dark_count
+            
+            if _eta == 0.:
+                return _dark_count
+            
+            if _eta == 1.:
+                return 1.
+            
+            return 1 - (1 - _dark_count) * (1 - _eta) ** _k
         
-        self._sender_depolar: float = (4 * _sender_source._fidelity - 1) / 3
-        self._receiver_depolar: float = (4 * _receiver_source._fidelity - 1) / 3
-        _total_depolar_prob: float = self._sender_depolar * self._receiver_depolar
+        def __PNR_rate(_eta, _k, _dark_count):
+            
+            if _k == 0:
+                return _dark_count
+            
+            if _eta == 0.:
+                return _dark_count
+            
+            if _eta == 1.:
+                return (1.0 - _dark_count) * (1.0 if _k == 1 else 0.0)
+            
+            return (1 - _dark_count) * _k * _eta * (1 - _eta) ** (_k - 1) + _dark_count * (1 - _eta) ** _k
         
-        self._success_prob: float = 0.5 * _sender_arrival_prob * _receiver_arrival_prob * _coin_ph_ph * _visibility * (1 - _sender_detector._dark_count_prob) ** 2 * (1 - _receiver_detector._dark_count_prob) ** 2
+        __D_rate = {0: __TD_rate, 1: __PNR_rate}
         
-        if -np.log10(self._success_prob) >= 6:
+        _s_det = isinstance(_sender_detector, PNRDetector)
+        _r_det = isinstance(_receiver_detector, PNRDetector)
+            
+        C_00 = __D_rate[_s_det](_sender_efficiency, 0, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 0, _receiver_dark)
+        C_01 = 0.5 * (__D_rate[_s_det](_sender_efficiency, 1, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 0, _receiver_dark) + __D_rate[_s_det](_sender_efficiency, 0, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 1, _receiver_dark))
+        C_10 = C_01
+        C_11_t = _split_eff * _sender_efficiency * _receiver_efficiency
+        if _s_det:
+            C_11_t *= (1 - _sender_dark)
+        if _r_det:
+            C_11_t *= (1 - _receiver_dark)
+        C_11_total = _split_eff * __D_rate[_s_det](_sender_efficiency, 1, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 1, _receiver_dark) + 0.5 * (1 - _split_eff) * (__D_rate[_s_det](_sender_efficiency, 2, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 0, _receiver_dark) + __D_rate[_s_det](_sender_efficiency, 0, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 2, _receiver_dark))
+        C_11_f = C_11_total - C_11_t
+        C_02 = 0.5 * __D_rate[_s_det](_sender_efficiency, 1, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 1, _receiver_dark) + 0.25 * (__D_rate[_s_det](_sender_efficiency, 2, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 0, _receiver_dark) + __D_rate[_s_det](_sender_efficiency, 0, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 2, _receiver_dark))
+        C_20 = C_02
+        C_12 = (3 / 8) * (__D_rate[_s_det](_sender_efficiency, 0, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 3, _receiver_dark) + __D_rate[_s_det](_sender_efficiency, 3, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 0, _receiver_dark)) + 0.125 * (__D_rate[_s_det](_sender_efficiency, 1, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 2, _receiver_dark) + __D_rate[_s_det](_sender_efficiency, 2, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 1, _receiver_dark))
+        C_21 = C_12
+        C_22 = (3 / 8) * (__D_rate[_s_det](_sender_efficiency, 0, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 4, _receiver_dark) + __D_rate[_s_det](_sender_efficiency, 4, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 0, _receiver_dark)) + 0.25 * __D_rate[_s_det](_sender_efficiency, 2, _sender_dark) * __D_rate[_r_det](_receiver_efficiency, 2, _receiver_dark)
+        
+        self._success_prob = C_11_t * _p_11
+        
+        if self._success_prob <= 0.0 or -np.log10(self._success_prob) >= 6:
             raise ValueError('Too low success probability')
         
         _false_prob = C_11_f * _p_11 + C_00 * _p_00 + C_01 * _p_01 + C_10 * _p_10 + C_02 * _p_02 + C_20 * _p_20 + C_12 * _p_12 + C_21 * _p_21 + C_22 * _p_22
@@ -959,10 +1021,10 @@ class BellStateMeasurementConnection:
         packet_s.l1_protocol = 3
         packet_r.l1_protocol = 3
         
-        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender.id))
-        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver_id))
-        self._sender._connections['packet'][self._receiver_id][SEND].put(packet_r)
-        self._sender._connections['packet'][self._receiver_id][RECEIVE].put(packet_s)        
+        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender.id, self._receiver_id))
+        self._sim.schedule_event(ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver_id, self._sender.id))
+        self._sender._channels['pc'][self._receiver_id][SEND].put(packet_r)
+        self._sender._channels['pc'][self._receiver_id][RECEIVE].put(packet_s)
     
     def create_bell_pairs(self, _requested: int=1) -> None:
         

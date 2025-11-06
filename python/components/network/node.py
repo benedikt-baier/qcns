@@ -404,7 +404,7 @@ class Node:
         
         if not self.has_space(receiver, 0, _num_needed):
             _num_needed = self.remaining_space(receiver, 0)
-
+        
         if not self._sim._hosts[receiver].has_space(self.id, 1, _num_needed):
             _num_needed = self._sim._hosts[receiver].remaining_space(self.id, 1)
         
@@ -413,7 +413,7 @@ class Node:
         
         if _num_needed < num_requested:
             num_requested = _num_needed
-
+        
         self._connections['eqs'][receiver].attempt_bell_pairs(num_requested, _num_needed)
     
     def create_bell_pairs(self, receiver: int, num_requested: int=1) -> None:

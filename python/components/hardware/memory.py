@@ -223,8 +223,6 @@ class QuantumMemory:
         
         if not self._size + 1:
             return True
-
-        print(f'SIZE_MEMORY: {self._size} REMAINING_SPACE: {self.remaining_space()}')
         
         return self.remaining_space() >= _num_qubits
     
