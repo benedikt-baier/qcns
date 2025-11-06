@@ -190,7 +190,7 @@ class Simulation:
                 self._hosts[event._node_id]._time = event._end_time
             
             if event._id == 1:
-                self._hosts[event._node_id]._resume[event._src_id].set()
+                self._hosts[event._node_id]._resume.set()
             
         self.stop_simulation()
     
@@ -232,7 +232,7 @@ class Simulation:
                 self._hosts[event._node_id]._time = event._end_time
             
             if event._id == 1:
-                self._hosts[event._node_id]._resume[event._src_id].set()
+                self._hosts[event._node_id]._resume.set()
             
         self.stop_simulation()
     

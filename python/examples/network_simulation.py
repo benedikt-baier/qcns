@@ -202,7 +202,15 @@ def main():
     
     routers, clients = create_topology(sim, num_routers, num_clients, edge_prob, coherence)
     
+    import time
+    
+    start_time = time.perf_counter()
+    
     sim.run()
+    
+    end_time = time.perf_counter() - start_time
+    
+    print(end_time)
     
 if __name__ == '__main__':
     main()

@@ -104,7 +104,7 @@ class Node:
         
         self._time: float = 0.
         
-        self._resume: Dict[int, asc.Event] = {}
+        self._resume: asc.Event = asc.Event()
         self._receive_tasks: Dict[int, asc.Task] = {}
         self._receive_queue: asc.Queue = asc.Queue()
         self.stop: bool = stop
@@ -138,10 +138,6 @@ class Node:
             /
         """
         
-        for neighbor in self._neighbors:
-            self._resume[neighbor] = asc.Event()
-            self._receive_tasks[neighbor] = asc.create_task(self._listener(neighbor, self._resume[neighbor]))
-        
         if not self.stop:
             self._sim.schedule_event(StopEvent(self.id))
         
@@ -174,16 +170,6 @@ class Node:
             self._memory[neighbor][RECEIVE].discard_qubits()
             self._layer_results[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
             self._packets[neighbor] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
-    
-    async def _listener(self, neighbor: int, event: asc.Event) -> None:
-        
-        try:
-            while True:
-                await event.wait()
-                event.clear()
-                await self._receive_queue.put(neighbor)
-        except asc.CancelledError:
-            pass
     
     def set_sqs_connection(self, host: Node, sender_config: SQC_Model=SQC_Model(), receiver_config: SQC_Model=SQC_Model()) -> None:
         
@@ -562,7 +548,7 @@ class Node:
         """
         
         self._sim.schedule_event(SendEvent(self._time, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['qc'][receiver][SEND]._propagation_time, receiver, self.id))
+        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['qc'][receiver][SEND]._propagation_time, receiver))
         
         self._channels['qc'][receiver][SEND].put(qubit)
     
@@ -577,21 +563,19 @@ class Node:
         Returns:
             _qubit (Qubit): received qubit
         """
-           
-        if sender is not None:
-            try:
-                await asc.wait_for(self._resume[sender].wait(), timeout=time_out)
-                self._resume[sender].clear()
-                return self._channels['qc'][sender][RECEIVE].get()
-            except asc.TimeoutError:
-                return None
         
         try:
-            neighbor = await asc.wait_for(self._receive_queue.get(), timeout=time_out)
+            await asc.wait_for(self._resume.wait(), timeout=time_out)
+            self._resume.clear()
         except asc.TimeoutError:
             return None
         
-        return self._channels['qc'][neighbor][RECEIVE].get()
+        if sender is not None:
+            return self._channels['qc'][sender][RECEIVE].get()
+        
+        for neighbor in self._neighbors:
+            if not self._channels['qc'][neighbor][RECEIVE].empty():
+                return self._channels['qc'][neighbor][RECEIVE].get()
          
     def send_packet(self, _packet: Packet) -> None:
         
@@ -607,7 +591,7 @@ class Node:
         
         self._time += self._channels['pc'][_packet.l2_dst][SEND]._sending_time(len(_packet))
         self._sim.schedule_event(SendEvent(self._time, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['pc'][_packet.l2_dst][SEND]._propagation_time, _packet.l2_dst, self.id))
+        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['pc'][_packet.l2_dst][SEND]._propagation_time, _packet.l2_dst))
         
         self._channels['pc'][_packet.l2_dst][SEND].put(_packet)
         
@@ -623,20 +607,18 @@ class Node:
             _packet (Packet): received packet
         """
             
-        if sender is not None:
-            try:
-                await asc.wait_for(self._resume[sender].wait(), timeout=time_out)
-                self._resume[sender].clear()
-                return self._channels['pc'][sender][RECEIVE].get()
-            except asc.TimeoutError:
-                return None
-        
         try:
-            neighbor = await asc.wait_for(self._receive_queue.get(), timeout=time_out)
+            await asc.wait_for(self._resume.wait(), timeout=time_out)
+            self._resume.clear()
         except asc.TimeoutError:
             return None
         
-        return self._channels['pc'][neighbor][RECEIVE].get()
+        if sender is not None:
+            return self._channels['pc'][sender][RECEIVE].get()
+        
+        for neighbor in self._neighbors:
+            if not self._channels['pc'][neighbor][RECEIVE].empty():
+                return self._channels['pc'][neighbor][RECEIVE].get()
     
     def wait(self, duration: float) -> None:
         
