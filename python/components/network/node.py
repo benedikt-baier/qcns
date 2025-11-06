@@ -548,9 +548,10 @@ class Node:
         """
         
         self._sim.schedule_event(SendEvent(self._time, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['qc'][receiver][SEND]._propagation_time, receiver))
+        recv_event = ReceiveEvent(self._time + self._channels['qc'][receiver][SEND]._propagation_time, receiver)
+        self._sim.schedule_event(recv_event)
         
-        self._channels['qc'][receiver][SEND].put(qubit)
+        self._channels['qc'][receiver][SEND].put(qubit, recv_event._end_time)
     
     async def receive_qubit(self, sender: int=None, time_out: float=None) -> Qubit | None:
         
@@ -591,9 +592,10 @@ class Node:
         
         self._time += self._channels['pc'][_packet.l2_dst][SEND]._sending_time(len(_packet))
         self._sim.schedule_event(SendEvent(self._time, self.id))
-        self._sim.schedule_event(ReceiveEvent(self._time + self._channels['pc'][_packet.l2_dst][SEND]._propagation_time, _packet.l2_dst))
+        recv_event = ReceiveEvent(self._time + self._channels['pc'][_packet.l2_dst][SEND]._propagation_time, _packet.l2_dst)
+        self._sim.schedule_event(recv_event)
         
-        self._channels['pc'][_packet.l2_dst][SEND].put(_packet)
+        self._channels['pc'][_packet.l2_dst][SEND].put(_packet, recv_event._end_time)
         
     async def receive_packet(self, sender: int=None, time_out: float=None) -> Packet | None:
         

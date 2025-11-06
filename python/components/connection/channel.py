@@ -1,7 +1,7 @@
 import numpy as np
-from queue import Queue
+from heapq import heappop, heappush
 
-from typing import List, Union
+from typing import List, Tuple
 
 from qcns.python.components.qubit.qubit import remove_qubits
 from qcns.python.components.hardware.connection import QChannel_Model, PChannel_Model
@@ -52,7 +52,7 @@ class QChannel:
         self._in_coupling: float = _model._in_coupling
         self._out_prob: float = 10 ** (_model._length * _model._attenuation) * _model._out_coupling
         self._errors: List[QuantumError] = _errors
-        self._channel: Queue = Queue()
+        self._channel: List[Tuple[float, Qubit]] = []
     
     def empty(self) -> bool:
         
@@ -68,7 +68,7 @@ class QChannel:
         
         return self._channel.empty()
 
-    def put(self, _qubit: Qubit) -> None:
+    def put(self, _qubit: Qubit, _arrival_time: float) -> None:
         
         """
         Sends a qubit through the channel
@@ -82,10 +82,10 @@ class QChannel:
         
         if np.random.uniform(0, 1) > self._in_coupling:
             remove_qubits([_qubit])
-            self._channel.put_nowait(None)
+            heappush(self._channel, (_arrival_time, None))
             return
         
-        self._channel.put_nowait(_qubit)
+        heappush(self._channel, (_arrival_time, _qubit))
 
     def get(self) -> Qubit | None:
         
@@ -99,7 +99,7 @@ class QChannel:
             _qubit (Qubit): received qubit
         """
         
-        _qubit = self._channel.get()
+        _, _qubit = heappop(self._channel)
         
         if _qubit is None:
             return _qubit
@@ -137,7 +137,7 @@ class PChannel:
         
         self._propagation_time: float = _model._length * 5e-6
         self._data_rate: float = _model._data_rate
-        self._channel: Queue = Queue()
+        self._channel: List[Tuple[float, Packet]] = []
     
     def empty(self) -> bool:
         
@@ -151,7 +151,7 @@ class PChannel:
             _empty (bool): whether channel is empty
         """
         
-        return self._channel.empty()
+        return not self._channel
     
     def _sending_time(self, _packet_length: float) -> float:
         
@@ -160,7 +160,7 @@ class PChannel:
         
         return _packet_length / self._data_rate
     
-    def put(self, _packet: Packet) -> None:
+    def put(self, _packet: Packet, _arrival_time: float) -> None:
         
         """
         Sends a packet through the channel
@@ -172,7 +172,7 @@ class PChannel:
             /
         """
         
-        self._channel.put_nowait(_packet)
+        heappush(self._channel, (_arrival_time, _packet))
         
     def get(self) -> Packet:
         
@@ -186,4 +186,6 @@ class PChannel:
             _packet (Packet): received packet
         """
         
-        return self._channel.get()
+        _, _packet = heappop(self._channel)
+        
+        return _packet
