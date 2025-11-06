@@ -142,7 +142,7 @@ class ReceiveEvent(Event):
         _node_id (int): ID of Host which scheduled event
     """
     
-    def __init__(self, _end_time: float, _node_id: int) -> None:
+    def __init__(self, _end_time: float, _node_id: int, _src_id: int) -> None:
         
         """
         Initializes a Receive Event
@@ -158,6 +158,7 @@ class ReceiveEvent(Event):
         self._id: int = 1
         self._end_time: float = _end_time
         self._node_id: int = _node_id
+        self._src_id: int = _src_id
         
     def __repr__(self) -> str:
         

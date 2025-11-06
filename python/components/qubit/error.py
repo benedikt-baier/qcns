@@ -2,14 +2,13 @@ import numpy as np
 
 from qcns.python.components.qubit.qubit import Qubit, dot, get_single_operator
 
-__all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError',
-           'SystematicDephasingError', 'SystematicError']
+__all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError', 'SystematicDephasingError', 'SystematicError', 'pauli_error']
 
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),
               'P01': np.array([[0, 1], [0, 0]], dtype=np.complex128),
               'Z': np.array([[1, 0], [0, -1]], dtype=np.complex128)}
-   
+
 class DepolarizationError:
     
     """
@@ -411,3 +410,17 @@ class SystematicError:
         _qubit.Rz(self._theta_z)
         
         return _qubit
+
+def pauli_error(_qubit: Qubit, p_i: float, p_x: float, p_y: float, p_z: float) -> Qubit:
+        
+    key_x = f's_x_{_qubit.num_qubits}_{_qubit._index}'
+    key_y = f's_y_{_qubit.num_qubits}_{_qubit._index}'
+    key_z = f's_z_{_qubit.num_qubits}_{_qubit._index}'
+    
+    gate_x = get_single_operator(key_x, full_gates['X'], _qubit._index, _qubit.num_qubits)    
+    gate_y = get_single_operator(key_y, full_gates['y'], _qubit._index, _qubit.num_qubits)
+    gate_z = get_single_operator(key_z, full_gates['Z'], _qubit._index, _qubit.num_qubits)
+    
+    _qubit.state = p_i * _qubit.state + p_x * dot(_qubit.state, gate_x) + p_y * dot(_qubit.state, gate_y) + p_z * dot(_qubit.state, gate_z)
+    
+    return _qubit
