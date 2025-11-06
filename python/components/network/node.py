@@ -404,6 +404,45 @@ class Node:
         
         if not self.has_space(receiver, 0, _num_needed):
             _num_needed = self.remaining_space(receiver, 0)
+
+        # send_mem = self._connections["memory"][receiver][0]
+        # receive_mem = self._connections["memory"][receiver][1]
+        # send_mem_other_host = self._sim._hosts[receiver]._connections['memory'][self.id][0]
+
+        # remaining_space_receiver_memory = send_mem.size - len(receive_mem)
+        # print(f'REMAINING IN RECEIVER: {remaining_space_receiver_memory}')
+
+        # if _num_needed > remaining_space_receiver_memory:
+        #     _num_needed = remaining_space_receiver_memory
+
+        # if _num_needed >= (send_mem.size - len(receive_mem)):
+        #     _num_needed = send_mem.size - len(receive_mem)
+
+        # if not send_mem.has_space(_num_needed) or not receive_mem.has_space(_num_needed):
+        #     _num_needed = min(send_mem.remaining_space(), receive_mem.remaining_space())
+        #     print(f'NUM_NEEDED: {_num_needed}')
+
+        # print(f"SEND_MEMORY -> "
+        #     f"L0: {len(send_mem._memory[0])}, "
+        #     f"L1: {len(send_mem._memory[1])}, "
+        #     f"L2: {len(send_mem._memory[2])}, "
+        #     f"L3: {len(send_mem._memory[3])}, "
+        #     f"remaining: {send_mem.remaining_space()}")
+
+        # print(f"RECEIVE_MEMORY -> "
+        #     f"L0: {len(receive_mem._memory[0])}, "
+        #     f"L1: {len(receive_mem._memory[1])}, "
+        #     f"L2: {len(receive_mem._memory[2])}, "
+        #     f"L3: {len(receive_mem._memory[3])}, "
+        #     f"remaining: {receive_mem.remaining_space()}")
+
+        # if not self.has_space(receiver, 1, _num_needed):
+        #     _num_needed = self.remaining_space(receiver, 1)
+
+        # if not self.has_space(receiver, 0, _num_needed) or not self.has_space(receiver, 1, _num_needed):
+        # _num_needed = min(send_mem.remaining_space(), receive_mem.remaining_space())
+           
+        print(f'NUM_NEEDED: {_num_needed}')
         
         if not self._sim._hosts[receiver].has_space(self.id, 1, _num_needed):
             _num_needed = self._sim._hosts[receiver].remaining_space(self.id, 1)
@@ -413,6 +452,8 @@ class Node:
         
         if _num_needed < num_requested:
             num_requested = _num_needed
+
+        print(f'NUM_REQUESTED:{num_requested} NUM_NEEDED:{_num_needed}')
         
         self._connections['eqs'][receiver].attempt_bell_pairs(num_requested, _num_needed)
     

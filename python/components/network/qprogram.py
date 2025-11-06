@@ -3,6 +3,7 @@ from functools import partial
 from typing import List, Dict, Union, Awaitable
 
 import numpy as np
+import copy
 
 from qcns.python.components.qubit.qubit import Qubit
 from qcns.python.components.packet.packet import Packet
@@ -185,7 +186,7 @@ class L1_EGP(QProgram):
         _qdp_modes (dict): dictionary of functions of the _rap_mode
     """
     
-    def __init__(self, eg_mode: str='l3cp', rap_mode: str='attempt', reattempt: bool=True) -> None:
+    def __init__(self, eg_mode: str='l3cp', rap_mode: str='attempt', reattempt: bool=True, qubits_requested: int=1) -> None:
         
         """
         Initializes the L1 Entanglement Generation Protocol (EGP)
@@ -198,6 +199,8 @@ class L1_EGP(QProgram):
         Returns:
             /
         """
+
+        self.qubits_requested = qubits_requested
         
         super(L1_EGP, self).__init__()
         self.layer = 1
@@ -207,9 +210,13 @@ class L1_EGP(QProgram):
         
         self._eg_mode: str = eg_mode
         self.classical_data_plane = _eg_modes[self._eg_mode]
-        if reattempt:
-            self.classical_data_plane = partial(self._reattempt, self.classical_data_plane)
         self.classical_data_plane = partial(self._protocol_n, self.classical_data_plane)
+        if reattempt:
+            if self._eg_mode == 'srp' or self._eg_mode == 'tpsp':
+                self.classical_data_plane = partial(self._reattempt_srp_tpsp, self.classical_data_plane)
+            else:
+                self.classical_data_plane = partial(self._reattempt, self.classical_data_plane)
+        # self.classical_data_plane = partial(self._protocol_n, self.classical_data_plane)
         
         self._rap_mode: str = _rap_modes[rap_mode]
         self._qdp_modes: Dict[str, Awaitable] = {3: self.attempt_bell_pairs, 2: self.create_bell_pairs}
@@ -228,7 +235,9 @@ class L1_EGP(QProgram):
             /
         """
         
+        # print(f'RECEIVER: {receiver}')
         await self.host.attempt_bell_pairs(receiver, requested, estimate)
+
         
     async def create_bell_pairs(self, receiver: int, requested: int=1) -> None:
         
@@ -258,10 +267,62 @@ class L1_EGP(QProgram):
             /
         """
         
+        print(f'ID: {self.host.id}; execute _reattempt')
+
+        if self.host.l3_num_qubits(packet.l2_src, packet.l1_ack) > 0.5 * self.qubits_requested:
+            return
+
         await func(packet)
-        if self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack) < packet.l1_requested:
-            await self.quantum_data_plane(packet.l2_src, packet.l1_requested - self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack), True)
-    
+
+        # if not packet.l1_ack:
+        #     return
+
+        if self.host.l3_num_qubits(packet.l2_src, packet.l1_ack) < 0.5 * self.qubits_requested:
+            print(f'ID: {self.host.id}; L1_NUM_QUBITS: {self.host.l1_num_qubits(packet.l2_src, packet.l1_ack)} requested: {self.qubits_requested - self.host.l1_num_qubits(packet.l2_src, packet.l1_ack)}')
+            await self.quantum_data_plane(packet.l2_src, self.qubits_requested - self.host.l1_num_qubits(packet.l2_src, packet.l1_ack), True)
+       
+        # if self.host.l1_num_qubits(packet.l2_src, packet.l1_ack) < self.qubits_requested:
+        #     print(f'ID: {self.host.id}; L1_NUM_QUBITS: {self.host.l1_num_qubits(packet.l2_src, packet.l1_ack)} requested: {self.qubits_requested - self.host.l1_num_qubits(packet.l2_src, packet.l1_ack)}')
+        #     await self.quantum_data_plane(packet.l2_src, self.qubits_requested - self.host.l1_num_qubits(packet.l2_src, packet.l1_ack), True)
+
+        print(f'ID: {self.host.id}; finished _reattempt')
+
+
+    async def _reattempt_srp_tpsp(self, func: Awaitable, packet: Packet) -> None:
+        
+        """
+        Wrapper function when qubits should be reattempted
+        
+        Args:
+            func (Awaitable): function to execute before reattempting
+            packet (Packet): packet needed for the reattempt
+            
+        Returns:
+            /
+        """
+        
+        print(f'ID: {self.host.id}; execute _reattempt_srp')
+
+        if self.host.l3_num_qubits(packet.l2_src, packet.l1_ack) > 0.5 * self.qubits_requested:
+            return
+
+        await func(packet)
+
+        # if packet.l1_ack:
+        #     return
+        
+        if self._eg_mode == 'tpsp':
+            if packet.l2_src not in self.host._connections['memory'] or (not packet.l1_ack) not in self.host._connections['memory'][packet.l2_src]:
+                print('sike')
+                return
+
+        if self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack) < self.qubits_requested:
+            print(f'ID: {self.host.id}; L1_NUM_QUBITS: {self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack)} requested: {self.qubits_requested - self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack)}')
+            await self.quantum_data_plane(packet.l2_src, self.qubits_requested - self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack), True)
+
+        print(f'ID: {self.host.id}; finished _reattempt')
+
+
     async def _protocol_n(self, func: Awaitable, packet: Packet) -> None:
         
         """
@@ -274,10 +335,19 @@ class L1_EGP(QProgram):
         Returns:
             /
         """
-        
+
+        print(f'ID: {self.host.id}; Executing Protocol_n')
+
         await func(packet)
+
+        if self._eg_mode == 'tpsp':
+            if packet.l2_src not in self.host._connections['memory'] or (not packet.l1_ack) not in self.host._connections['memory'][packet.l2_src]:
+                return
+        
         if self.next_protocol is not None:
+            print(f'NEXTTTTTT: {self.next_protocol}')
             await self.next_protocol.quantum_data_plane(packet)
+            
 
     async def _l3cp(self, packet: Packet) -> None:
         
@@ -304,14 +374,26 @@ class L1_EGP(QProgram):
         Returns:
             /
         """
+
+        print(f'PRE --- ID: {self.host.id}; L1_NUM_QUBITS: {self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack)}')
         
         self.host.l0_move_qubits_l1(packet.l2_src, not packet.l1_ack, packet.l1_success)
-        
+
+        print(f'POST --- ID: {self.host.id}; L1_NUM_QUBITS: {self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack)}')
+
         if not packet.l1_ack:
-            packet.l1_set_ack()
-            packet.l2_switch_src_dst()
-            await self.host.send_packet(packet)
+            packet_new = copy.deepcopy(packet)
+            packet_new.l2_switch_src_dst()
+            packet_new.l1_set_ack()
+            await self.host.send_packet(packet_new)
             return
+        
+        # if not packet.l1_ack:
+        #     packet.l1_set_ack()
+        #     packet.l2_switch_src_dst()
+        #     await self.host.send_packet(packet)
+        #     print(f'MIRRORED PACKET: {packet}')
+        #     return
 
     async def _tpsp(self, packet: Packet) -> None:
         
@@ -347,8 +429,12 @@ class L1_EGP(QProgram):
         Returns:
             /
         """
+
+        # print(f'ID: {self.host.id}; Executing _bsmp')
         
         self.host.l0_move_qubits_l1(packet.l2_src, packet.l1_ack, packet.l1_success)
+
+        # print(f'ID: {self.host.id}; L1_NUM_QUBITS: {self.host.l1_num_qubits(packet.l2_src, packet.l1_ack)}')
 
     async def _fsp(self, packet: Packet) -> None:
         
@@ -377,8 +463,28 @@ class L1_EGP(QProgram):
         Returns:
             /
         """
+
+        send_mem = self.host._connections["memory"][receiver][0]
+        receive_mem_0 = self.host._sim._hosts[receiver]._connections["memory"][self.host.id][0]
+        receive_mem_1 = self.host._sim._hosts[receiver]._connections["memory"][self.host.id][1]
+
+        # if not receive_mem_0.has_space() or receive_mem_1.__len__ >= self.qubits_requested:
+        #     return
+
+        # if len(receive_mem_1) >= receive_mem_0.size:
+        #     return
+
+        # print(f'ID:{self.host.id} SEND_SPACE: {send_mem.remaining_space()} REC_SPACE:{receive_mem.remaining_space()}')
+
+        # if not send_mem.has_space() or not receive_mem.has_space():
+        #     print('NOO SPACE')
+        #     return
+
+        # if not self.host.has_space(receiver, 0) or not self.host.has_space(receiver, 1):
+        #     return
         
-        self._qdp_modes[self._rap_mode](*([receiver, requested, estimate][:self._rap_mode]))
+        print(f'ID: {self.host.id}; Executing quantum data plane REQUESTED {requested}')
+        await self._qdp_modes[self._rap_mode](*([receiver, requested, estimate][:self._rap_mode]))
 
     async def classical_data_plane(self, packet: Packet) -> None:
         
@@ -470,23 +576,37 @@ class L2_FIP(QProgram):
             /  
         """
         
-        purifications = self.host.l2_num_purification(packet.l2_src, packet.l1_ack)
+        if self.prev_protocol._eg_mode == 'srp' or self.prev_protocol._eg_mode == 'tpsp':
+            purifications = self.host.l2_num_purification(packet.l2_src, not packet.l1_ack)
+            print(f'SRP/TPSP NUM_PURIFICATION: {purifications}')
+        else:
+            purifications = self.host.l2_num_purification(packet.l2_src, packet.l1_ack)
+            print(f'NUM_PURIFICATION: {purifications}')
+
         if not purifications:
             return
         
         packet_new = Packet(packet.l2_dst, packet.l2_src, l2_requested=purifications, l2_needed=2 * purifications)
-        if packet.l1_ack:
-            packet_new.l2_set_ack()
+
+        if self.prev_protocol._eg_mode == 'srp' or self.prev_protocol._eg_mode == 'tpsp':
+            if not packet.l1_ack:
+                packet_new.l2_set_ack()
+        else:        
+            if packet.l1_ack:
+                packet_new.l2_set_ack()
             
         for i in range(purifications):
-            res = await self.host.l2_purify(packet_new.l2_dst, packet_new.l2_ack)
+            res = self.host.l2_purify(packet_new.l2_dst, packet_new.l2_ack)
             packet_new.l2_success[i] = res
+
+        print(packet_new)
 
         self.host.l2_store_result(packet_new.l2_ack, packet_new)
         
         await self.host.send_packet(packet_new)
         
         if self.host.l2_check_packets(packet_new.l2_dst, packet.l2_ack):
+            print(f'CHECK PACKETS: {self.host.l2_retrieve_packet(packet_new.l2_dst, packet.l2_ack)}')
             self.classical_data_plane(self.host.l2_retrieve_packet(packet_new.l2_dst, packet.l2_ack))
     
     async def _cdp_epp(self, packet: Packet) -> None:
@@ -502,10 +622,13 @@ class L2_FIP(QProgram):
         """
         
         if not self.host.l2_check_results(packet.l2_src, not packet.l2_ack):
-            self.host.l2_store_packet(packet)
+            self.host.l2_store_packet(packet.l2_src, not packet.l2_ack, packet)
+            print(f'STORING PACKET')
             return
         
         comp_res = self.host.l2_compare_results(packet)
+
+        print(f'COMP_RES: {comp_res}')
         
         self.host.l2_move_qubits_l3(packet.l2_src, not packet.l2_ack, comp_res)
         
@@ -531,7 +654,9 @@ class L2_FIP(QProgram):
         """
         
         await func(packet)
-        if self.host.l3_num_packets(packet.l2_src, not packet.l2_ack) < packet.l2_requested:
+        # print(f'FINISHED P_PROTOCOL')
+        if self.host.l3_num_qubits(packet.l2_src, not packet.l2_ack) < packet.l2_requested:
+            print(f'ID: {self.host.id}; L3_NUM_QUBITS: {self.host.l3_num_qubits(packet.l2_src, not packet.l2_ack)} requested: {packet.l2_requested - self.host.l3_num_qubits(packet.l2_src, not packet.l2_ack)}')
             await self.prev_protocol.quantum_data_plane(packet.l2_src, packet.l2_requested - self.host.l3_num_qubits(packet.l2_src, not packet.l2_ack), True)
             
     async def _n_protocol(self, func: Awaitable, packet: Packet) -> None:
@@ -548,7 +673,9 @@ class L2_FIP(QProgram):
         """
         
         await func(packet)
+        # print(f'FINISHED N_PROTOCOL')
         if self.host.l3_check_packets(packet.l2_src, 0) and self.next_protocol is not None:
+            print(f'NEXT IS L3!')
             await self.next_protocol.handle_stored_packets(packet.l2_src, 0)
     
     async def quantum_data_plane(self, packet: Packet) -> None:
