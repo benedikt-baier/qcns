@@ -1,11 +1,11 @@
 
-from qcns.python.components.network.node import Node
+from qcns.python.components.network.host import Host
 from qcns.python.components.simulation.simulation import Simulation
 from qcns.python.components.network.qprogram import *
 
 __all__ = ['Controller']
 
-class Controller(Node):
+class Controller(Host):
     
     """
     Class for a Network controller

@@ -1,10 +1,10 @@
-from qcns.python.components.network.node import Node
+from qcns.python.components.network import Host
 from qcns.python.components.simulation import Simulation
 from qcns.python.components.network.qprogram import *
 
 __all__ = ['Server']
 
-class Server(Node):
+class Server(Host):
     
     """
     Class for a Server in a Network

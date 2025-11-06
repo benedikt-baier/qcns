@@ -5,14 +5,14 @@ import numpy as np
 
 import qcns
 
-class Sender(qcns.Node):
+class Sender(qcns.Host):
     
     def __init__(self, _id, _sim):
         super(Sender, self).__init__(_id, _sim)
         
     async def run(self):
         
-        self.attempt_bell_pairs(1, 1)
+        await self.attempt_bell_pairs(1, 1)
         
         data_qubit = qcns.QSystem(1).qubits
         
@@ -23,14 +23,14 @@ class Sender(qcns.Node):
         
         com_qubit = self.l3_retrieve_qubit(1, 0)
         
-        res = self.apply_gate('bsm', data_qubit, com_qubit)
+        res = self.apply_gate('bsm', data_qubit, com_qubit, combine=True, remove=True)
         
         packet = qcns.Packet(0, 1, 0, 1, l3_needed=1, payload=[angle_x, angle_z])
         packet.l3_update_es(res)
         
-        self.send_packet(packet)
+        await self.send_packet(packet)
 
-class Receiver(qcns.Node):
+class Receiver(qcns.Host):
     
     def __init__(self, _id, _sim):
         super(Receiver, self).__init__(_id, _sim)
@@ -61,12 +61,12 @@ class Receiver(qcns.Node):
         
 def main():
 
-    sim = qcns.Simulation(logging_path='./debug.log')
+    sim = qcns.Simulation()
     
     sender = Sender(0, sim)
     receiver = Receiver(1, sim)
 
-    sender.set_eqs_connection(receiver)
+    sender.set_l3_connection(receiver, 1)
     
     sim.run()
     

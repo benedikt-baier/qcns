@@ -8,16 +8,9 @@ import copy
 from qcns.python.components.qubit.qubit import Qubit
 from qcns.python.components.packet.packet import Packet
 
-__all__ = ['QProgram', 'L1_EGP', 'L2_FIP', 'L3_QFP', 'L7_TPP', 'L7_DQC', 'QProgram_Model']
+__all__ = ['QProgram', 'L1_EGP', 'L2_FIP', 'L3_QFP', 'L7_TPP', 'L7_DQC']
 
-L0 = 0
-L1 = 1
-L2 = 2
-L3 = 3
-L4 = 4
-L7 = 5
-
-class Node:
+class Host:
     
     pass
 
@@ -31,7 +24,7 @@ class QProgram:
     Represents a generic Quantum Program to run
     
     Attrs:
-        _host (Node): host on which the program runs
+        _host (Host): host on which the program runs
         _layer (int): identifier on which layer the qprogram runs
         _prev_protocol (QProgram): protocol of the previous layer
         _next_protocol (QProgram): protocol of the next layer
@@ -43,20 +36,20 @@ class QProgram:
         Initializes a generic Quantum Program
         
         Args:
-            host (Node): host on which the program runs
+            host (Host): host on which the program runs
             
         Returns:
             /
         """
         
-        self._host: Node = None
+        self._host: Host = None
         self._layer: int = 0
         
         self._prev_protocol: QProgram = None
         self._next_protocol: QProgram = None
         
     @property
-    def host(self) -> Node:
+    def host(self) -> Host:
         
         """
         Property to access host more easily
@@ -65,19 +58,19 @@ class QProgram:
             /
             
         Returns:
-            host (Node): host on which the program runs
+            host (Host): host on which the program runs
         """
         
         return self._host
     
     @host.setter
-    def host(self, host: Node) -> None:
+    def host(self, host: Host) -> None:
         
         """
         Sets the host for the qprogram
         
         Args:
-            host (Node): host the qprogram runs on
+            host (Host): host the qprogram runs on
             
         Returns:
             /
@@ -192,7 +185,7 @@ class L1_EGP(QProgram):
         Initializes the L1 Entanglement Generation Protocol (EGP)
         
         Args:
-            host (Node): host the program runs on
+            host (Host): host the program runs on
             eg_mode (str): mode of the entanglement generation
             rap_mode (str): mode of allocation of qubits
             
@@ -1076,25 +1069,4 @@ class L7_DQC(QProgram):
         
         super(L7_DQC, self).__init__()
         self.layer = 5
-
-class QProgram_Model:
-    
-    def __init__(self, l1_qprogram: QProgram=QProgram(), l2_qprogram: QProgram=QProgram(), l3_qprogram: QProgram=QProgram(), l4_qprogram: QProgram=QProgram(), l7_qprogram: QProgram=QProgram()):
-        
-        self._qprograms: List[QProgram] = {L1: l1_qprogram, L2: l2_qprogram, L3: l3_qprogram, L4: l4_qprogram, L7: l7_qprogram}
-        self._qprograms = {layer: qprogram for layer, qprogram in self._qprograms.items() if qprogram.layer}
-        
-        if not all([layer == qprogram.layer for layer, qprogram in self._qprograms.items()]):
-            raise ValueError('Cannot have a quantum program without the program of the previous layer')
-        
-        for layer, qprogram in self._qprograms.items():
-            qprogram.host = self
-            
-            if (layer - 1) in self._qprograms:
-                qprogram.prev_protocol = self._qprograms[layer - 1]
-            if (layer + 1) in self._qprograms:
-                qprogram.next_protocol = self._qprograms[layer + 1]
-            
-            if not (layer + 1):
-                pass
            

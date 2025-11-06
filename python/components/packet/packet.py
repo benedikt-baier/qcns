@@ -525,7 +525,7 @@ class Packet:
         return self._layer1.success
 
     @l1_success.setter
-    def l1_success(self, l1_success: np.ndarray) -> None:
+    def l1_success(self, l1_success: np.array) -> None:
         
         """
         Sets the L1 success array
@@ -852,7 +852,7 @@ class Packet:
         return self._layer2.success
 
     @l2_success.setter
-    def l2_success(self, l2_success: np.ndarray) -> None:
+    def l2_success(self, l2_success: np.array) -> None:
         
         """
         Sets the L2 success array
@@ -1342,7 +1342,7 @@ class Packet:
         return self._layer3.success
 
     @l3_success.setter
-    def l3_success(self, l3_success: np.ndarray) -> None:
+    def l3_success(self, l3_success: np.array) -> None:
         
         """
         Sets the L3 success array
@@ -1378,7 +1378,7 @@ class Packet:
         return self._layer3.es_result
     
     @l3_es_result.setter
-    def l3_es_result(self, l3_es_result: np.ndarray) -> None:
+    def l3_es_result(self, l3_es_result: np.array) -> None:
         
         """
         Sets the X and Z array
@@ -1988,7 +1988,7 @@ class Packet:
         return self._layer4.success
 
     @l4_success.setter
-    def l4_success(self, l4_success: np.ndarray) -> None:
+    def l4_success(self, l4_success: np.array) -> None:
         
         """
         Sets the L4 success array
@@ -2198,7 +2198,7 @@ class Packet:
         return self._layer7.success
 
     @l7_success.setter
-    def l7_success(self, l7_success: np.ndarray) -> None:
+    def l7_success(self, l7_success: np.array) -> None:
         
         """
         Sets the L7 success array
