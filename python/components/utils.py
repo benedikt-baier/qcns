@@ -7,7 +7,7 @@ from numpy import pi
 import networkx as nx
 import scipy.sparse as sp
 
-from typing import List, Dict, Any
+from typing import List, Dict, Tuple, Any
 
 from qcns.python.components.qubit import combine_gates
 from qcns.python.components.network.node import Node
@@ -337,3 +337,12 @@ def dqc_apply_circuit(node: Node, circuit: List[List[Any]], qubits: Dict[int, Qu
     gate = combine_gates(gates)
     
     node.apply_gate('custom_gate', next(iter(qubits.values())), gate)
+    
+def update_circuit(circuit: List[Tuple[int]], parameter: List[float]) -> List[Tuple[int]]:
+    
+    for gate, param in zip(circuit, parameter):
+        if gate[0] == 1:
+            continue
+        gate[-1] = param
+        
+    return circuit
