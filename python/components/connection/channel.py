@@ -160,7 +160,7 @@ class PChannel:
         
         return _packet_length / self._data_rate
     
-    def put(self, _packet: Packet, _arrival_time: float) -> None:
+    def put(self, _packet: Packet, _arrival_time: float, _event_counter: int) -> None:
         
         """
         Sends a packet through the channel
@@ -172,7 +172,7 @@ class PChannel:
             /
         """
         
-        heappush(self._channel, (_arrival_time, _packet))
+        heappush(self._channel, (_arrival_time, _event_counter, _packet))
         
     def get(self) -> Packet:
         
@@ -186,6 +186,6 @@ class PChannel:
             _packet (Packet): received packet
         """
         
-        _, _packet = heappop(self._channel)
+        _, _, _packet = heappop(self._channel)
         
         return _packet

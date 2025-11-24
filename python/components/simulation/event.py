@@ -16,6 +16,8 @@ class Event:
         _node_id (int): ID of Host which scheduled event
     """
     
+    event_counter: int = 0
+    
     def __init__(self, _id: int, _end_time: float, _node_id: int) -> None:
         
         """
@@ -33,6 +35,8 @@ class Event:
         self._id: int = _id
         self._end_time: float = _end_time
         self._node_id: int = _node_id
+        self._event_counter = Event.event_counter
+        Event.event_counter += 1
         
     def __lt__(self, other: Event) -> bool:
         
@@ -71,9 +75,7 @@ class StopEvent(Event):
             /
         """
         
-        self._id: int = -1
-        self._end_time: float = np.inf
-        self._node_id: int = _node_id
+        super(StopEvent, self).__init__(-1, np.inf, _node_id)
     
     def __repr__(self) -> str:
         
@@ -113,9 +115,7 @@ class SendEvent(Event):
             /
         """
     
-        self._id: int = 0
-        self._end_time: float = _end_time
-        self._node_id: int = _node_id
+        super(SendEvent, self).__init__(0, _end_time, _node_id)
         
     def __repr__(self) -> str:
         
@@ -155,9 +155,7 @@ class ReceiveEvent(Event):
             /
         """
     
-        self._id: int = 1
-        self._end_time: float = _end_time
-        self._node_id: int = _node_id
+        super(ReceiveEvent, self).__init__(1, _end_time, _node_id)
         
     def __repr__(self) -> str:
         
@@ -197,9 +195,7 @@ class GateEvent(Event):
             / 
         """
         
-        self._id: int = 2
-        self._end_time = _end_time
-        self._node_id = _node_id
+        super(GateEvent, self).__init__(2, _end_time, _node_id)
         
     def __repr__(self) -> str:
         
@@ -239,9 +235,7 @@ class WaitEvent(Event):
             /
         """
         
-        self._id: int = 2
-        self._end_time: float = _end_time
-        self._node_id: int = _node_id
+        super(WaitEvent, self).__init__(3, _end_time, _node_id)
         
     def __repr__(self) -> str:
         

@@ -592,10 +592,10 @@ class Node:
         
         self._time += self._channels['pc'][_packet.l2_dst][SEND]._sending_time(len(_packet))
         self._sim.schedule_event(SendEvent(self._time, self.id))
-        recv_event = ReceiveEvent(self._time + self._channels['pc'][_packet.l2_dst][SEND]._propagation_time, _packet.l2_dst)
-        self._sim.schedule_event(recv_event)
+        _recv_event = ReceiveEvent(self._time + self._channels['pc'][_packet.l2_dst][SEND]._propagation_time, _packet.l2_dst)
+        self._sim.schedule_event(_recv_event)
         
-        self._channels['pc'][_packet.l2_dst][SEND].put(_packet, recv_event._end_time)
+        self._channels['pc'][_packet.l2_dst][SEND].put(_packet, _recv_event._end_time, _recv_event._event_counter)
         
     async def receive_packet(self, sender: int=None, time_out: float=None) -> Packet | None:
         

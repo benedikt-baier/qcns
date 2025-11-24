@@ -185,20 +185,6 @@ class Packet:
         
         return f'{self._layer1}{self._layer2}{self._layer3}{self._layer4}{self._layer7}'
     
-    def __lt__(self, packet: Packet) -> bool:
-        
-        """
-        Less than operator for packet comparison for priority queues
-        
-        Args:
-            packet (Packet): packet to compare to
-        
-        Returns:
-            is_less (bool): whether this packet is less than the other packet
-        """
-        
-        return self.l2_src < packet.l2_src
-    
     @property
     def is_l1(self) -> bool:
         
