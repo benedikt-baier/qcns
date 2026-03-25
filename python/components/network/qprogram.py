@@ -592,7 +592,7 @@ class L3_QFP(QProgram):
         _qdp (dict): quantum data plane functions
     """
     
-    def __init__(self, routing_table: Dict[int, int], qf_mode: str='frp', bsm_mode: str='bsm') -> None:
+    def __init__(self, routing_table: Dict[int, int], qf_mode: str='frp') -> None:
         
         """
         Initializes the L3_CRP program
@@ -611,7 +611,6 @@ class L3_QFP(QProgram):
         
         self._routing_table: Dict[int, int] = routing_table
         self._qf_mode: str = qf_mode
-        self._bsm_mode: str = bsm_mode
     
         self._cdp: Dict[int, Callable] = {0: self.classical_forwarding, 1: self.no_reject, 2: self.partial_reject, 3: self.complete_reject}
         self._qdp: Dict[str, Callable] = {'crp': self.crp, 'frp': self.frp}
@@ -640,7 +639,7 @@ class L3_QFP(QProgram):
             if packet.l3_es_result[1][index]:
                 self.host.apply_gate('Z', qubit_src)
             
-            res = self.host.apply_gate(self._bsm_mode, qubit_src, qubit_dst, combine=True, remove=True)
+            res = self.host.apply_gate('bsm', qubit_src, qubit_dst)
             
             packet.l3_reset_es(index)
             packet.l3_update_es(res, index)  
@@ -666,7 +665,7 @@ class L3_QFP(QProgram):
             qubit_src = self.host.l3_retrieve_qubit(packet.l2_src, 1, offset_index)
             qubit_dst = self.host.l3_retrieve_qubit(packet.l2_dst, 0)
             
-            res = self.host.apply_gate(self._bsm_mode, qubit_src, qubit_dst, combine=True, remove=True)
+            res = self.host.apply_gate('bsm', qubit_src, qubit_dst)
             
             packet.l3_update_es(res, index)  
         
