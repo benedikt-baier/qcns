@@ -529,7 +529,7 @@ class Node:
         else:
             event = 2
         
-        return self.event_dict[event](self, gate, remove, args)
+        return self.event_dict[event](gate, remove, args)
     
     def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
         
