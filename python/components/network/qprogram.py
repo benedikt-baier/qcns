@@ -1,6 +1,6 @@
 
 from functools import partial
-from typing import List, Dict, Union, Awaitable
+from typing import List, Dict, Union, Callable
 
 import numpy as np
 
@@ -212,9 +212,9 @@ class L1_EGP(QProgram):
         self.classical_data_plane = partial(self._protocol_n, self.classical_data_plane)
         
         self._rap_mode: str = _rap_modes[rap_mode]
-        self._qdp_modes: Dict[str, Awaitable] = {3: self.attempt_bell_pairs, 2: self.create_bell_pairs}
+        self._qdp_modes: Dict[str, Callable] = {3: self.attempt_bell_pairs, 2: self.create_bell_pairs}
 
-    async def attempt_bell_pairs(self, receiver: int, requested: int=1, estimate: bool=False) -> None:
+    def attempt_bell_pairs(self, receiver: int, requested: int=1, estimate: bool=False) -> None:
     
         """
         Attempts to create the number of requested bell pairs, can estimate the number of needed qubits based on success probability
@@ -228,9 +228,9 @@ class L1_EGP(QProgram):
             /
         """
         
-        await self.host.attempt_bell_pairs(receiver, requested, estimate)
+        self.host.attempt_bell_pairs(receiver, requested, estimate)
         
-    async def create_bell_pairs(self, receiver: int, requested: int=1) -> None:
+    def create_bell_pairs(self, receiver: int, requested: int=1) -> None:
         
         """
         Creates the number of requested qubits, no matter how long it takes
@@ -243,9 +243,9 @@ class L1_EGP(QProgram):
             /
         """
         
-        await self.host.create_bell_pairs(receiver, requested)
+        self.host.create_bell_pairs(receiver, requested)
 
-    async def _reattempt(self, func: Awaitable, packet: Packet) -> None:
+    def _reattempt(self, func: Callable, packet: Packet) -> None:
         
         """
         Wrapper function when qubits should be reattempted
@@ -258,11 +258,11 @@ class L1_EGP(QProgram):
             /
         """
         
-        await func(packet)
+        func(packet)
         if self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack) < packet.l1_requested:
-            await self.quantum_data_plane(packet.l2_src, packet.l1_requested - self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack), True)
+            self.quantum_data_plane(packet.l2_src, packet.l1_requested - self.host.l1_num_qubits(packet.l2_src, not packet.l1_ack), True)
     
-    async def _protocol_n(self, func: Awaitable, packet: Packet) -> None:
+    def _protocol_n(self, func: Callable, packet: Packet) -> None:
         
         """
         Wrapper function for executing the next protocol
@@ -275,11 +275,11 @@ class L1_EGP(QProgram):
             /
         """
         
-        await func(packet)
+        func(packet)
         if self.next_protocol is not None:
-            await self.next_protocol.quantum_data_plane(packet)
+            self.next_protocol.quantum_data_plane(packet)
 
-    async def _l3cp(self, packet: Packet) -> None:
+    def _l3cp(self, packet: Packet) -> None:
         
         """
         Protocol for the L3 connection
@@ -293,7 +293,7 @@ class L1_EGP(QProgram):
         
         self.host.l3_remove_qubits(packet.l2_src, 1, packet.l1_success)
 
-    async def _srp(self, packet: Packet) -> None:
+    def _srp(self, packet: Packet) -> None:
         
         """
         Protocol for the SR connection
@@ -310,10 +310,10 @@ class L1_EGP(QProgram):
         if not packet.l1_ack:
             packet.l1_set_ack()
             packet.l2_switch_src_dst()
-            await self.host.send_packet(packet)
+            self.host.send_packet(packet)
             return
 
-    async def _tpsp(self, packet: Packet) -> None:
+    def _tpsp(self, packet: Packet) -> None:
         
         """
         Protocol for the TPS connection
@@ -330,13 +330,13 @@ class L1_EGP(QProgram):
             self.host.l1_store_result(packet.l1_ack, packet)
             packet.l1_reset_ps()
             packet.l2_switch_src_dst()
-            await self.host.send_packet(packet)
+            self.host.send_packet(packet)
             return
         
         comp_res = self.host.l1_compare_results(packet)
         self.host.l0_move_qubits_l1(packet.l2_src, not packet.l1_ack, comp_res)
 
-    async def _bsmp(self, packet: Packet) -> None:
+    def _bsmp(self, packet: Packet) -> None:
         
         """
         Protocol for the BSM connection
@@ -350,7 +350,7 @@ class L1_EGP(QProgram):
         
         self.host.l0_move_qubits_l1(packet.l2_src, packet.l1_ack, packet.l1_success)
 
-    async def _fsp(self, packet: Packet) -> None:
+    def _fsp(self, packet: Packet) -> None:
         
         """
         Protocol for the FS connection
@@ -364,7 +364,7 @@ class L1_EGP(QProgram):
         
         self.host.l0_move_qubits_l1(packet.l2_src, packet.l1_ack, packet.l1_success)
 
-    async def quantum_data_plane(self, receiver: int, requested: int=1, estimate: bool=False) -> None:
+    def quantum_data_plane(self, receiver: int, requested: int=1, estimate: bool=False) -> None:
         
         """
         Quantum Data Plane of Entanglement Generation
@@ -380,7 +380,7 @@ class L1_EGP(QProgram):
         
         self._qdp_modes[self._rap_mode](*([receiver, requested, estimate][:self._rap_mode]))
 
-    async def classical_data_plane(self, packet: Packet) -> None:
+    def classical_data_plane(self, packet: Packet) -> None:
         
         """
         Classical Data Plane of Generating Entanglement, is overwritten
@@ -430,7 +430,7 @@ class L2_FIP(QProgram):
             self.classical_data_plane = partial(self._p_protocol, self.classical_data_plane)
         self.classical_data_plane = partial(self._n_protocol, self.classical_data_plane)
         
-    async def _qdp_necp(self, packet: Packet) -> None:
+    def _qdp_necp(self, packet: Packet) -> None:
         
         """
         Quantum Data Plane of no error correction protocol
@@ -444,7 +444,7 @@ class L2_FIP(QProgram):
         
         pass    
     
-    async def _cdp_necp(self, packet: Packet) -> None:
+    def _cdp_necp(self, packet: Packet) -> None:
         
         """
         Quantum Data Plane of no error correction protocol
@@ -458,7 +458,7 @@ class L2_FIP(QProgram):
         
         self.host.l1_move_qubits_l3(packet.l2_src, packet.l1_ack, np.ones(packet.l1_needed, dtype=np.bool_))
     
-    async def _qdp_epp(self, packet: Packet) -> None:
+    def _qdp_epp(self, packet: Packet) -> None:
         
         """
         Quantum Data Plane Protocol for the purification of qubits
@@ -479,17 +479,17 @@ class L2_FIP(QProgram):
             packet_new.l2_set_ack()
             
         for i in range(purifications):
-            res = await self.host.l2_purify(packet_new.l2_dst, packet_new.l2_ack)
+            res = self.host.l2_purify(packet_new.l2_dst, packet_new.l2_ack)
             packet_new.l2_success[i] = res
 
         self.host.l2_store_result(packet_new.l2_ack, packet_new)
         
-        await self.host.send_packet(packet_new)
+        self.host.send_packet(packet_new)
         
         if self.host.l2_check_packets(packet_new.l2_dst, packet.l2_ack):
             self.classical_data_plane(self.host.l2_retrieve_packet(packet_new.l2_dst, packet.l2_ack))
     
-    async def _cdp_epp(self, packet: Packet) -> None:
+    def _cdp_epp(self, packet: Packet) -> None:
         
         """
         Classical Data Plane Protocol for the purification of qubits
@@ -509,15 +509,15 @@ class L2_FIP(QProgram):
         
         self.host.l2_move_qubits_l3(packet.l2_src, not packet.l2_ack, comp_res)
         
-    async def _qdp_qecp(self, packet: Packet) -> None:
+    def _qdp_qecp(self, packet: Packet) -> None:
         
         pass
     
-    async def _cdp_qecp(self, packet: Packet) -> None:
+    def _cdp_qecp(self, packet: Packet) -> None:
         
         pass
     
-    async def _p_protocol(self, func: Awaitable, packet: Packet) -> None:
+    def _p_protocol(self, func: Callable, packet: Packet) -> None:
         
         """
         Wrapper function to call the quantum data plane of the previous function
@@ -530,11 +530,11 @@ class L2_FIP(QProgram):
             /
         """
         
-        await func(packet)
+        func(packet)
         if self.host.l3_num_packets(packet.l2_src, not packet.l2_ack) < packet.l2_requested:
-            await self.prev_protocol.quantum_data_plane(packet.l2_src, packet.l2_requested - self.host.l3_num_qubits(packet.l2_src, not packet.l2_ack), True)
+            self.prev_protocol.quantum_data_plane(packet.l2_src, packet.l2_requested - self.host.l3_num_qubits(packet.l2_src, not packet.l2_ack), True)
             
-    async def _n_protocol(self, func: Awaitable, packet: Packet) -> None:
+    def _n_protocol(self, func: Callable, packet: Packet) -> None:
         
         """
         Wrapper function for the next protocol
@@ -547,11 +547,11 @@ class L2_FIP(QProgram):
             /
         """
         
-        await func(packet)
+        func(packet)
         if self.host.l3_check_packets(packet.l2_src, 0) and self.next_protocol is not None:
-            await self.next_protocol.handle_stored_packets(packet.l2_src, 0)
+            self.next_protocol.handle_stored_packets(packet.l2_src, 0)
     
-    async def quantum_data_plane(self, packet: Packet) -> None:
+    def quantum_data_plane(self, packet: Packet) -> None:
         
         """
         Function for the quantum data plane will be overwritten
@@ -565,7 +565,7 @@ class L2_FIP(QProgram):
         
         pass
     
-    async def classical_data_plane(self, packet: Packet) -> None:
+    def classical_data_plane(self, packet: Packet) -> None:
         
         """
         Function for the classical data plane will be overwritten
@@ -613,11 +613,11 @@ class L3_QFP(QProgram):
         self._qf_mode: str = qf_mode
         self._bsm_mode: str = bsm_mode
     
-        self._cdp: Dict[int, Awaitable] = {0: self.classical_forwarding, 1: self.no_reject, 2: self.partial_reject, 3: self.complete_reject}
-        self._qdp: Dict[str, Awaitable] = {'crp': self.crp, 'frp': self.frp}
+        self._cdp: Dict[int, Callable] = {0: self.classical_forwarding, 1: self.no_reject, 2: self.partial_reject, 3: self.complete_reject}
+        self._qdp: Dict[str, Callable] = {'crp': self.crp, 'frp': self.frp}
         self.quantum_data_plane = self._qdp[self._qf_mode]
     
-    async def crp(self, packet: Packet, offset_index: int=None) -> None:
+    def crp(self, packet: Packet, offset_index: int=None) -> None:
         
         """
         Function for the classical repeater protocol
@@ -646,9 +646,9 @@ class L3_QFP(QProgram):
             packet.l3_update_es(res, index)  
         
         packet.l2_src = self.host.id
-        await self.host.send_packet(packet)
+        self.host.send_packet(packet)
     
-    async def frp(self, packet: Packet, offset_index: int=None) -> None:
+    def frp(self, packet: Packet, offset_index: int=None) -> None:
         
         """
         Function for the fast repeater protocol
@@ -671,9 +671,9 @@ class L3_QFP(QProgram):
             packet.l3_update_es(res, index)  
         
         packet.l2_src = self.host.id
-        await self.host.send_packet(packet)
+        self.host.send_packet(packet)
     
-    async def reject_packet(self, packet: Packet) -> None:
+    def reject_packet(self, packet: Packet) -> None:
         
         """
         Function to reject a packet
@@ -689,9 +689,9 @@ class L3_QFP(QProgram):
         packet.l3_set_cf()
         packet.l2_src = self.host.id
         packet.l2_dst = self._routing_table[packet.l3_dst]
-        await self.host.send_packet(packet)
+        self.host.send_packet(packet)
     
-    async def classical_forwarding(self, packet: Packet) -> None:
+    def classical_forwarding(self, packet: Packet) -> None:
         
         """
         Function to forward a packet
@@ -704,9 +704,9 @@ class L3_QFP(QProgram):
         """
         
         packet.l2_src = self.host.id
-        await self.host.send_packet(packet)
+        self.host.send_packet(packet)
         
-    async def no_reject(self, packet: Packet) -> None:
+    def no_reject(self, packet: Packet) -> None:
         
         """
         Function to execute if the packet has the no reject flag set
@@ -719,18 +719,18 @@ class L3_QFP(QProgram):
         """
         
         if packet.l3_needed > self.host.memory_size(packet.l2_dst, 0):
-            await self.reject_packet(packet)
+            self.reject_packet(packet)
             return
         
         if packet.l3_needed > self.host.l3_num_qubits(packet.l2_dst, 0):
             offset_index = self.host.l3_add_offset(packet.l2_src, 1, packet.l3_needed)
             self.host.l3_store_packet(packet.l2_dst, 0, packet, offset_index)
-            await self.prev_protocol.prev_protocol.quantum_data_plane(packet.l2_dst, self.host.remaining_space(packet.l2_dst, 0), True)
+            self.prev_protocol.prev_protocol.quantum_data_plane(packet.l2_dst, self.host.remaining_space(packet.l2_dst, 0), True)
             return
             
-        await self.quantum_data_plane(packet)
+        self.quantum_data_plane(packet)
             
-    async def partial_reject(self, packet: Packet) -> None:
+    def partial_reject(self, packet: Packet) -> None:
         
         """
         Function to execute if the packet has the partial reject flag set
@@ -743,16 +743,16 @@ class L3_QFP(QProgram):
         """
         
         if not self.host.l3_num_qubits(packet.l2_src, 0):
-            await self.reject_packet(packet)
-            await self.prev_protocol.prev_protocol.quantum_data_plane(packet.l2_dst, self.host.remaining_space(packet.l2_dst, 0), True)
+            self.reject_packet(packet)
+            self.prev_protocol.prev_protocol.quantum_data_plane(packet.l2_dst, self.host.remaining_space(packet.l2_dst, 0), True)
             return 
         
         if packet.l3_needed > self.host.l3_num_qubits(packet.l2_dst, 0):
             packet.l3_needed = self.host.l3_num_qubits(packet.l2_dst, 0)
             
-        await self.quantum_data_plane(packet)
+        self.quantum_data_plane(packet)
     
-    async def complete_reject(self, packet: Packet) -> None:
+    def complete_reject(self, packet: Packet) -> None:
         
         """
         Function to execute if the packet has the complete reject flag set
@@ -765,12 +765,12 @@ class L3_QFP(QProgram):
         """
         
         if packet.l3_needed > self.host.l3_num_qubits(packet.l2_dst, 0):
-            await self.reject_packet(packet)
+            self.reject_packet(packet)
             return
         
-        await self.quantum_data_plane(packet)
+        self.quantum_data_plane(packet)
     
-    async def quantum_data_plane(self, packet: Packet, offset_index: int=None) -> None:
+    def quantum_data_plane(self, packet: Packet, offset_index: int=None) -> None:
         
         """
         Protocol for Quantum Data Plane
@@ -785,7 +785,7 @@ class L3_QFP(QProgram):
         
         pass
     
-    async def classical_data_plane(self, packet: Packet):
+    def classical_data_plane(self, packet: Packet):
         
         """
         Protocol for the classical data plane
@@ -801,7 +801,7 @@ class L3_QFP(QProgram):
         
         self._cdp[packet.l3_mode](packet)
       
-    async def handle_store_packets(self, host: int, store: int):
+    def handle_store_packets(self, host: int, store: int):
         
         """
         Handles stored packets due to no reject mode
@@ -818,7 +818,7 @@ class L3_QFP(QProgram):
             packet, offset_index = self.host.l3_retrieve_packet(host, store)
             if self.host.l3_num_qubits(host, store) < packet.l3_needed:
                 self.host.l3_store_packet(packet.l2_dst, 0, packet, offset_index)
-            await self.quantum_data_plane(packet, offset_index)
+            self.quantum_data_plane(packet, offset_index)
             self.host.l3_remove_offset(packet.l2_src, 1, offset_index)
         
 class L4_GP(QProgram):
@@ -871,7 +871,7 @@ class L7_TPP(QProgram):
         
         self._bsm_mode: str = bsm_mode
         
-    async def send(self, data_qubit: Union[Qubit, List[Qubit]], l3_receiver: int, l2_receiver: int):
+    def send(self, data_qubit: Union[Qubit, List[Qubit]], l3_receiver: int, l2_receiver: int):
         
         """
         Teleports qubits to a receiver
@@ -898,7 +898,7 @@ class L7_TPP(QProgram):
             results.append(res)
             
         packet = Packet(self.host.id, l2_receiver, l3_src=self.host.id, l3_dst=l3_receiver, l7_requested=len(data_qubit), payload=results) 
-        await self.host.send_packet(packet)
+        self.host.send_packet(packet)
         
     async def receive(self):
         

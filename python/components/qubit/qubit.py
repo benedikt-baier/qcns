@@ -335,7 +335,7 @@ def depolarization_error(_qubit: Qubit, _fidelity: float) -> None:
         
     _qubit.state = _fidelity * _qubit.state + ((1 - _fidelity) / 3) * (dot(_qubit.state, gate_x) + dot(_qubit.state, gate_y) + dot(_qubit.state, gate_z))
 
-def combine_state(q_l: List[Qubit]) -> QSystem:
+def combine_state(q_l: List[Qubit | QSystem]) -> QSystem:
         
     """
     Combines multiple qsystems into one qsystem
@@ -347,20 +347,28 @@ def combine_state(q_l: List[Qubit]) -> QSystem:
         qsys_n (QSystem): new qsystem
     """
     
-    if len(set([id(qubit._qsystem) for qubit in q_l])) == 1:
-        return q_l[0]._qsystem
-    
-    qsys_n = q_l[0]._qsystem
-    qsys_l = [q._qsystem for n, q in enumerate(q_l) if q not in q_l[:n]]
-    num_qubits_n = sum([qsys._num_qubits for qsys in qsys_l])
-    
+    q_l = [q.qsystem for q in q_l]
+
+    qsystem_ids = set()
+    qsys_l = []
+    for qsys in q_l:
+        if qsys.qsystem_id in qsystem_ids:
+            continue
+        qsystem_ids.add(qsys.qsystem_id)
+        qsys_l.append(qsys)
+
+    qsys_n = qsys_l[0]
+
+    if len(qsys_l) < 2:
+        return qsys_n
+
     qsys_n._qubits = [q for qsys in qsys_l for q in qsys._qubits]
-    qsys_n._num_qubits = num_qubits_n
-    qsys_n._state = tensor_operator(np.array([qsys._state for qsys in qsys_l], dtype=object))
-    qsys_n._state = qsys_n._state.astype(np.complex128)
-    for i in range(num_qubits_n):
-        qsys_n._qubits[i]._index = i
-        qsys_n._qubits[i]._qsystem = qsys_n
+    qsys_n._num_qubits = sum(qsys.num_qubits for qsys in qsys_l)
+    qsys_n._state = tensor_operator([qsys._state for qsys in qsys_l]).astype(np.complex128, copy=False)
+
+    for i, qubit in enumerate(qsys_n._qubits):
+        qubit._index = i
+        qubit._qsystem = qsys_n
 
     return qsys_n
 
@@ -522,6 +530,21 @@ class Qubit:
         """
         
         self._qsystem._num_qubits = num_qubits
+    
+    @property
+    def qsystem(self) -> QSystem:
+        
+        """
+        Returns the Qsystem the qubit is a part of
+        
+        Args:
+            /
+            
+        Returns:
+            qsystem (QSystem): qsystem the qubit is a part of
+        """
+        
+        return self._qsystem
     
     @property
     def qubit_id(self) -> int:
@@ -1522,9 +1545,9 @@ class Qubit:
             measurement (int): measurement outcome
         """
         
-        if basis == 'x' or basis == 'X':
+        if basis in ['x', 'X']:
             self.H()
-        if basis == 'y' or basis == 'Y':
+        if basis in ['y', 'Y']:
             self.iSZ()
             self.H()
         
@@ -1725,6 +1748,21 @@ class QSystem:
         return str(self._state)
     
     @property
+    def num_qubits(self) -> int:
+        
+        """
+        Returns the number of qubits in the qsystem
+        
+        Args:
+            /
+            
+        Returns:
+            num_qubits (int): number of qubits in the qsystem
+        """
+        
+        return self._num_qubits
+    
+    @property
     def state(self) -> np.ndarray:
         
         """
@@ -1752,6 +1790,21 @@ class QSystem:
         
         self._state = _state
     
+    @property
+    def qsystem(self) -> QSystem:
+        
+        """
+        Returns itself
+        
+        Args:
+            /
+            
+        Returns:
+            qsystem (QSystem): the qsystem
+        """
+        
+        return self
+    
     @property    
     def qubits(self) -> Union[Qubit, List[Qubit]]:
         
@@ -1768,6 +1821,21 @@ class QSystem:
         if self._num_qubits > 1:
             return self._qubits
         return self._qubits[0]
+    
+    @property
+    def qsystem_id(self) -> int:
+        
+        """
+        Returns the id of the qsystem
+        
+        Args:
+            /
+            
+        Returns:
+            qsystem_id (int): id of qsystem
+        """
+        
+        return id(self)
     
     def qubit(self, _index: int) -> Qubit:
         
