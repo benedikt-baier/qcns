@@ -747,7 +747,7 @@ class L3_Protocol:
         _header_length (int): header length
     """
     
-    def __init__(self, _src: int, _dst: int, _requested: int, _needed: int, _fidelity: float | List[float]) -> None:
+    def __init__(self, _src: int, _dst: int, _requested: int, _needed: int, _fidelity: float) -> None:
         
         """
         Initializes the L3 Protocol Header
@@ -761,6 +761,9 @@ class L3_Protocol:
         Returns:
             /
         """
+        
+        if _fidelity < 0.5 or _fidelity > 1:
+            raise ValueError(f'Fidelity must be in the range [0.5, 1], got {_fidelity}')
         
         self._src: int = _src # 16 byte
         self._dst: int = _dst # 16 byte
@@ -778,27 +781,21 @@ class L3_Protocol:
     
         self._x_count: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 32 byte
         self._z_count: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 32 byte
-        
-        if isinstance(_fidelity, float):
-            _fidelity = [_fidelity] * self._needed
 
-        if len(_fidelity) != self._needed:
-            raise ValueError(f'Fidelity array must be of length {self._needed}, got {len(_fidelity)}')
-
-        _fidelity = np.array(_fidelity, dtype=np.float32)
-        
-        if np.any(_fidelity < 0.5) or np.any(_fidelity > 1):
-            raise ValueError(f'Fidelity values must be in the range [0.5, 1]')
-        
-        self._threshold: np.ndarray = _convert_fidelity_IR(_fidelity) # 256 byte
+        self._threshold: np.uint8 = _convert_fidelity_IR(_fidelity) # 1 byte
         self._fidelity: np.ndarray = np.zeros(self._needed, dtype=np.uint8) # 256 byte
         
         self._mode: int = 1 # 2 bit
         self._hop_count: int = 0 # 1byte
         
+        self._next_purification: int = 0 # 1 bit
+        self._next_mutability: int = 0 # 1 bit
+        self._feedback: int = 0 # 1 bit
+        self._retries: int = 0 # 5 bit
+        
         self._protocol: int = 0 # 1byte
         self._next_protocol: int = 0 # 1byte
-        self._header_length: int = 5146
+        self._header_length: int = 3130
     
     def __len__(self) -> int:
         
@@ -1276,140 +1273,144 @@ class L3_Protocol:
         self._z_count[_idx] = np.logical_not(self._z_count[_idx], _res)
     
     @property
-    def threshold(self) -> np.array:
+    def threshold(self) -> int:
         
         """
-        Returns the fidelity threshold array
+        Returns the IR threshold of the header
         
         Args:
             /
             
         Returns:
-            threshold (np.array): fidelity threshold for all needed qubits
+            threshold (int): IR threshold of the header
         """
         
         return self._threshold
     
     @threshold.setter
-    def threshold(self, _threshold: int, _idx: int) -> None:
-    
+    def threshold(self, _threshold: int) -> None:
+        
         """
-        Sets the fidelity threshold for the given index
+        Sets the IR threshold of the header
         
         Args:
-            _threshold (int): new threshold value
-            _idx (int): index of the threshold
+            _threshold (int): new IR threshold
             
         Returns:
             /
         """
-    
+        
         if _threshold < 0 or _threshold > 255:
-            raise ValueError(f'Fidelity must be in the range [0, 255], got {_threshold}')
+            raise ValueError(f'Threshold must be in the range [0, 255], got {_threshold}')
         
-        self._threshold[_idx] = _threshold
-    
+        self._threshold = _threshold
+        
     @property
-    def fidelity(self) -> np.array:
-    
-        """"
-        Returns the fidelity array
+    def decoded_threshold(self) -> float:
+        
+        """
+        Returns the decoded fidelity threshold of the header
         
         Args:
             /
             
         Returns:
-            _fidelity (np.array): fidelity array
+            decoded_threshold (float): decoded fidelity threshold of the header
         """
-    
-        return self._fidelity
-    
-    @fidelity.setter
-    def fidelity(self, _fidelity: int, _idx: int) -> None:
-    
-        """
-        Sets the fidelity at a given index
         
-        Args:
-            _fidelity (int): new fidelity value
-            _idx (int): index of the fidelity
-            
-        Returns:
-            /
-        """
-    
-        if _fidelity < 0 or _fidelity > 255:
-            raise ValueError(f'Fidelity must be in the range [0, 255], got {_fidelity}')
-        
-        self._fidelity[_idx] = _fidelity
-    
-    @property
-    def decoded_threshold(self) -> np.array:
-    
-        """
-        Returns the float representation of the fidelity threshold array
-        
-        Args:
-            /
-            
-        Returns:
-            _threshold (np.array): float representation of the fidelity threshold array
-        """
-    
         return _invert_IR_fidelity(self._threshold)
     
     @decoded_threshold.setter
-    def decoded_threshold(self, _threshold: float, _idx: int) -> None:
-    
+    def decoded_threshold(self, _threshold: float) -> None:
+        
         """
-        Sets the float representation of the fidelity threshold array at the given index
+        Sets the IR threshold of the header by encoding the fidelity threshold
         
         Args:
-            _threshold (float): new threshold value
-            _idx (int): index of the threshold
+            _decoded_threshold (float): new fidelity threshold
             
         Returns:
             /
         """
-    
-        if _threshold < 0.5 or _threshold > 1:
-            raise ValueError(f'Fidelity must be in the range [0.5, 1], got {_threshold}')
         
-        self._threshold[_idx] = _convert_fidelity_IR(_threshold)
+        if _threshold < 0.5 or _threshold > 1:
+            raise ValueError(f'Fidelity threshold must be in the range [0.5, 1], got {_threshold}')
+        
+        self._threshold = _convert_fidelity_IR(_threshold)
     
     @property
-    def decoded_fidelity(self) -> np.array:
-    
+    def fidelity(self) -> np.array:
+        
         """
-        Returns the float representation of the fidelity array
+        Returns the IR fidelity array of the header
         
         Args:
             /
             
         Returns:
-            _fidelity (np.array): fidelity array
+            fidelity (np.array): IR fidelity array of the header
         """
+        
+        return self._fidelity
     
+    @fidelity.setter
+    def fidelity(self, _fidelity: np.ndarray) -> None:
+        
+        """
+        Sets the IR fidelity array of the header
+        
+        Args:
+            _fidelity (np.array): new IR fidelity array
+            
+        Returns:
+            /
+        """
+        
+        self._fidelity = _fidelity
+        
+    @property
+    def decoded_fidelity(self) -> np.array:
+        
+        """
+        Returns the decoded fidelity array of the header
+        
+        Args:
+            /
+            
+        Returns:
+            decoded_fidelity (np.array): decoded fidelity array of the header
+        """
+        
         return _invert_IR_fidelity(self._fidelity)
     
     @decoded_fidelity.setter
-    def decoded_fidelity(self, _fidelity: float, _idx: int) -> None:
+    def decoded_fidelity(self, _decoded_fidelity: np.array) -> None:
         
         """
-        Sets the float representation of a fidelity as the given index
+        Sets the IR fidelity array of the header by encoding the decoded fidelity array
         
         Args:
-            _fidelity (float): float representation of fidelity
-            _idx (int): index of the fidelity
+            _decoded_fidelity (np.array): new decoded fidelity array
             
         Returns:
             /
         """
-    
-        if _fidelity < 0.5 or _fidelity > 1:
-            raise ValueError(f'Fidelity must be in the range [0.5, 1], got {_fidelity}')
         
-        self._fidelity[_idx] = _convert_fidelity_IR(_fidelity)
+        self._fidelity = _convert_fidelity_IR(_decoded_fidelity)
+    
+    def compare_fidelity(self) -> np.array:
+        
+        """
+        Compares the fidelity array with the threshold and returns a boolean array whether the fidelity is above the threshold
+        
+        Args:
+            /
+            
+        Returns:
+            comparison (np.array): boolean array whether the fidelity is above the threshold
+        """
+        
+        return self._fidelity >= self._threshold
     
     @property
     def protocol(self) -> int:

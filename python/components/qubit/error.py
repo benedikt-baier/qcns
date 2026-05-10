@@ -418,7 +418,7 @@ def pauli_error(_qubit: Qubit, p_i: float, p_x: float, p_y: float, p_z: float) -
     key_z = f's_z_{_qubit.num_qubits}_{_qubit._index}'
     
     gate_x = get_single_operator(key_x, full_gates['X'], _qubit._index, _qubit.num_qubits)    
-    gate_y = get_single_operator(key_y, full_gates['y'], _qubit._index, _qubit.num_qubits)
+    gate_y = get_single_operator(key_y, full_gates['Y'], _qubit._index, _qubit.num_qubits)
     gate_z = get_single_operator(key_z, full_gates['Z'], _qubit._index, _qubit.num_qubits)
     
     _qubit.state = p_i * _qubit.state + p_x * dot(_qubit.state, gate_x) + p_y * dot(_qubit.state, gate_y) + p_z * dot(_qubit.state, gate_z)
