@@ -62,7 +62,7 @@ class LQM_Model:
         if not (0. <= efficiency <= 1.):
             raise ValueError(f'Efficiency should be between 0 and 1: {efficiency}')
         
-        if logical_mode not in ['deterministic', 'stoachistic']:
+        if logical_mode not in ['deterministic', 'stochastic']:
             raise ValueError(f'Logical Mode should be either deterministic or stochastic: {logical_mode}')
         
         if code_length < 1:
@@ -562,7 +562,7 @@ class LogicalQuantumMemory(QuantumMemory):
         if num_random < p_i + p_x:
             return pauli_error(_qubit, p_i + p_y + p_z, p_x, 0, 0)
         if num_random < p_i + p_x + p_y:
-            return pauli_error(p_i + p_x + p_z, 0, p_y, 0)
+            return pauli_error(_qubit, p_i + p_x + p_z, 0, p_y, 0)
         
         return pauli_error(_qubit, p_i + p_x + p_y, 0, 0, p_z)
     

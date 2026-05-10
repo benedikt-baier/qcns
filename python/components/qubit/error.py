@@ -7,6 +7,8 @@ __all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'Rando
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),
               'P01': np.array([[0, 1], [0, 0]], dtype=np.complex128),
+              'X': np.array([[0, 1], [1, 0]], dtype=np.complex128),
+              'Y': np.array([[0, -1j], [1j, 0]], dtype=np.complex128),
               'Z': np.array([[1, 0], [0, -1]], dtype=np.complex128)}
 
 class DepolarizationError:
