@@ -1,21 +1,35 @@
 
 __all__ = ['Interaction_Device', 'BSM_Device', 'FS_Device']
 
-# Sender Receiver: duration, interaction probability, state transfer fidelity
-# Two photon source: duration, interaction probability, state transfer fidelity,
-# Bell State measurement: duration, visibility, coin ph ph, coin ph dc, coin dc dc
-# Fock State: duration, visibility, coherent phase, spin photon correlation
-
-INTERACTION_DEVICE = {}
+# (duration, interaction_probability, state_transfer_fidelity)
+INTERACTION_DEVICE = {
+    'perfect': (0., 1., 1.), 
+    # [9] Photon bound state dynamics from a single artificial atom (2023)
+    # [10] High-fidelity remote entanglement of trapped atoms mediated by time-bin photons (2025)
+    'tomm2023photon': (135e-12, 0.93, 0.97) # FST aus [10]
+}
 
 SENDER_RECEIVER_MODELS = {'perfect': (0., 1., 1.), 'standard': (8.95e-7, 0.14, 0.85)}
 TWO_PHOTON_MODELS = {'standard': (8.95e-7, 0.37, 0.85)}
 
+# (duration, visibility, signal_prob)
+BSM_DEVICE = {
+    'perfect': (0., 1., 1.),
+    # [11] Bell-state measurement exceeding 50% success probability with linear optics (2023)
+    'bayerbach2023bell': (13.2e-9, 0.9645, 0.579), # duration aus [12]  
+    # [12] Boosted Bell-state measurements for photonic quantum computation (2025)
+    'hauser2025boosted': (13.2e-9, 0.94, 0.693)
+}
 
-BSM_DEVICE = {'perfect': (0., 1., 1., 0., 0.), 'standard': (70e-9, 0.955, 1., 1., 1.), 'leent70ns': (70e-9, 0.955, 1., 1., 1.), 'krut3mus': (3e-6, 0.66, 0.313, 0.355, 0.313), 'krut5mus': (5e-6, 0.45, 0.487, 0.546, 0.49), 
-              'krut7mus': (7e-6, 0.37, 0.635, 0.698, 0.64), 'krut10mus': (10e-6, 0.36, 0.811, 0.86, 0.816), 'krut15mus': (15e-6, 0.25, 0.98, 0.988, 0.98)}
-
-FOCK_DEVICE = {'perfect': (0., 1., 0., 0.), 'standard': (3.8e-6, 0.9, 0., 0.01)}
+# (duration, visibility, coherent_phase, spin_photon_correlation)
+FOCK_DEVICE = {
+    'perfect': (0., 1., 0., 1.),
+    # [13] Generation of multi-photon Fock states at telecommunication wavelength using picosecond pulsed light (2024)
+    'sonoyama2024generation': (100e-9, 0.96, 0., 1.),    # V aus [14];
+    'sonoyama2024generation_130ns': (130e-9, 0.96, 0., 1.), # V aus [14]
+    # [14] Neural Network Enhanced Single-Photon Fock State Tomography (2024)
+    'hsieh2024neural': (100e-9, 0.96, 0., 1.),    # duration aus [13]
+}
 
 class Interaction_Device:
     

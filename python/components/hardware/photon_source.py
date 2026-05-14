@@ -9,17 +9,39 @@ __all__ = ['SinglePhotonSource', 'AtomPhotonSource', 'PhotonPhotonSource']
 # photon photon source parameters: duration, brightness, stats, fidelity, fidelity variance, visibility
 # fock photon source parameters: duration, bright state, bright state variance, visibility, emission_prob, leakage_split
 
-SINGLE_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 1., 0.), 'standard': None} # needs the additional parameters
-ATOM_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 1., 0.), 'standard': (3e-6, 0.8, 0.941, 0.0005), 'krutyanskiy': (3.5e-4, 0.75, 0.938, 0.04)} # needs the additional parameters
-PHOTON_PHOTON_SOURCE_MODELS = {'perfect': (0., 1., 1., 0., 1.), 'standard': (126e-6, 0.901, 0.880, 0.002, 0.65)} # needs the additional parameters
-FOCK_PHOTON_SOURCE = {'perfect': (0., 1., 0.5, 0.), 'standard': (3.8e-6, 0.939, 0.05, 0.)} # needs the additional parameters
+SINGLE_PHOTON_SOURCE_MODELS = {
+    'perfect': (0., 1., 0., 1., 0., 1.),
+    # [1] High-efficiency single-photon source above the loss-tolerant threshold for efficient linear optical quantum computing, 2025
+    'ding2025high': (39.4e-9, 0.712, 0.0205, 0.9795, 0.01, 0.9856), # σ²_F aus [15]
+    # [2] Deterministic and highly indistinguishable single photons in the telecom C-band, 2025     
+    'hauser2026deterministic': (12.5e-9, 0.712, 0.017, 9795, 0.01, 0.950), # α, F aus [1]; σ²_F aus [15]
+    # [15] Generation and characterization of polarization-entangled states using quantum dot single photon sources, 2024 
+    # LA = Longitudinal Acoustic              
+    'valeri2024generation_LA': (12e-9, 0.712, 0.012, 0.92, 0.01, 0.927), # α aus [1]
+    # RF = Resonance Fluorescence
+    'valeri2024generation_RF': (12e-9, 0.712, 0.016, 0.95, 0.01, 0.949), # α aus [1]
+}
 
-# atom photon source:
-#   standard: Entangling single atoms over 33 km telecom fibre
-#   Krutyanskiy: Entanglement of trapped-ion qubits separated by 230 meters.
+ATOM_PHOTON_SOURCE_MODELS = {
+    'perfect': (0., 1., 0., 1., 0., 1.),
+    # [3] Source of Heralded Atom-Photon Entanglement for Quantum Networking, 2025
+    'Ref3': (40e-9, 0.68, 0.012, 0.87, 0.01, 0.9856), # g2, σ²_F aus [15]; ν aus [1]
+}
 
-# photon photon source
-#   standard: A solid-state source of strongly entangled photon pairs with high brightness and indistinguishability
+PHOTON_PHOTON_SOURCE_MODELS = {
+    'perfect': (0., 1., 'poisson', 1., 0., 1.),
+    # [4] Passive demultiplexed two-photon state generation (2025)
+    'karli2025passive': (12.5e-9, 1.0, 'poisson', 0.992, 0.001, 0.937), # F, σ²_F aus [16]
+    # [5] Bright source of degenerate polarization-entangled photons (2025)
+    # without iris filtering
+    'bera2025bright': (12.5e-9, 1.0, 'thermal', 0.83, 0.001, 0.976), # d aus [4]; σ²_F aus [16]
+    # with iris filtering
+    'bera2025bright_iris': (12.5e-9, 1.0, 'thermal', 0.95, 0.001, 0.971), # d aus [4]; σ²_F aus [16]
+    # [16] High-quality entangled photon source by symmetric beam displacement (2025)
+    'paganini2025high': (12.5e-9, 1.0, 'thermal', 0.992, 0.001, 0.99) # d aus [4]
+}
+
+FOCK_PHOTON_SOURCE = {'perfect': (0., 1., 0.5, 0.), 'standard': (3.8e-6, 0.939, 0.05, 0.)}
 
 
 class PhotonSource:

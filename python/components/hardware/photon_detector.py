@@ -1,14 +1,22 @@
 
 __all__ = ['PhotonDetector', 'ThresholdDetector', 'PNRDetector']
 
-PHOTON_DETECTOR_MODELS = {'perfect': (0., 1., 0.), 'standard': (138e-9, 0.85, 4.55e-6), 'krut': (5.5e-6, 0.87, 1.696e-4)} # need to be changed
+# photon dtector models parameters: duration, quench_time, dead_time, after_pulse_duration, efficiency, dark_count, after_pulse_prob, spectral_overlap, temporal_overlap, polarization_overlap
+
+PHOTON_DETECTOR_MODELS = {
+    'perfect': (0., 0., 0., 0., 1., 0., 0., 1., 1., 1.),
+    # [6] Time-Resolved Calibration of Photon Detection Efficiency and Afterpulse Probability in 100 MHz Gated InGaAs/InP Single-Photon Avalanche Diodes, 2025
+    'wang2025time': (10e-9, 20e-9, 13e-9, 0., 0.33, 27.3e-7, 0.224, 1., 1., 1.), # quench_time aus [17]
+    # [7]  Large-photosensitive-area InGaAs(P) near-infrared single-photon detector with a low dark count rate at 203 K, 2025
+    'dong2025large_50um': (10e-9, 20e-9, 40e-9, 0., 0.26, 27.3e-7, 0.117, 1., 1., 1.), # duration, dark_count aus [6]; quench_time aus [17]
+    'dong2025large_80um': (10e-9, 20e-9, 45e-9, 0., 0.35, 27.3e-7, 0.098, 1., 1., 1.), # duration, dark_count aus [6]; quench_time aus [17]
+    # [17] Silicon single-photon detector achieving over 84photon detection efficiency with flexible operation modes, 2025
+    'an2025silicon': (10e-9, 20e-9, 50e-9, 0., 0.844, 27.3e-7, 0.029, 1., 1., 1.) # duration, dark_count aus [6];
+}
 
 THRESHOLD_DETECTOR_MODELS = {}
 PNR_DETECTOR_MODELS = {}
 
-# photon detector:
-#   standard: Entangling single atoms over 33 km telecom fibre
-#   Krutyanskiy: Entanglement of Trapped-Ion Qubits Separated by 230 Meters
 
 class PhotonDetector:
     
