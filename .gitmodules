@@ -1,0 +1,3 @@
+[submodule "qcnspp"]
+	path = qcnspp
+	url = git@gitlab.lrz.de:benedikt_baier_research/niklas_keller_research/qcnspp/qcnspp.git
