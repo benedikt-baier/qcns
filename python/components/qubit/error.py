@@ -2,7 +2,7 @@ import numpy as np
 
 from qcns.python.components.qubit.qubit import Qubit, dot, get_single_operator
 
-__all__ = ['DepolarizationError', 'DephasingError', 'TimeDependentError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError', 'SystematicDephasingError', 'SystematicError', 'pauli_error']
+__all__ = ['DepolarizationError', 'DephasingError', 'DepolarizationDephasingError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError', 'SystematicDephasingError', 'SystematicError', 'pauli_error']
 
 full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'P1': np.array([[0, 0], [0, 1]], dtype=np.complex128),
@@ -106,10 +106,10 @@ class DephasingError:
         
         return _qubit
 
-class TimeDependentError:
+class DepolarizationDephasingError:
     
     """
-    Represents a Time Dependent Error consisting of depolarization and dephasing
+    Represents a depolarization and dephasing Error
     
     Attr:
         _depolar_time (float): depolarization time

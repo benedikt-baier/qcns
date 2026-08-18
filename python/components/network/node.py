@@ -13,9 +13,9 @@ from qcns.python.components.connection.channel import QChannel, PChannel
 from qcns.python.components.packet import Packet
 from qcns.python.components.hardware.memory import PhysicalQuantumMemory, LogicalQuantumMemory, PQM_Model, LQM_Model
 from qcns.python.components.connection.connection import PChannel_Model, SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
-from qcns.python.components.network.qprogram import QProgram, QProgram_Model
+from qcns.python.components.network.qprotocol import QProtocol, QProtocol_Model
 
-__all__ = ['Node', 'IF_entanglement_swapping', 'IF_fidelity_improvement', 'FF_entanglement_swapping', 'FF_fidelity_improvement']
+__all__ = ['Node']
 
 class QuantumError:
     pass
@@ -34,6 +34,10 @@ L2 = 2
 L3 = 3
 L4 = 4
 L7 = 5
+
+POSITIVE = 1
+NEGATIVE = -1
+NEUTRAL = 0
 
 class Node:
     
@@ -62,7 +66,7 @@ class Node:
         stop (bool): stop flag for infinitly running hosts  
     """
     
-    def __init__(self, node_id: int, sim: Simulation, stop: bool=True, qprograms: QProgram_Model=QProgram_Model(), gate_duration: Dict[str, float]=_GATE_DURATION, 
+    def __init__(self, node_id: int, sim: Simulation, stop: bool=True, qprotocols: QProtocol_Model=QProtocol_Model(), gate_duration: Dict[str, float]=_GATE_DURATION, 
                  gate_parameters: Dict[str, float]=_GATE_PARAMETERS) -> None:
         
         """
@@ -88,7 +92,7 @@ class Node:
         self._node_id: int = node_id
         self._sim: Simulation = sim
         
-        self._qprograms: Dict[int, QProgram] = qprograms._qprograms
+        self._qprotocols: Dict[int, QProtocol] = qprotocols._qprotocols
         
         self._gates: Dict[str, Qubit] = {k: v for k, v in Qubit.__dict__.items() if not k.startswith(('__', 'f'))}
         self._gate_duration: Dict[str, float] = gate_duration
@@ -531,39 +535,6 @@ class Node:
         
         return self.event_dict[event](gate, remove, args)
     
-    def l2_purify(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None) -> int:
-        
-        """
-        Purifies two qubits in the store given the indices
-        
-        Args:
-            host (int): the host the memory points to
-            store (int): send or receive entanglement store
-            direction (int): whether to apply src->dst or dst->src
-            gate (str): gate to apply
-            basis (str): in which basis to measure the target qubit
-            index_src (int): index of source qubit
-            index_dst (int): index of dest qubit
-            
-        Returns:
-            res (int): measurement result
-        """
-        
-        self._time += self._gate_duration.get(gate, 5e-6)
-        self._sim.schedule_event(GateEvent(self._time, self.id))
-        
-        _qubit_src, _qubit_dst = self._memory[host][store].purify(index_src, index_dst, self._time)
-        
-        combine_state([_qubit_src, _qubit_dst])
-        
-        _res = self._gates['purification'](_qubit_src, _qubit_dst, direction, gate, basis)
-        
-        remove_qubits([_qubit_dst])
-        
-        self._memory[host][store].store_qubit(L2, _qubit_src, -1, self._time)
-        
-        return _res
-    
     def send_qubit(self, receiver: int, qubit: Qubit) -> None:
         
         """
@@ -698,10 +669,10 @@ class Node:
         return self._neighbors
     
     @property
-    def l1_qprogram(self) -> QProgram:
+    def l1_qprotocol(self) -> QProtocol:
         
         """
-        Returns the L1 QProgram
+        Returns the L1 QProtocol
         
         Args:
             /
@@ -710,13 +681,13 @@ class Node:
             L1_QProgram (QProgram): L1 program to return
         """
         
-        return self._qprograms[L1]
+        return self._qprotocols[L1]
     
     @property
-    def l2_qprogram(self) -> QProgram:
+    def l2_qprotocol(self) -> QProtocol:
         
         """
-        Returns the L2 QProgram
+        Returns the L2 QProtocol
         
         Args:
             /
@@ -725,10 +696,10 @@ class Node:
             L2_QProgram (QProgram): L2 program to return
         """
         
-        return self._qprograms[L2]
+        return self._qprotocols[L2]
     
     @property
-    def l3_qprogram(self) -> QProgram:
+    def l3_qprotocol(self) -> QProtocol:
         
         """
         Returns the L3 QProgram
@@ -740,10 +711,10 @@ class Node:
             L3_QProgram (QProgram): L3 program to return
         """
         
-        return self._qprograms[L3]
+        return self._qprotocols[L3]
     
     @property
-    def l4_qprogram(self) -> QProgram:
+    def l4_qprotocol(self) -> QProtocol:
         
         """
         Returns the L4 QProgram
@@ -755,10 +726,10 @@ class Node:
             L4_QProgram (QProgram): L4 program to return
         """
         
-        return self._qprograms[L4]
+        return self._qprotocols[L4]
     
     @property
-    def l7_qprogram(self) -> QProgram:
+    def l7_qprotocol(self) -> QProtocol:
         
         """
         Returns the L7 QProgram
@@ -770,7 +741,7 @@ class Node:
             L7_QProgram (QProgram): L7 program to return
         """
         
-        return self._qprograms[L7]
+        return self._qprotocols[L7]
     
     def has_space(self, host: int, store: int, num_qubits: int=1) -> bool:
         
@@ -1018,7 +989,7 @@ class Node:
         
         self._local_memory['entangled'].store_qubits(L0, qubits, self._time)
      
-    def l0_retrieve_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
+    def l0_retrieve_qubit(self, host: int, store: int, index: int=None, _mode: bool=True) -> Qubit | None:
         
         """
         Retrieves a qubit from the L0 store
@@ -1032,9 +1003,9 @@ class Node:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._memory[host][store].retrieve_qubit(L0, index, self._time)
+        return self._memory[host][store].retrieve_qubit(L0, index, self._time, _mode)
     
-    def l1_retrieve_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
+    def l1_retrieve_qubit(self, host: int, store: int, index: int=None, _mode: bool=True) -> Qubit | None:
         
         """
         Retrieves a qubit from the L1 store
@@ -1048,9 +1019,9 @@ class Node:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._memory[host][store].retrieve_qubit(L1, index, self._time)
+        return self._memory[host][store].retrieve_qubit(L1, index, self._time, _mode)
     
-    def l2_retrieve_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
+    def l2_retrieve_qubit(self, host: int, store: int, index: int=None, _mode: bool=True) -> Qubit | None:
         
         """
         Retrieves a qubit from the L2 store
@@ -1064,7 +1035,7 @@ class Node:
             qubit (Qubit/None): retrieved qubit
         """
         
-        return self._memory[host][store].retrieve_qubit(L2, index, self._time)
+        return self._memory[host][store].retrieve_qubit(L2, index, self._time, _mode)
     
     def l3_retrieve_qubit(self, host: int, store: int, index: int=None, offset_index: int=None) -> Qubit | None:
         
@@ -1110,98 +1081,6 @@ class Node:
         """
         
         return self._local_memory['entangled'].retrieve_qubits(L0, index, self._time)
-    
-    def l0_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
-        
-        """
-        Looks at the qubit without retrieving it from the L0 memory
-        
-        Args:
-            host (int): the host the memory points to
-            store (int): SEND or RECEIVE store
-            index (int): index to retrieve from
-            
-        Returns:
-            _qubit (Qubit/None): peeked at qubit
-        """
-        
-        return self._memory[host][store].peek_qubit(L0, index)
-    
-    def l1_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
-        
-        """
-        Looks at the qubit without retrieving it from the L1 memory
-        
-        Args:
-            host (int): the host the memory points to
-            store (int): SEND or RECEIVE store
-            index (int): index to retrieve from
-            
-        Returns:
-            qubit (Qubit/None): peeked at qubit
-        """
-        
-        return self._memory[host][store].peek_qubit(L1, index)
-    
-    def l2_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
-        
-        """
-        Looks at the qubit without retrieving it from the L2 memory
-        
-        Args:
-            host (int): the host the memory points to
-            store (int): SEND or RECEIVE store
-            index (int): index to retrieve from
-            
-        Returns:
-            qubit (Qubit/None): peeked at qubit
-        """
-        
-        return self._memory[host][store].peek_qubit(L2, index)
-    
-    def l3_peek_qubit(self, host: int, store: int, index: int=None) -> Qubit | None:
-        
-        """
-        Looks at the qubit without retrieving it from the L3 memory
-        
-        Args:
-            host (int): the host the memory points to
-            store (int): SEND or RECEIVE store
-            index (int): index to retrieve from
-            
-        Returns:
-            qubit (Qubit/None): peeked at qubit
-        """
-        
-        return self._memory[host][store].peek_qubit(L3, index)
-    
-    def local_peek_single_qubit(self, index: int=None) -> Qubit | None:
-        
-        """
-        Looks at a local single qubit without retrieving it from the local memory
-        
-        Args:
-            index (int): index of qubit to peek at
-            
-        Returns:
-            qubit (Qubit/None): peeked at qubit
-        """
-        
-        return self._local_memory['single'].peek_qubit(L0, index)
-    
-    def local_peek_entangled_qubits(self, index: int=None) -> List[Qubit] | None:
-        
-        """
-        Looks at local entangled qubits without retrieving them from the local memory
-        
-        Args:
-            index (int): index of qubits to peek at
-            
-        Returns:
-            qubits (list/None): peeked at qubits
-        """
-        
-        return self._local_memory['entangled'].peek_qubits(L0, index)
     
     def l0_move_qubits_l1(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -2009,6 +1888,92 @@ class Node:
         
         return self._local_memory['entangled'].retrieve_time_stamp(L0, index)
     
+    def l2_standard_purification(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None, rounds: int=1) -> List[int]:
+    
+        """
+        Performs a standard purification on two qubits in L2 memory
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): SEND or RECEIVE store
+            index_1 (int): index of first qubit
+            index_2 (int): index of second qubit
+            
+        Returns:
+            /
+        """
+        
+        results = np.zeros(rounds)
+        
+        for i in rounds:
+            if self.l2_num_qubits(host, store) < 2:
+                raise ValueError("Not enough qubits in L2 memory to perform purification.")
+        
+            qubit_src = self.l2_retrieve_qubit(host, store, index_src)
+            qubit_dst = self.l2_retrieve_qubit(host, store, index_dst)
+            
+            if direction:
+                self.apply_gate(gate, qubit_dst, qubit_src)
+            else:
+                self.apply_gate(gate, qubit_src, qubit_dst)
+            
+            results[i] = self.apply_gate('measure', qubit_dst, basis, remove=True)
+        
+        return results
+            
+    def l2_stateless_purification(self, host: int, store: int, index: int=None, rounds: int=1) -> Dict[int, int]:
+    
+        """
+        Performs a stateless purification on two qubits in L2 memory
+        
+        Args:
+            host (int): the host the memory points to
+            store (int): SEND or RECEIVE store
+            index_1 (int): index of first qubit
+            
+        Returns:
+            /
+        """
+        
+        if self.l2_num_qubits(host, store) < 1:
+            raise ValueError("Not enough qubits in L2 memory to perform purification.")
+
+        qubit_src = self.l2_retrieve_qubit(host, store, index)
+       
+        results = {POSITIVE: 0, NEGATIVE: 0, NEUTRAL: 0}
+       
+        for _ in range(rounds):
+       
+            if self.local_num_single_qubits() < 1:
+                self.create_local_qubit()
+            
+            if self.local_num_entangled_qubits() < 2:
+                self.create_local_bell_pair()
+                
+            qubit_3 = self.local_retrieve_single_qubit()
+            self.apply_gate('CNOT', qubit_src, qubit_3)
+            
+            qubit_pair_1, qubit_pair_2 = self.local_retrieve_entangled_qubits()
+            self.apply_gate('CNOT', qubit_src, qubit_pair_1)
+            self.apply_gate('CNOT', qubit_3, qubit_pair_2)
+        
+            res = self.apply('BSM', qubit_pair_1, qubit_pair_2, remove=True)
+        
+            if res == 0:
+                results[POSITIVE] += 1
+            if res == 1:
+                results[NEGATIVE] += 1
+            if res > 1:
+                self.apply_gate('Z', qubit_src)
+                results[NEUTRAL] += 1
+        
+        res = self.apply_gate('measure', qubit_3, 'X', remove=True)
+        
+        if res:
+            self.apply_gate('Z', qubit_src)
+        
+        return results
+                
     def __S(self, gate: str, remove: bool, args: List[Any]):
             
             res = self._gates[gate](*args)
@@ -2041,82 +2006,82 @@ class Node:
             remove_qubits(args[:2])
             return np.random.randint(0, 4)
 
-def _IF(IF: int) -> float:
+# def _IF(IF: int) -> float:
     
-    """
-    Conversion function for an Integer Fidelity (IF) for use in the fidelity formulas for entanglement swapping and fidelity improvement
+#     """
+#     Conversion function for an Integer Fidelity (IF) for use in the fidelity formulas for entanglement swapping and fidelity improvement
     
-    Args:
-        IF (int): integer representation of a fidelity
+#     Args:
+#         IF (int): integer representation of a fidelity
         
-    Returns:
-        _IF (float): converted integer fidelity
-    """
+#     Returns:
+#         _IF (float): converted integer fidelity
+#     """
     
-    return (2 ** (8 * IF / 255)).astype(np.float32)
+#     return (2 ** (8 * IF / 255)).astype(np.float32)
 
-def IF_entanglement_swapping(IF_1: int, IF_2: int) -> int:
+# def IF_entanglement_swapping(IF_1: int, IF_2: int) -> int:
     
-    """
-    Computes the integer fidelity for entanglement swapping based on two input integer fidelities
+#     """
+#     Computes the integer fidelity for entanglement swapping based on two input integer fidelities
     
-    Args:
-        IF_1 (int): first integer fidelity
-        IF_2 (int): second integer fidelity
+#     Args:
+#         IF_1 (int): first integer fidelity
+#         IF_2 (int): second integer fidelity
         
-    Returns:
-        _IF (int): output integer fidelity
-    """
+#     Returns:
+#         _IF (int): output integer fidelity
+#     """
     
-    IF_1 = _IF(IF_1)
-    IF_2 = _IF(IF_2)
+#     IF_1 = _IF(IF_1)
+#     IF_2 = _IF(IF_2)
     
-    return np.ceil(31.875 * np.log2(IF_1 + IF_2 - 1 - 2 / 765 * (IF_1 - 1) * (IF_2 - 1))).astype(np.uint8)
+#     return np.ceil(31.875 * np.log2(IF_1 + IF_2 - 1 - 2 / 765 * (IF_1 - 1) * (IF_2 - 1))).astype(np.uint8)
 
-def IF_fidelity_improvement(IF_g: int, IF_b: int) -> int:
+# def IF_fidelity_improvement(IF_g: int, IF_b: int) -> int:
     
-    """
-    Computes the integer fidelity of the fidelity improvement for a GHZ and BP
+#     """
+#     Computes the integer fidelity of the fidelity improvement for a GHZ and BP
     
-    Args:
-        IF_g (int): integer fidelity of the GHZ
-        IF_b (int): integer fidelity of the BP
+#     Args:
+#         IF_g (int): integer fidelity of the GHZ
+#         IF_b (int): integer fidelity of the BP
         
-    Returns:
-        _IF (int): output integer fidelity
-    """
+#     Returns:
+#         _IF (int): output integer fidelity
+#     """
     
-    IF_g = _IF(IF_g)
-    IF_b = _IF(IF_b)
+#     IF_g = _IF(IF_g)
+#     IF_b = _IF(IF_b)
     
-    return np.ceil(31.875 * np.log2((327679 + 584456 * IF_g + 454151 * IF_b - 761 * IF_g * IF_b) / (1368844 - 1534 * IF_g - 1789 * IF_b + 4 * IF_g * IF_b))).astype(np.uint8)
+#     return np.ceil(31.875 * np.log2((327679 + 584456 * IF_g + 454151 * IF_b - 761 * IF_g * IF_b) / (1368844 - 1534 * IF_g - 1789 * IF_b + 4 * IF_g * IF_b))).astype(np.uint8)
 
-def FF_entanglement_swapping(fid_1: float, fid_2: float) -> float:
+# def FF_entanglement_swapping(fid_1: float, fid_2: float) -> float:
     
-    """
-    Computes the float fidelity for the entanglement swapping
+#     """
+#     Computes the float fidelity for the entanglement swapping
     
-    Args:
-        fid_1 (float): first float fidelity
-        fid_2 (float): second float fidelity
+#     Args:
+#         fid_1 (float): first float fidelity
+#         fid_2 (float): second float fidelity
         
-    Returns:
-        _FF (float): output float fidelity
-    """
+#     Returns:
+#         _FF (float): output float fidelity
+#     """
     
-    return (4 * fid_1 * fid_2 - fid_1 - fid_2 + 1) / 3
+#     return (4 * fid_1 * fid_2 - fid_1 - fid_2 + 1) / 3
 
-def FF_fidelity_improvement(fid_g: float, fid_b: float) -> float:
+# def FF_fidelity_improvement(fid_g: float, fid_b: float) -> float:
     
-    """
-    Computes the float fidelity of the fidelity improvement with a GHZ and BP
+#     """
+#     Computes the float fidelity of the fidelity improvement with a GHZ and BP
     
-    Args:
-        fid_g (float): float fidelity of GHZ
-        fid_b (float): float fidelity of BP
+#     Args:
+#         fid_g (float): float fidelity of GHZ
+#         fid_b (float): float fidelity of BP
         
-    Returns:
-        _FF (float): output fidelity
-    """
+#     Returns:
+#         _FF (float): output fidelity
+#     """
     
-    return (22 * fid_g * fid_b - fid_g - fid_b + 1) / (16 * fid_g * fid_b - 4 * fid_g - 2 * fid_b + 11)
+#     return (22 * fid_g * fid_b - fid_g - fid_b + 1) / (16 * fid_g * fid_b - 4 * fid_g - 2 * fid_b + 11)

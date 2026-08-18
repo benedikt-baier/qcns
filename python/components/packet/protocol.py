@@ -2,15 +2,15 @@
 import numpy as np
 from typing import List, Tuple, Union, Any
 
-__all__ = ['L1_Protocol', 'L2_Protocol', 'L3_Protocol', 'L4_Protocol', 'L7_Protocol', '_convert_fidelity_IR', '_invert_IR_fidelity']
+__all__ = ['L1_Protocol', 'L2_Protocol', 'L3_Protocol', 'L4_Protocol', 'L7_Protocol']
 
-def _convert_fidelity_IR(_fidelity: float | np.ndarray) -> int | np.ndarray:
+# def _convert_fidelity_IR(_fidelity: float | np.ndarray) -> int | np.ndarray:
     
-    return np.ceil(31.875 * np.log2(511 - 510 * _fidelity)).astype(np.uint8)
+#     return np.ceil(31.875 * np.log2(511 - 510 * _fidelity)).astype(np.uint8)
 
-def _invert_IR_fidelity(_IR: int | np.ndarray) -> float | np.ndarray:
+# def _invert_IR_fidelity(_IR: int | np.ndarray) -> float | np.ndarray:
     
-    return ((511 - 2 ** (_IR / 31.875)) / 510).astype(np.float32)
+#     return ((511 - 2 ** (_IR / 31.875)) / 510).astype(np.float32)
 
 class L1_Protocol:
     
@@ -741,13 +741,13 @@ class L3_Protocol:
         _success (np.array): success array
         _x_count (np.array): amplitude flip array
         _z_count (np.array): phase flip array
-        _mode (int): mode how to access quantum data plane or simply forward
+        _fmode (int): mode how to access quantum data plane or simply forward
         _protocol (int): id of protocol header
         _next_protocol (int): id of protocol header one layer above
         _header_length (int): header length
     """
     
-    def __init__(self, _src: int, _dst: int, _requested: int, _needed: int, _fidelity: float) -> None:
+    def __init__(self, _src: int, _dst: int, _requested: int, _needed: int) -> None:
         
         """
         Initializes the L3 Protocol Header
@@ -762,14 +762,11 @@ class L3_Protocol:
             /
         """
         
-        if _fidelity < 0.5 or _fidelity > 1:
-            raise ValueError(f'Fidelity must be in the range [0.5, 1], got {_fidelity}')
-        
         self._src: int = _src # 16 byte
         self._dst: int = _dst # 16 byte
         
-        self._requested: int = _requested # 1byte
-        self._needed: int = _needed # 1byte
+        self._requested: int = _requested # 1 byte
+        self._needed: int = _needed # 1 byte
         
         if self._requested < 1 and self._needed > 0:
             self._requested = self._needed
@@ -782,20 +779,15 @@ class L3_Protocol:
         self._x_count: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 32 byte
         self._z_count: np.ndarray = np.zeros(self._needed, dtype=np.bool_) # 32 byte
 
-        self._threshold: np.uint8 = _convert_fidelity_IR(_fidelity) # 1 byte
-        self._fidelity: np.ndarray = np.zeros(self._needed, dtype=np.uint8) # 256 byte
-        
-        self._mode: int = 1 # 2 bit
-        self._hop_count: int = 0 # 1byte
-        
-        self._next_purification: int = 0 # 1 bit
-        self._next_mutability: int = 0 # 1 bit
-        self._feedback: int = 0 # 1 bit
-        self._retries: int = 0 # 5 bit
-        
-        self._protocol: int = 0 # 1byte
-        self._next_protocol: int = 0 # 1byte
-        self._header_length: int = 3130
+        self._fmode: int = 1 # 2 bit
+        self._np: int = 0 # 1 bit
+        self._nm: int = 0 # 1 bit
+        self._retries: int = 0 # 4 bit    
+        self._hop_count: int = 0 # 1 byte
+    
+        self._protocol: int = 0 # 1 byte
+        self._next_protocol: int = 0 # 1 byte
+        self._header_length: int = 1072
     
     def __len__(self) -> int:
         
@@ -823,7 +815,7 @@ class L3_Protocol:
             layer3 (str): str repr of layer 1
         """
         
-        return f' | L3: Src {self._src} Dst {self._dst} Req {self._requested} Need {self._needed} Mode {self._mode} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} X {self._x_count} Z {self._z_count}'
+        return f' | L3: Src {self._src} Dst {self._dst} Req {self._requested} Need {self._needed} FMode {self._fmode} PMode {self._pmode} Proto {self._protocol} Next Proto {self._next_protocol} Len {self._header_length} X {self._x_count} Z {self._z_count}'
      
     @property
     def src(self) -> int:
@@ -963,10 +955,10 @@ class L3_Protocol:
         self._z_count = np.zeros(self._needed, dtype=np.bool_)
      
     @property
-    def mode(self) -> int:
+    def fmode(self) -> int:
         
         """
-        Returns the mode of the packet
+        Returns the forwarding mode of the packet
         
         00: classical forwarding
         01: no reject mode
@@ -980,7 +972,7 @@ class L3_Protocol:
             mode (int): quantum data plane mode of the header
         """
         
-        return self._mode
+        return self._fmode
     
     def set_cf(self) -> None:
         
@@ -994,7 +986,7 @@ class L3_Protocol:
             /
         """
         
-        self._mode: int = 0
+        self._fmode: int = 0
     
     def set_nr(self) -> None:
         
@@ -1008,7 +1000,7 @@ class L3_Protocol:
             /
         """
         
-        self._mode: int = 1
+        self._fmode: int = 1
     
     def set_pr(self) -> None:
         
@@ -1022,7 +1014,7 @@ class L3_Protocol:
             /
         """
         
-        self._mode: int = 2
+        self._fmode: int = 2
         
     def set_cr(self) -> None:
         
@@ -1036,7 +1028,7 @@ class L3_Protocol:
             /
         """
         
-        self._mode: int = 3
+        self._fmode: int = 3
     
     @property
     def is_cf(self) -> bool:
@@ -1051,7 +1043,7 @@ class L3_Protocol:
             is_cf (bool): whether the packet is in cf mode
         """
         
-        return self._mode == 0
+        return self._fmode == 0
     
     @property
     def is_nr(self) -> bool:
@@ -1066,7 +1058,7 @@ class L3_Protocol:
             is_nr (bool): whether the packet is in nr mode
         """
         
-        return self._mode == 1
+        return self._fmode == 1
     
     @property
     def is_pr(self) -> bool:
@@ -1081,7 +1073,7 @@ class L3_Protocol:
             is_pr (bool): whether the packet is in pr mode
         """
         
-        return self._mode == 2
+        return self._fmode == 2
     
     @property
     def is_cr(self) -> bool:
@@ -1096,7 +1088,113 @@ class L3_Protocol:
             is_cr (bool): whether the packet is in cr mode
         """
         
-        return self._mode == 3
+        return self._fmode == 3
+    
+    @property
+    def pmode(self) -> int:
+        
+        """
+        Returns the purification mode of the packet
+        
+        00: no next purification and no next mutability
+        01: no next purification and next mutability
+        10: next purification and no next mutability
+        11: next purification and next mutability
+        
+        Args:
+            /
+            
+        Returns:
+            pmode (int): purification mode of the packet
+        """
+        
+        return 2 * self._np + self._nm
+    
+    def set_np(self) -> None:
+        
+        """
+        Enables purification for the next router
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._np = 1
+    
+    def unset_np(self) -> None:
+        
+        """
+        Disables purification for the next router
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._np = 0
+    
+    def set_nm(self) -> None:
+        
+        """
+        Enables mutability of purification for the next router
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._nm = 1
+    
+    def unset_nm(self) -> None:
+        
+        """
+        Disables mutability of purification for the next router
+        
+        Args:
+            /
+            
+        Returns:
+            /
+        """
+        
+        self._nm = 0
+    
+    @property
+    def is_np(self) -> bool:
+        
+        """
+        Checks whether purification for the next router is enabled
+        
+        Args:
+            /
+            
+        Returns:
+            is_np (bool): whether purification for the next router is enabled
+        """
+        
+        return self._np > 0
+    
+    @property
+    def is_nm(self) -> bool:
+        
+        """
+        Checks whether mutability of purification for the next router is enabled
+        
+        Args:
+            /
+            
+        Returns:
+            is_nm (bool): whether mutability of purification is enabled for the next router is enabled
+        """
+        
+        return self._nm > 0
     
     @property
     def hop_count(self) -> int:
@@ -1271,146 +1369,6 @@ class L3_Protocol:
         """
 
         self._z_count[_idx] = np.logical_not(self._z_count[_idx], _res)
-    
-    @property
-    def threshold(self) -> int:
-        
-        """
-        Returns the IR threshold of the header
-        
-        Args:
-            /
-            
-        Returns:
-            threshold (int): IR threshold of the header
-        """
-        
-        return self._threshold
-    
-    @threshold.setter
-    def threshold(self, _threshold: int) -> None:
-        
-        """
-        Sets the IR threshold of the header
-        
-        Args:
-            _threshold (int): new IR threshold
-            
-        Returns:
-            /
-        """
-        
-        if _threshold < 0 or _threshold > 255:
-            raise ValueError(f'Threshold must be in the range [0, 255], got {_threshold}')
-        
-        self._threshold = _threshold
-        
-    @property
-    def decoded_threshold(self) -> float:
-        
-        """
-        Returns the decoded fidelity threshold of the header
-        
-        Args:
-            /
-            
-        Returns:
-            decoded_threshold (float): decoded fidelity threshold of the header
-        """
-        
-        return _invert_IR_fidelity(self._threshold)
-    
-    @decoded_threshold.setter
-    def decoded_threshold(self, _threshold: float) -> None:
-        
-        """
-        Sets the IR threshold of the header by encoding the fidelity threshold
-        
-        Args:
-            _decoded_threshold (float): new fidelity threshold
-            
-        Returns:
-            /
-        """
-        
-        if _threshold < 0.5 or _threshold > 1:
-            raise ValueError(f'Fidelity threshold must be in the range [0.5, 1], got {_threshold}')
-        
-        self._threshold = _convert_fidelity_IR(_threshold)
-    
-    @property
-    def fidelity(self) -> np.array:
-        
-        """
-        Returns the IR fidelity array of the header
-        
-        Args:
-            /
-            
-        Returns:
-            fidelity (np.array): IR fidelity array of the header
-        """
-        
-        return self._fidelity
-    
-    @fidelity.setter
-    def fidelity(self, _fidelity: np.ndarray) -> None:
-        
-        """
-        Sets the IR fidelity array of the header
-        
-        Args:
-            _fidelity (np.array): new IR fidelity array
-            
-        Returns:
-            /
-        """
-        
-        self._fidelity = _fidelity
-        
-    @property
-    def decoded_fidelity(self) -> np.array:
-        
-        """
-        Returns the decoded fidelity array of the header
-        
-        Args:
-            /
-            
-        Returns:
-            decoded_fidelity (np.array): decoded fidelity array of the header
-        """
-        
-        return _invert_IR_fidelity(self._fidelity)
-    
-    @decoded_fidelity.setter
-    def decoded_fidelity(self, _decoded_fidelity: np.array) -> None:
-        
-        """
-        Sets the IR fidelity array of the header by encoding the decoded fidelity array
-        
-        Args:
-            _decoded_fidelity (np.array): new decoded fidelity array
-            
-        Returns:
-            /
-        """
-        
-        self._fidelity = _convert_fidelity_IR(_decoded_fidelity)
-    
-    def compare_fidelity(self) -> np.array:
-        
-        """
-        Compares the fidelity array with the threshold and returns a boolean array whether the fidelity is above the threshold
-        
-        Args:
-            /
-            
-        Returns:
-            comparison (np.array): boolean array whether the fidelity is above the threshold
-        """
-        
-        return self._fidelity >= self._threshold
     
     @property
     def protocol(self) -> int:

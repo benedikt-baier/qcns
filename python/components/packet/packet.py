@@ -31,7 +31,7 @@ class Packet:
     def __base_init(self, l2_src: int, l2_dst: int,
                       l1_requested: int=0, l1_needed: int=0,
                       l2_requested: int=0, l2_needed: int=0,
-                      l3_src: int=None, l3_dst: int=None, l3_requested: int=0, l3_needed: int=0, l3_fidelity: float | List[float]=0.5,
+                      l3_src: int=None, l3_dst: int=None, l3_requested: int=0, l3_needed: int=0,
                       l4_src: int=None, l4_dst: int=None, l4_requested: int=0, l4_needed: int=0,
                       l7_requested: int=0, payload: List[Any]=None) -> None:
         
@@ -82,7 +82,7 @@ class Packet:
             self._layer_counter = 4
         
         if self._layer_counter > 1:
-            self._layer3 = L3_Protocol(l3_src, l3_dst, l3_requested, l3_needed, l3_fidelity)
+            self._layer3 = L3_Protocol(l3_src, l3_dst, l3_requested, l3_needed)
             self._layer2.next_protocol = self._layer3.protocol
             
         if self._layer_counter > 2:
@@ -1152,7 +1152,7 @@ class Packet:
         self._layer3.needed = l3_needed
         
     @property
-    def l3_mode(self) -> int:
+    def l3_fmode(self) -> int:
         
         """
         Checks whether the L3 mode flag is set
@@ -1167,7 +1167,7 @@ class Packet:
         if not self._layer3:
             raise ValueError('Layer 3 is not present in the packet')
         
-        return self._layer3.mode
+        return self._layer3.fmode
     
     def l3_set_cf(self) -> None:
         
@@ -1296,6 +1296,16 @@ class Packet:
         """
         
         return self._layer3.is_cr
+    
+    @property
+    def l3_is_np(self) -> bool:
+        
+        return self._layer3.is_np
+    
+    @property
+    def l3_is_nm(self) -> bool:
+        
+        return self._layer3.is_nm
     
     @property
     def l3_hop_count(self) -> int:
@@ -1507,154 +1517,6 @@ class Packet:
             raise ValueError('Layer 3 is not present in the packet')
         
         self._layer3.update_z_count(l3_z_count, index)
-    
-    @property
-    def l3_threshold(self) -> np.array:
-        
-        """
-        Returns the L3 fidelity threshold array
-        
-        Args:
-            /
-            
-        Returns:
-            l3_threshold (np.array): L3 threshold array
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        return self._layer3.threshold
-    
-    @l3_threshold.setter
-    def l3_threshold(self, l3_threshold: int, index: int=0) -> None:
-        
-        """
-        Sets the L3 threshold at the given index
-        
-        Args:
-            l3_threshold (int): new threshold value
-            index (int): index of the threshold
-            
-        Returns:
-            /
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        self._layer3.threshold[index] = l3_threshold
-            
-    @property
-    def l3_fidelity(self) -> np.array:
-        
-        """
-        Returns the L3 fidelity array
-        
-        Args:
-            /
-            
-        Returns:
-            l3_fidelity (np.array): L3 fidelity array
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        return self._layer3.fidelity
-    
-    @l3_fidelity.setter
-    def l3_fidelity(self, l3_fidelity: int, index: int=0) -> None:
-        
-        """
-        Sets the L3 fidelity at the given index
-        
-        Args:
-            l3_fidelity (int): new fidelity value
-            index (int): index of the fidelity
-            
-        Returns:
-            /
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        self._layer3.fidelity[index] = l3_fidelity
-    
-    @property
-    def l3_decoded_threshold(self) -> np.array:
-        
-        """
-        Returns the float representation of the L3 threshold array
-        
-        Args:
-            /
-            
-        Returns:
-            l3_decoded_threshold (np.array): L3 threshold array
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        return self._layer3.decoded_threshold
-    
-    @l3_decoded_threshold.setter
-    def l3_decoded_threshold(self, l3_threshold: float, index: int=0) -> None:
-        
-        """
-        Sets the float representation of the fidelity at the L3 threshold array
-        
-        Args:
-            l3_threshold (np.array): L3 threshold array
-            index (int): index of the threshold
-            
-        Returns:
-            /
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        self._layer3.decoded_threshold[index] = _convert_fidelity_IR(l3_threshold)
-        
-    @property
-    def l3_decoded_fidelity(self) -> np.array:
-        
-        """
-        Returns the float representation of the L3 fidelity array
-        
-        Args:
-            /
-            
-        Returns:
-            l3_decoded_fidelity (np.array): L3 fidelity
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        return self.layer3.decoded_fidelity
-    
-    @l3_decoded_fidelity.setter
-    def l3_decoded_fidelity(self, l3_fidelity: float, index: int=0) -> None:
-        
-        """
-        Sets the float representation of the L3 fidelity
-        
-        Args:
-            l3_fidelity (float): L3 fidelity
-            index (int): index of the fidelity
-            
-        Returns:
-            /
-        """
-        
-        if not self._layer3:
-            raise ValueError('Layer 3 is not present in the packet')
-        
-        self._layer3.decoded_fidelity[index] = _convert_fidelity_IR(l3_fidelity)
     
     @property
     def l3_protocol(self) -> int:

@@ -1633,31 +1633,6 @@ class Qubit:
         if fidelity < 1.:
             depolarization_error(self, fidelity)
 
-    def purification(self, target: Qubit, direction: bool=0, gate: str='CNOT', basis: str='Z') -> int:
-        
-        """
-        Performs a purification on the self and target qubit
-        
-        Args:
-            target (Qubit): target Qubit which will be measured
-            direction (bool): wether s->t or t->s
-            gate (str): gate to apply
-            basis (str): basis to measure target in
-            
-        Returns:
-            res (int): measurement result
-        """
-        
-        q_1, q_2 = self, target
-        if direction:
-            q_1, q_2 = q_2, q_1
-        
-        key = f'd_{purification_gates[gate].lower()}_{q_2.num_qubits}_{q_1._index}_{q_2._index}'
-        gate_f = get_double_operator(key, full_gates[purification_gates[gate]], q_1._index, q_2._index, q_2.num_qubits)
-        q_2.state = dot(q_2.state, gate_f)
-        
-        return target.measure(basis)
-
     def fidelity(self, _op: Qubit | np.ndarray) -> float:
 
         """

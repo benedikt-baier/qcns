@@ -7,7 +7,7 @@ import numpy as np
 from qcns.python.components.qubit.qubit import Qubit
 from qcns.python.components.packet.packet import Packet
 
-__all__ = ['QProgram', 'L1_EGP', 'L2_FIP', 'L3_QFP', 'L7_TPP', 'L7_DQC', 'QProgram_Model']
+__all__ = ['QProtocol', 'L1_EGP', 'L2_FIP', 'L3_QFP', 'L4_FIP', 'L7_TPP', 'L7_DQC', 'QProtocol_Model']
 
 L0 = 0
 L1 = 1
@@ -20,11 +20,11 @@ class Node:
     
     pass
 
-class QProgram:
+class QProtocol:
     
     pass
 
-class QProgram:
+class QProtocol:
     
     """
     Represents a generic Quantum Program to run
@@ -32,8 +32,8 @@ class QProgram:
     Attrs:
         _host (Node): host on which the program runs
         _layer (int): identifier on which layer the qprogram runs
-        _prev_protocol (QProgram): protocol of the previous layer
-        _next_protocol (QProgram): protocol of the next layer
+        _prev_protocol (QProtocol): protocol of the previous layer
+        _next_protocol (QProtocol): protocol of the next layer
     """
     
     def __init__(self) -> None:
@@ -51,8 +51,8 @@ class QProgram:
         self._host: Node = None
         self._layer: int = 0
         
-        self._prev_protocol: QProgram = None
-        self._next_protocol: QProgram = None
+        self._prev_protocol: QProtocol = None
+        self._next_protocol: QProtocol = None
         
     @property
     def host(self) -> Node:
@@ -85,7 +85,7 @@ class QProgram:
         self._host = host
     
     @property
-    def prev_protocol(self) -> QProgram:
+    def prev_protocol(self) -> QProtocol:
         
         """
         Property to access the previous protocol
@@ -94,28 +94,28 @@ class QProgram:
             /
             
         Returns:
-            prev_protocol (QProgram): program of the lower layer
+            prev_protocol (QProtocol): program of the lower layer
         """
         
         return self._prev_protocol
     
     @prev_protocol.setter
-    def prev_protocol(self, prev_protocol: QProgram) -> None:
+    def prev_protocol(self, prev_protocol: QProtocol) -> None:
         
         """
         Sets the previous protocol
         
         Args:
-            prev_protocol (QProgram): previous protocol to run
+            prev_protocol (QProtocol): previous protocol to run
             
         Returns:
             /
         """
         
-        self._prev_protocol: QProgram = prev_protocol
+        self._prev_protocol: QProtocol = prev_protocol
     
     @property
-    def next_protocol(self) -> QProgram:
+    def next_protocol(self) -> QProtocol:
         
         """
         Property to access the next protocol
@@ -124,25 +124,25 @@ class QProgram:
             /
             
         Returns:
-            next_protocol (QProgram): program of the higher layer
+            next_protocol (QProtocol): program of the higher layer
         """
         
         return self._next_protocol
     
     @next_protocol.setter
-    def next_protocol(self, next_protocol: QProgram) -> None:
+    def next_protocol(self, next_protocol: QProtocol) -> None:
         
         """
         Sets the next protocol
         
         Args:
-            next_protocol (QProgram): next protocol to run
+            next_protocol (QProtocol): next protocol to run
             
         Returns:
             /
         """
         
-        self._next_protocol: QProgram = next_protocol
+        self._next_protocol: QProtocol = next_protocol
     
     @property
     def layer(self) -> int:
@@ -174,7 +174,7 @@ class QProgram:
         
         self._layer = layer
     
-class L1_EGP(QProgram):
+class L1_EGP(QProtocol):
     
     """
     Program for the Entanglement Generation Protocol (EGP) in Layer 1
@@ -394,7 +394,7 @@ class L1_EGP(QProgram):
         
         pass
 
-class L2_FIP(QProgram):
+class L2_FIP(QProtocol):
     
     """
     Program to improve the entanglement fidelity of qubits on L2
@@ -579,7 +579,7 @@ class L2_FIP(QProgram):
         
         pass
 
-class L3_QFP(QProgram):
+class L3_QFP(QProtocol):
     
     """
     Program for swapping entanglement with Classical Repeater Protocol (CRP)
@@ -820,7 +820,7 @@ class L3_QFP(QProgram):
             self.quantum_data_plane(packet, offset_index)
             self.host.l3_remove_offset(packet.l2_src, 1, offset_index)
         
-class L4_GP(QProgram):
+class L4_FIP(QProtocol):
     
     """
     Generic Layer 4 Program
@@ -841,10 +841,10 @@ class L4_GP(QProgram):
             /
         """
         
-        super(L4_GP, self).__init__()
+        super(L4_FIP, self).__init__()
         self.layer = 4   
         
-class L7_TPP(QProgram):
+class L7_TPP(QProtocol):
     
     """
     Quantum Program for teleporting qubits
@@ -925,10 +925,10 @@ class L7_TPP(QProgram):
             qubits.append(qubit)
         return qubits
     
-class L7_DQC(QProgram):
+class L7_DQC(QProtocol):
     
     """
-    QProgram for executing Quantum Circuits distributed
+    QProtocol for executing Quantum Circuits distributed
     
     Attrs:
         /
@@ -937,7 +937,7 @@ class L7_DQC(QProgram):
     def __init__(self) -> None:
         
         """
-        Initializes a QProgram for executing Quantum Circuits distributed
+        Initializes a QProtocol for executing Quantum Circuits distributed
         
         Args:
             /
@@ -949,23 +949,23 @@ class L7_DQC(QProgram):
         super(L7_DQC, self).__init__()
         self.layer = 5
 
-class QProgram_Model:
+class QProtocol_Model:
     
-    def __init__(self, l1_qprogram: QProgram=QProgram(), l2_qprogram: QProgram=QProgram(), l3_qprogram: QProgram=QProgram(), l4_qprogram: QProgram=QProgram(), l7_qprogram: QProgram=QProgram()):
+    def __init__(self, l1_qprotocol: QProtocol=QProtocol(), l2_qprotocol: QProtocol=QProtocol(), l3_qprotocol: QProtocol=QProtocol(), l4_qprotocol: QProtocol=QProtocol(), l7_qprotocol: QProtocol=QProtocol()):
         
-        self._qprograms: List[QProgram] = {L1: l1_qprogram, L2: l2_qprogram, L3: l3_qprogram, L4: l4_qprogram, L7: l7_qprogram}
-        self._qprograms = {layer: qprogram for layer, qprogram in self._qprograms.items() if qprogram.layer}
+        self._qprotocols: List[QProtocol] = {L1: l1_qprotocol, L2: l2_qprotocol, L3: l3_qprotocol, L4: l4_qprotocol, L7: l7_qprotocol}
+        self._qprotocols = {layer: qprogram for layer, qprogram in self._qprotocols.items() if qprogram.layer}
         
-        if not all([layer == qprogram.layer for layer, qprogram in self._qprograms.items()]):
+        if not all([layer == qprogram.layer for layer, qprogram in self._qprotocols.items()]):
             raise ValueError('Cannot have a quantum program without the program of the previous layer')
         
-        for layer, qprogram in self._qprograms.items():
+        for layer, qprogram in self._qprotocols.items():
             qprogram.host = self
             
-            if (layer - 1) in self._qprograms:
-                qprogram.prev_protocol = self._qprograms[layer - 1]
-            if (layer + 1) in self._qprograms:
-                qprogram.next_protocol = self._qprograms[layer + 1]
+            if (layer - 1) in self._qprotocols:
+                qprogram.prev_protocol = self._qprotocols[layer - 1]
+            if (layer + 1) in self._qprotocols:
+                qprogram.next_protocol = self._qprotocols[layer + 1]
             
             if not (layer + 1):
                 pass

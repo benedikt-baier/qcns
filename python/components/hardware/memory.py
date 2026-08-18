@@ -456,7 +456,7 @@ class PhysicalQuantumMemory(QuantumMemory):
         if self._errors is None:
             self._errors = []
     
-    def retrieve_qubit(self, _store: int, _index: int, _time: float, _offset_index: int=None) -> Qubit | None:
+    def retrieve_qubit(self, _store: int, _index: int, _time: float, _mode: bool, _offset_index: int=None) -> Qubit | None:
     
         """
         Retrieves a qubit from the memory
@@ -479,7 +479,10 @@ class PhysicalQuantumMemory(QuantumMemory):
         
         _index = self._transform[self._extraction_mode](_index + sum(self._offsets[:_offset_index]))
         
-        _qubit, _store_time = self._memory[_store].pop(_index)
+        if _mode:
+            _qubit, _store_time = self._memory[_store][_index]
+        else:
+            _qubit, _store_time = self._memory[_store].pop(_index)
         
         if np.random.uniform(0, 1) > self._efficiency:
             return None
@@ -570,7 +573,7 @@ class LogicalQuantumMemory(QuantumMemory):
         
         pass
     
-    def retrieve_qubit(self, _store: int, _index: int, _time: float, _offset_index: int=None) -> Qubit | None:
+    def retrieve_qubit(self, _store: int, _index: int, _time: float, _mode: bool, _offset_index: int=None) -> Qubit | None:
         
         """
         Retrieves a qubit from the memory
@@ -593,7 +596,10 @@ class LogicalQuantumMemory(QuantumMemory):
         
         _index = self._transform[self._extraction_mode](_index + sum(self._offsets[:_offset_index]))
         
-        _qubit, _store_time = self._memory[_store].pop(_index)
+        if _mode:
+            _qubit, _store_time = self._memory[_store][_index]
+        else:
+            _qubit, _store_time = self._memory[_store].pop(_index)
         
         e_max = 2 * min(self._x_errors, self._z_errors)
         

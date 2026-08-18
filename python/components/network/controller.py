@@ -1,7 +1,7 @@
 
 from qcns.python.components.network.node import Node
 from qcns.python.components.simulation.simulation import Simulation
-from qcns.python.components.network.qprogram import *
+from qcns.python.components.network.qprotocol import *
 
 __all__ = ['Controller']
 
