@@ -1749,6 +1749,8 @@ class QSystem:
         Returns:
             state (np.array): full state of the QSystem
         """
+        
+        return self._state
     
     @state.setter
     def state(self, _state: np.ndarray) -> None:
