@@ -13,7 +13,7 @@ from qcns.python.components.connection.channel import QChannel, PChannel
 from qcns.python.components.packet import Packet
 from qcns.python.components.hardware.memory import PhysicalQuantumMemory, LogicalQuantumMemory, PQM_Model, LQM_Model
 from qcns.python.components.connection.connection import PChannel_Model, SingleQubitConnection, SenderReceiverConnection, TwoPhotonSourceConnection, BellStateMeasurementConnection, FockStateConnection, L3Connection
-from qcns.python.components.network.qprotocol import QProtocol, QProtocol_Model
+from qcns.python.components.network.qprotocol import QProtocol, QProtocolStack
 
 __all__ = ['Node']
 
@@ -66,7 +66,7 @@ class Node:
         stop (bool): stop flag for infinitly running hosts  
     """
     
-    def __init__(self, node_id: int, sim: Simulation, stop: bool=True, qprotocols: QProtocol_Model=QProtocol_Model(), gate_duration: Dict[str, float]=_GATE_DURATION, 
+    def __init__(self, node_id: int, sim: Simulation, stop: bool=True, qprotocols: QProtocolStack=QProtocolStack(), gate_duration: Dict[str, float]=_GATE_DURATION, 
                  gate_parameters: Dict[str, float]=_GATE_PARAMETERS) -> None:
         
         """
@@ -94,6 +94,9 @@ class Node:
         
         self._qprotocols: Dict[int, QProtocol] = qprotocols._qprotocols
         
+        for qprotocol in self._qprotocols.values():
+            qprotocol.host = self
+        
         self._gates: Dict[str, Qubit] = {k: v for k, v in Qubit.__dict__.items() if not k.startswith(('__', 'f'))}
         self._gate_duration: Dict[str, float] = gate_duration
         self._gate_parameters: Dict[str, float] = gate_parameters
@@ -101,7 +104,6 @@ class Node:
         self._channels: Dict[str, Dict[str, Any]] = {'qc': {}, 'pc': {}}
         self._connections: Dict[str, Dict[str, Any]] = {'sqs': {}, 'eqs': {}}
         self._memory: Dict[str, Any] = {}
-        self._local_memory: Dict[str, Any] = {}
         self._neighbors: Set[int] = set()
         
         self._layer_results: Dict[int, Dict[int, Dict[int, List[np.ndarray]]]] = {}
@@ -330,23 +332,6 @@ class Node:
         self._packets[host.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
         host._packets[self.id] = {SEND: {L1: [], L2: [], L3: []}, RECEIVE: {L1: [], L2: [], L3: []}}
     
-    def set_local_memory(self, memory_config: PQM_Model | LQM_Model=LQM_Model()) -> None:
-    
-        """
-        Creates a local quantum memory to store single and entangled qubits.
-        
-        Args:
-            memory_config (PQM_Model/LQM_Model): configuration of the local quantum memory
-            
-        Returns:
-            None
-        """
-        
-        memories = {'pqm': PhysicalQuantumMemory, 'lqm': LogicalQuantumMemory}
-        
-        self._local_memory['single'] = memories[memory_config._memory_type](memory_config)
-        self._local_memory['entangled'] = memories[memory_config._memory_type](memory_config)
-    
     def attempt_qubit(self, receiver: int, num_requested: int=1, estimate: bool=True) -> None:
         
         """
@@ -451,53 +436,6 @@ class Node:
             return
         
         self._connections['eqs'][receiver].create_bell_pairs(num_requested)
-    
-    def create_local_qubit(self, num_qubits: int=1, success_probability: float=1.0, fidelity: float=1.0, estimate: bool=False) -> None:
-        
-        """
-        Creates a local qubit in the host
-        
-        Args:
-            num_qubits (int): number of qubits to create
-            success_probability (float): probability of success for each qubit creation
-            fidelity (float): fidelity of the qubits to be created
-            estimate (bool): whether to estimate the number of qubits to create based on success probability
-            
-        Returns:
-            qubits (list): list of created qubits
-        """
-        
-        if estimate:
-            num_qubits = int(np.ceil(num_qubits / success_probability))
-        
-        num_qubits = int(np.random.binomial(num_qubits, success_probability))
-        for _ in range(num_qubits):
-            qubit = self._sim.create_qsystem(fidelity=fidelity).qubits[0]
-            self._local_memory['single'].store_qubit(L0, qubit, self._time)
-        
-    def create_local_bell_pair(self, num_pairs: int=1, success_probability: float=1.0, fidelity: float=1.0, estimate: bool=False) -> None:
-        
-        """
-        Creates a local bell pair in the host
-        
-        Args:
-            num_pairs (int): number of bell pairs to create
-            success_probability (float): probability of success for each bell pair creation
-            fidelity (float): fidelity of the bell pairs to be created
-            estimate (bool): whether to estimate the number of bell pairs to create based on success probability
-            
-        Returns:
-            qubits (list): list of created bell pairs
-        """
-        
-        if estimate:
-            num_pairs = int(np.ceil(num_pairs / success_probability))
-        
-        num_pairs = int(np.random.binomial(num_pairs, success_probability))
-        qubits = [self._sim.create_qsystem(2).qubits for _ in range(num_pairs)]
-        for q_1, q_2 in qubits:
-            q_1.bell_state(q_2, fidelity=fidelity)
-            self._local_memory['entangled'].store_qubit(L0, (q_1, q_2), self._time)
     
     def apply_gate(self, gate: str, *args: List[Any], apply: bool=True, success_prob: float=1., false_prob: float=0., combine: bool=True, remove: bool=True) -> int | None:
         
@@ -865,34 +803,6 @@ class Node:
         
         return self._memory[host][store].num_qubits(L3)
     
-    def local_num_single_qubits(self) -> int:
-        
-        """
-        Returns the number of single qubits in the local memory
-        
-        Args:
-            /
-            
-        Returns:
-            num_single_qubits (int): number of single qubits in local memory
-        """
-        
-        return self._local_memory['single'].num_qubits(L0)
-    
-    def local_num_entangled_qubits(self) -> int:
-        
-        """
-        Returns the number of entangled qubits in the local memory
-        
-        Args:
-            /
-            
-        Returns:
-            num_entangled_qubits (int): number of entangled qubits in local memory
-        """
-        
-        return self._local_memory['entangled'].num_qubits(L0)
-    
     def l0_store_qubit(self, qubit: Qubit, host: int, store: int, index: int=-1) -> None:
         
         """
@@ -960,34 +870,6 @@ class Node:
         """
         
         self._memory[host][store].store_qubit(L3, qubit, index, self._time)
-    
-    def local_store_single_qubit(self, qubit: Qubit) -> None:
-        
-        """
-        Stores a single qubit in the local memory
-        
-        Args:
-            qubit (Qubit): qubit to store
-            
-        Returns:
-            /
-        """
-        
-        self._local_memory['single'].store_qubit(L0, qubit, self._time)
-        
-    def local_store_entangled_qubits(self, qubits: Tuple[Qubit]) -> None:
-        
-        """
-        Stores entangled qubits in the local memory
-        
-        Args:
-            qubits (list): list of qubits to store
-            
-        Returns:
-            /
-        """
-        
-        self._local_memory['entangled'].store_qubits(L0, qubits, self._time)
      
     def l0_retrieve_qubit(self, host: int, store: int, index: int=None, _mode: bool=True) -> Qubit | None:
         
@@ -1053,34 +935,6 @@ class Node:
         """
         
         return self._memory[host][store].retrieve_qubit(L3, index, self._time, offset_index)
-    
-    def local_retrieve_single_qubit(self, index: int=None) -> Qubit | None:
-        
-        """
-        Retrieves a single qubit from the local memory
-        
-        Args:
-            index (int): index of qubit to retrieve
-            
-        Returns:
-            qubit (Qubit/None): retrieved qubit
-        """
-        
-        return self._local_memory['single'].retrieve_qubit(L0, index, self._time)
-    
-    def local_retrieve_entangled_qubits(self, index: int=None) -> List[Qubit] | None:
-        
-        """
-        Retrieves entangled qubits from the local memory
-        
-        Args:
-            index (int): index of qubits to retrieve
-            
-        Returns:
-            qubits (list/None): retrieved qubits
-        """
-        
-        return self._local_memory['entangled'].retrieve_qubits(L0, index, self._time)
     
     def l0_move_qubits_l1(self, host: int, store: int, indices: List[int]) -> None:
         
@@ -1238,34 +1092,6 @@ class Node:
         
         self._memory[host][store].discard_qubits(L3)
     
-    def local_discard_single_qubits(self) -> None:
-        
-        """
-        Discards all single qubits in local memory
-        
-        Args:
-            /
-            
-        Returns:
-            /
-        """
-        
-        self._local_memory['single'].discard_qubits(L0)
-    
-    def local_discard_entangled_qubits(self) -> None:
-        
-        """
-        Discards all entangled qubits in local memory
-        
-        Args:
-            /
-            
-        Returns:
-            /
-        """
-        
-        self._local_memory['entangled'].discard_qubits(L0)
-    
     def discard_all_qubits(self, host: int, store: int) -> None:
         
         """
@@ -1359,34 +1185,6 @@ class Node:
         """
         
         return self._memory[host][store].estimate_fidelity(L3, index, self._time)
-    
-    def local_estimate_single_fidelity(self, index: int=None) -> float:
-        
-        """
-        Estimates the fidelity of a single qubit in local memory
-        
-        Args:
-            index (int): index of qubit
-            
-        Returns:
-            fidelity (float): estimated fidelity
-        """
-        
-        return self._local_memory['single'].estimate_fidelity(L0, index, self._time)
-    
-    def local_estimate_entangled_fidelity(self, index: int=None) -> float:
-        
-        """
-        Estimates the fidelity of entangled qubits in local memory
-        
-        Args:
-            index (int): index of qubits
-            
-        Returns:
-            fidelity (float): estimated fidelity
-        """
-        
-        return self._local_memory['entangled'].estimate_fidelity(L0, index, self._time)
     
     def l1_check_results(self, host: int, store: int) -> bool:
         
@@ -1860,35 +1658,7 @@ class Node:
         
         return self._memory[host][store].retrieve_time_stamp(L3, index)
     
-    def local_retrieve_single_time_stamp(self, index: int=None) -> float | None:
-        
-        """
-        Retrieves the time stamp of a single qubit in local memory
-        
-        Args:
-            index (int): index of qubit to retrieve from
-        
-        Returns:
-            time_stamp (float/None): time stamp of qubit
-        """
-        
-        return self._local_memory['single'].retrieve_time_stamp(L0, index)
-    
-    def local_retrieve_entangled_time_stamp(self, index: int=None) -> float | None:
-        
-        """
-        Retrieves the time stamp of entangled qubits in local memory
-        
-        Args:
-            index (int): index of qubits to retrieve from
-            
-        Returns:
-            time_stamp (float/None): time stamp of qubits
-        """
-        
-        return self._local_memory['entangled'].retrieve_time_stamp(L0, index)
-    
-    def l2_standard_purification(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None, rounds: int=1) -> List[int]:
+    def l2_purification(self, host: int, store: int, direction: bool=0, gate: str='CNOT', basis: str='Z', index_src: int=None, index_dst: int=None, rounds: int=1) -> List[int]:
     
         """
         Performs a standard purification on two qubits in L2 memory
@@ -1918,59 +1688,6 @@ class Node:
                 self.apply_gate(gate, qubit_src, qubit_dst)
             
             results[i] = self.apply_gate('measure', qubit_dst, basis, remove=True)
-        
-        return results
-            
-    def l2_stateless_purification(self, host: int, store: int, index: int=None, rounds: int=1) -> Dict[int, int]:
-    
-        """
-        Performs a stateless purification on two qubits in L2 memory
-        
-        Args:
-            host (int): the host the memory points to
-            store (int): SEND or RECEIVE store
-            index_1 (int): index of first qubit
-            
-        Returns:
-            /
-        """
-        
-        if self.l2_num_qubits(host, store) < 1:
-            raise ValueError("Not enough qubits in L2 memory to perform purification.")
-
-        qubit_src = self.l2_retrieve_qubit(host, store, index)
-       
-        results = {POSITIVE: 0, NEGATIVE: 0, NEUTRAL: 0}
-       
-        for _ in range(rounds):
-       
-            if self.local_num_single_qubits() < 1:
-                self.create_local_qubit()
-            
-            if self.local_num_entangled_qubits() < 2:
-                self.create_local_bell_pair()
-                
-            qubit_3 = self.local_retrieve_single_qubit()
-            self.apply_gate('CNOT', qubit_src, qubit_3)
-            
-            qubit_pair_1, qubit_pair_2 = self.local_retrieve_entangled_qubits()
-            self.apply_gate('CNOT', qubit_src, qubit_pair_1)
-            self.apply_gate('CNOT', qubit_3, qubit_pair_2)
-        
-            res = self.apply('BSM', qubit_pair_1, qubit_pair_2, remove=True)
-        
-            if res == 0:
-                results[POSITIVE] += 1
-            if res == 1:
-                results[NEGATIVE] += 1
-            if res > 1:
-                self.apply_gate('Z', qubit_src)
-                results[NEUTRAL] += 1
-        
-        res = self.apply_gate('measure', qubit_3, 'X', remove=True)
-        
-        if res:
-            self.apply_gate('Z', qubit_src)
         
         return results
                 

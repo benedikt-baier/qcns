@@ -7,7 +7,7 @@ import numpy as np
 from qcns.python.components.qubit.qubit import Qubit
 from qcns.python.components.packet.packet import Packet
 
-__all__ = ['QProtocol', 'L1_EGP', 'L2_FIP', 'L3_QFP', 'L4_FIP', 'L7_TPP', 'L7_DQC', 'QProtocol_Model']
+__all__ = ['QProtocol', 'L1_EGP', 'L2_FIP', 'L3_QFP', 'L4_FIP', 'L7_TPP', 'L7_DQC', 'QProtocolStack']
 
 L0 = 0
 L1 = 1
@@ -949,7 +949,7 @@ class L7_DQC(QProtocol):
         super(L7_DQC, self).__init__()
         self.layer = 5
 
-class QProtocol_Model:
+class QProtocolStack:
     
     def __init__(self, l1_qprotocol: QProtocol=QProtocol(), l2_qprotocol: QProtocol=QProtocol(), l3_qprotocol: QProtocol=QProtocol(), l4_qprotocol: QProtocol=QProtocol(), l7_qprotocol: QProtocol=QProtocol()):
         
@@ -960,7 +960,6 @@ class QProtocol_Model:
             raise ValueError('Cannot have a quantum program without the program of the previous layer')
         
         for layer, qprogram in self._qprotocols.items():
-            qprogram.host = self
             
             if (layer - 1) in self._qprotocols:
                 qprogram.prev_protocol = self._qprotocols[layer - 1]
