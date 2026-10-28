@@ -47,7 +47,7 @@ class PChannel_Model:
         if length < 0.:
             raise ValueError('Length of connection cannot be negative')
             
-        if data_rate < -1:
+        if data_rate == 0 or data_rate < -1:
             raise ValueError(f'Data rate cannot be negative: {data_rate}')
         
         self._length: float = length

@@ -1,5 +1,7 @@
 import numpy as np
 from heapq import heappop, heappush
+from itertools import count
+from copy import deepcopy
 
 from typing import List, Tuple
 
@@ -32,7 +34,7 @@ class QChannel:
         _channel (queue): queue representing the channel
     """
     
-    def __init__(self, _model: QChannel_Model, _errors: List[QuantumError]) -> None:
+    def __init__(self, _model: QChannel_Model, _errors: List[QuantumError], *, rng: np.random.Generator | None = None) -> None:
         
         """
         Initializes a quantum channel
@@ -51,41 +53,24 @@ class QChannel:
         self._propagation_time: float = _model._length * 5e-6
         self._in_coupling: float = _model._in_coupling
         self._out_prob: float = 10 ** (_model._length * _model._attenuation) * _model._out_coupling
-        self._errors: List[QuantumError] = _errors
+        self._rng = np.random.default_rng() if rng is None else rng
+        self._errors = deepcopy(list(_errors or []))
+        for error in self._errors:
+            if hasattr(error, "bind_rng"):
+                error.bind_rng(self._rng)
+        self._sequence = count()
         self._channel: List[Tuple[float, Qubit]] = []
     
     def empty(self) -> bool:
         
-        """
-        Checks wether the channel is empty
-        
-        Args:
-            /
-            
-        Returns:
-            _empty (bool): whether channel is empty
-        """
-        
-        return self._channel.empty()
+        return not self._channel
 
     def put(self, _qubit: Qubit, _arrival_time: float) -> None:
         
-        """
-        Sends a qubit through the channel
-        
-        Args:
-            _qubit (Qubit): qubit to send
-            
-        Returns:
-            /
-        """
-        
-        if np.random.uniform(0, 1) > self._in_coupling:
+        if _qubit is not None and self._rng.uniform(0, 1) > self._in_coupling:
             remove_qubits([_qubit])
-            heappush(self._channel, (_arrival_time, None))
-            return
-        
-        heappush(self._channel, (_arrival_time, _qubit))
+            _qubit = None
+        heappush(self._channel, (_arrival_time, next(self._sequence), _qubit))
 
     def get(self) -> Qubit | None:
         
@@ -99,19 +84,23 @@ class QChannel:
             _qubit (Qubit): received qubit
         """
         
-        _, _qubit = heappop(self._channel)
+        _, _, _qubit = heappop(self._channel)
         
         if _qubit is None:
             return _qubit
         
-        if np.random.uniform(0, 1) > self._out_prob:
+        if self._rng.uniform(0, 1) > self._out_prob:
             remove_qubits([_qubit])
             return None
         
         for error in self._errors:
-            _qubit = error.apply(_qubit, self._sending_time)
+            _qubit = error.apply(_qubit, self._propagation_time)
         
         return _qubit
+
+    def ready(self, time):
+        """Queued data is readable only once its simulated arrival has passed."""
+        return bool(self._channel) and self._channel[0][0] <= time
 
 class PChannel:
     
@@ -172,7 +161,7 @@ class PChannel:
             /
         """
         
-        heappush(self._channel, (_arrival_time, _event_counter, _packet))
+        heappush(self._channel, (_arrival_time, _event_counter, deepcopy(_packet)))
         
     def get(self) -> Packet:
         
@@ -189,3 +178,6 @@ class PChannel:
         _, _, _packet = heappop(self._channel)
         
         return _packet
+    def ready(self, time):
+        """Queued data is readable only once its simulated arrival has passed."""
+        return bool(self._channel) and self._channel[0][0] <= time

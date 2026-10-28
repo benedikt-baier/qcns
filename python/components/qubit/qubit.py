@@ -1,6 +1,8 @@
 import numpy as np
+from collections import OrderedDict
 from functools import wraps, reduce
 from typing import List, Union, Callable
+from .backend import PythonBackend, get_backend
 
 __all__ = ['Qubit', 'QSystem', 'tensor_operator', 'dot', 'get_single_operator', 'depolarization_error', 'combine_state', 'combine_gates', 'remove_qubits']
 
@@ -32,6 +34,21 @@ class Qubit:
 class QSystem:
     pass
 
+DEFAULT_DENSE_BUDGET = 256 * 1024 * 1024
+
+
+def check_dense_allocation(qubits: int, max_bytes: int) -> int:
+    """Conservative four-array working-set estimate for complex128 kernels."""
+    if not isinstance(qubits, int) or isinstance(qubits, bool) or qubits < 1:
+        raise ValueError('num_qubits must be a positive integer')
+    if not isinstance(max_bytes, int) or max_bytes < 1:
+        raise ValueError('max_bytes must be a positive integer')
+    required = 4 * 16 * 4**qubits
+    if required > max_bytes:
+        raise MemoryError(f'Dense {qubits}-qubit operation needs approximately {required} bytes; '
+                          f'budget is {max_bytes}. Increase max_bytes explicitly or use a validated reduced backend.')
+    return required
+
 def cache(func: Callable) -> Callable:
     
     """
@@ -44,17 +61,46 @@ def cache(func: Callable) -> Callable:
         wrapper (Function): wrapper function
     """
 
-    _cache = {}
+    _cache: OrderedDict[str, np.ndarray] = OrderedDict()
+    limit = 8 * 1024 * 1024
+    retained = 0
+
+    def configure(max_bytes: int = 8 * 1024 * 1024) -> None:
+        nonlocal limit, retained
+        if not isinstance(max_bytes, int) or max_bytes < 0:
+            raise ValueError('Cache max_bytes must be a nonnegative integer')
+        limit = max_bytes
+        while retained > limit:
+            retained -= _cache.popitem(last=False)[1].nbytes
+
+    def clear() -> None:
+        nonlocal retained
+        _cache.clear()
+        retained = 0
+
+    def info() -> dict[str, int]:
+        return {'entries': len(_cache), 'bytes': retained, 'max_bytes': limit}
     
     @wraps(func)
-    def wrapper(*args):
+    def wrapper(*args: object) -> np.ndarray:
+        nonlocal retained
         
         key = args[0]
         if not key:
             return func(*(args[1:]))
-        if key not in _cache:
-            _cache[key] = func(*(args[1:]))
-        return _cache[key]
+        if key in _cache:
+            _cache.move_to_end(key)
+            return _cache[key]
+        value = func(*(args[1:]))
+        if value.nbytes <= limit:
+            while retained + value.nbytes > limit:
+                retained -= _cache.popitem(last=False)[1].nbytes
+            _cache[key] = value
+            retained += value.nbytes
+        return value
+    wrapper.cache_configure = configure
+    wrapper.cache_clear = clear
+    wrapper.cache_info = info
     return wrapper
 
 def kronecker_product(_op_1: np.ndarray, _op_2: np.ndarray) -> np.array:
@@ -325,15 +371,7 @@ def depolarization_error(_qubit: Qubit, _fidelity: float) -> None:
         /
     """
     
-    key_x = f's_x_{_qubit.num_qubits}_{_qubit._index}'
-    key_y = f's_y_{_qubit.num_qubits}_{_qubit._index}'
-    key_z = f's_z_{_qubit.num_qubits}_{_qubit._index}'
-    
-    gate_x = get_single_operator(key_x, full_gates['X'], _qubit._index, _qubit.num_qubits)    
-    gate_y = get_single_operator(key_y, full_gates['Y'], _qubit._index, _qubit.num_qubits)
-    gate_z = get_single_operator(key_z, full_gates['Z'], _qubit._index, _qubit.num_qubits)
-        
-    _qubit.state = _fidelity * _qubit.state + ((1 - _fidelity) / 3) * (dot(_qubit.state, gate_x) + dot(_qubit.state, gate_y) + dot(_qubit.state, gate_z))
+    _qubit.state = _qubit.qsystem.backend.depolarizing(_qubit.state, _qubit._index, 1 - _fidelity)
 
 def combine_state(q_l: List[Qubit | QSystem]) -> QSystem:
         
@@ -362,6 +400,13 @@ def combine_state(q_l: List[Qubit | QSystem]) -> QSystem:
     if len(qsys_l) < 2:
         return qsys_n
 
+    total = sum(qsys.num_qubits for qsys in qsys_l)
+    if any(type(qsys.backend) is not type(qsys_n.backend) for qsys in qsys_l):
+        raise ValueError('Cannot combine states from different backends; create them with the same backend')
+    qsys_n.backend.validate_size(total)
+    budget = min(qsys.max_bytes for qsys in qsys_l)
+    check_dense_allocation(total, budget)
+    qsys_n.max_bytes = budget
     qsys_n._qubits = [q for qsys in qsys_l for q in qsys._qubits]
     qsys_n._num_qubits = sum(qsys.num_qubits for qsys in qsys_l)
     qsys_n._state = tensor_operator([qsys._state for qsys in qsys_l]).astype(np.complex128, copy=False)
@@ -401,15 +446,7 @@ def ptrace_full(_q: Qubit) -> None:
         /
     """
 
-    dims_ = np.array([2] * 2 * _q.num_qubits, dtype=np.int8)
-    state_dim = 1 << (_q.num_qubits - 1)
-
-    reshaped_state = _q.state.reshape(dims_)
-
-    reshaped_state = np.moveaxis(reshaped_state, _q._index, -1)
-    reshaped_state = np.moveaxis(reshaped_state, _q.num_qubits + _q._index - 1, -1)
-
-    _q.state = np.trace(reshaped_state, axis1 = -2, axis2 = -1).reshape([state_dim, state_dim])
+    _q.state = _q.qsystem.backend.partial_trace(_q.state, _q._index)
     _q.num_qubits -= 1
     
     del _q._qsystem._qubits[_q._index]  
@@ -576,7 +613,31 @@ class Qubit:
         
         return id(self._qsystem)
     
-    def X(self, fidelity: float=1., apply: bool=True) -> None:
+    def _single_gate(self, gate: np.ndarray, fidelity: float, apply: bool, *, key: str) -> np.ndarray | None:
+        if not apply:
+            return get_single_operator(key, gate, self._index, self.num_qubits)
+        self.state = self.qsystem.backend.single(self.state, gate, self._index, key=key)
+        if fidelity < 1.:
+            depolarization_error(self, fidelity)
+        return None
+
+    def _controlled_gate(self, target: Qubit, gate: np.ndarray, fidelity: float, apply: bool,
+                         *, key: str, cnot: bool = False) -> np.ndarray | None:
+        if self.qsystem is not target.qsystem or self is target:
+            raise ValueError('Control and target must be distinct qubits in the same QSystem; use combine_state first')
+        if not apply:
+            return get_double_operator(key, gate, self._index, target._index, self.num_qubits)
+        backend = self.qsystem.backend
+        if cnot:
+            self.state = backend.cnot(self.state, self._index, target._index, key=key)
+        else:
+            self.state = backend.controlled(self.state, gate, self._index, target._index, key=key)
+        if fidelity < 1.:
+            depolarization_error(self, fidelity)
+            depolarization_error(target, fidelity)
+        return None
+
+    def X(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
 
         """
         Applies the X gate to the qubit
@@ -589,16 +650,9 @@ class Qubit:
         """
         
         key = f's_x_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['X'], self._index, self.num_qubits)
+        return self._single_gate(full_gates['X'], fidelity, apply, key=key)
         
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-        
-    def Y(self, fidelity: float=1., apply: bool=True) -> None:
+    def Y(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the Y gate to the qubit
@@ -611,16 +665,9 @@ class Qubit:
         """
         
         key = f's_y_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['Y'], self._index, self.num_qubits)
+        return self._single_gate(full_gates['Y'], fidelity, apply, key=key)
         
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-        
-    def Z(self, fidelity: float=1., apply: bool=True) -> None:
+    def Z(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the Z gate to the qubit
@@ -633,16 +680,9 @@ class Qubit:
         """
         
         key = f's_z_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['Z'], self._index, self.num_qubits)
+        return self._single_gate(full_gates['Z'], fidelity, apply, key=key)
         
-        if not apply:    
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-        
-    def H(self, fidelity: float=1., apply: bool=True) -> None:
+    def H(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the Hadamard gate to the qubit
@@ -655,16 +695,9 @@ class Qubit:
         """
         
         key = f's_h_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['H'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['H'], fidelity, apply, key=key)
 
-    def SX(self, fidelity: float=1., apply: bool=True) -> None:
+    def SX(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the square root X gate to the qubit
@@ -677,16 +710,9 @@ class Qubit:
         """
         
         key = f's_sx_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['SX'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['SX'], fidelity, apply, key=key)
     
-    def SY(self, fidelity: float=1., apply: bool=True) -> None:
+    def SY(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the square root Y gate to the qubit
@@ -699,16 +725,9 @@ class Qubit:
         """
         
         key = f's_sy_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['SY'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['SY'], fidelity, apply, key=key)
     
-    def SZ(self, fidelity: float=1., apply: bool=True) -> None:
+    def SZ(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the square root Z gate to the qubit
@@ -721,16 +740,9 @@ class Qubit:
         """
         
         key = f's_sz_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['SZ'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['SZ'], fidelity, apply, key=key)
     
-    def T(self, fidelity: float=1., apply: bool=True) -> None:
+    def T(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the T gate to the qubit
@@ -743,16 +755,9 @@ class Qubit:
         """
     
         key = f's_t_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['T'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['T'], fidelity, apply, key=key)
     
-    def K(self, fidelity: float=1., apply: bool=True) -> None:
+    def K(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the K gate to the qubit
@@ -765,16 +770,9 @@ class Qubit:
         """
         
         key = f's_k_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['K'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['K'], fidelity, apply, key=key)
     
-    def iSX(self, fidelity: float=1., apply: bool=True) -> None:
+    def iSX(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the inverse square root X gate to the qubit
@@ -787,16 +785,9 @@ class Qubit:
         """
         
         key = f's_isx_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['iSX'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['iSX'], fidelity, apply, key=key)
     
-    def iSY(self, fidelity: float=1., apply: bool=True) -> None:
+    def iSY(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the inverse square root Y gate to the qubit
@@ -809,16 +800,9 @@ class Qubit:
         """
         
         key = f's_isy_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['iSY'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['iSY'], fidelity, apply, key=key)
     
-    def iSZ(self, fidelity: float=1., apply: bool=True) -> None:
+    def iSZ(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the inverse square root Z gate to the qubit
@@ -831,16 +815,9 @@ class Qubit:
         """
         
         key = f's_isz_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['iSZ'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['iSZ'], fidelity, apply, key=key)
     
-    def iT(self, fidelity: float=1., apply: bool=True) -> None:
+    def iT(self, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the inverse of T gate to the qubit
@@ -853,14 +830,7 @@ class Qubit:
         """
         
         key = f's_it_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['iT'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['iT'], fidelity, apply, key=key)
     
     def iK(self, fidelity: float=1., apply: bool=True):
         
@@ -875,16 +845,9 @@ class Qubit:
         """
         
         key = f's_ik_{self.num_qubits}_{self._index}'
-        gate = get_single_operator(key, full_gates['iK'], self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(full_gates['iK'], fidelity, apply, key=key)
     
-    def Rx(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
+    def Rx(self, theta: float, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the rotation gate around the x axis to the qubit
@@ -899,16 +862,9 @@ class Qubit:
         
         key = f's_rx_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.cos(theta/2), -1j * np.sin(theta/2)], [-1j * np.sin(theta/2), np.cos(theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(gate_s, fidelity, apply, key=key)
     
-    def Ry(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
+    def Ry(self, theta: float, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the rotation gate around the y axis to the qubit
@@ -923,16 +879,9 @@ class Qubit:
         
         key = f's_ry_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.cos(theta/2), -np.sin(theta/2)], [np.sin(theta/2), np.cos(theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
+        return self._single_gate(gate_s, fidelity, apply, key=key)
         
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)        
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-        
-    def Rz(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
+    def Rz(self, theta: float, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the rotation gate around the z axis to the qubit
@@ -947,16 +896,9 @@ class Qubit:
         
         key = f's_rz_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.exp(-1j * theta/2), 0], [0, np.exp(1j * theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
+        return self._single_gate(gate_s, fidelity, apply, key=key)
         
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-        
-    def PHASE(self, theta: float, fidelity: float=1., apply: bool=True) -> None:
+    def PHASE(self, theta: float, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the PHASE gate to the qubit
@@ -971,16 +913,9 @@ class Qubit:
         
         key = f's_p_{theta}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
-        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(gate_s, fidelity, apply, key=key)
     
-    def general_rotation(self, theta: float, phi: float, psi: float, fidelity: float=1., apply: bool=True) -> None:
+    def general_rotation(self, theta: float, phi: float, psi: float, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies a general rotation to a single qubit
@@ -997,16 +932,9 @@ class Qubit:
         
         key = f's_gr_{theta}_{phi}_{psi}_{self.num_qubits}_{self._index}'
         gate_s = np.array([[np.cos(theta/2), -np.exp(1j*psi)*np.sin(theta/2)], [np.exp(1j*phi)*np.sin(theta/2), np.exp(1j*(phi+psi))*np.cos(theta/2)]], dtype=np.complex128)
-        gate = get_single_operator(key, gate_s, self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(gate_s, fidelity, apply, key=key)
     
-    def custom_single_gate(self, gate: np.ndarray, fidelity: float=1., apply: bool=True) -> None:
+    def custom_single_gate(self, gate: np.ndarray, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies a custom gate to the qubit
@@ -1019,17 +947,9 @@ class Qubit:
             /
         """
         
-        gate = get_single_operator('', gate, self._index, self.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        self.state = dot(self.state, gate)
-        
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
+        return self._single_gate(gate, fidelity, apply, key='')
      
-    def CNOT(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
+    def CNOT(self, target: Qubit, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the CNOT gate to a target qubit, with this qubit as the controll qubit
@@ -1043,17 +963,9 @@ class Qubit:
         """
         
         key = f'd_x_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, full_gates['X'], self._index, target._index, target.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        target.state = dot(target.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-            depolarization_error(target, fidelity)
+        return self._controlled_gate(target, full_gates['X'], fidelity, apply, key=key, cnot=True)
 
-    def CX(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
+    def CX(self, target: Qubit, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the CNOT gate to a target qubit, with this qubit as the controll qubit
@@ -1067,17 +979,9 @@ class Qubit:
         """
         
         key = f'd_x_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, full_gates['X'], self._index, target._index, target.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        target.state = dot(target.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-            depolarization_error(target, fidelity)
+        return self._controlled_gate(target, full_gates['X'], fidelity, apply, key=key, cnot=True)
 
-    def CY(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
+    def CY(self, target: Qubit, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the CY gate to a target qubit, with this qubit as the control qubit
@@ -1091,17 +995,9 @@ class Qubit:
         """
         
         key = f'd_y_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, full_gates['Y'], self._index, target._index, target.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        target.state = dot(target.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-            depolarization_error(target, fidelity)
+        return self._controlled_gate(target, full_gates['Y'], fidelity, apply, key=key)
     
-    def CZ(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
+    def CZ(self, target: Qubit, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the CZ gate to a target qubit, with this qubit as the control qubit
@@ -1115,17 +1011,9 @@ class Qubit:
         """
         
         key = f'd_z_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, full_gates['Z'], self._index, target._index, target.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        target.state = dot(target.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-            depolarization_error(target, fidelity)
+        return self._controlled_gate(target, full_gates['Z'], fidelity, apply, key=key)
     
-    def CH(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
+    def CH(self, target: Qubit, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the CH gate to a target qubit, with this qubit as the control qubit
@@ -1139,17 +1027,9 @@ class Qubit:
         """
         
         key = f'd_h_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_double_operator(key, full_gates['H'], self._index, target._index, target.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        target.state = dot(target.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-            depolarization_error(target, fidelity)
+        return self._controlled_gate(target, full_gates['H'], fidelity, apply, key=key)
     
-    def CPHASE(self, target: Qubit, theta: float, fidelity: float=1., apply: bool=True) -> None:
+    def CPHASE(self, target: Qubit, theta: float, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies the CPHASE gate to a target qubit, with this qubit as the controll qubit
@@ -1165,17 +1045,9 @@ class Qubit:
         
         key = f'd_p_{theta}_{target.num_qubits}_{self._index}_{target._index}'
         gate_s = np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
-        gate = get_double_operator(key, gate_s, self._index, target._index, target.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        target.state = dot(target.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-            depolarization_error(target, fidelity)
+        return self._controlled_gate(target, gate_s, fidelity, apply, key=key)
     
-    def CU(self, target: Qubit, gate: np.ndarray, fidelity: float=1., apply: bool=True) -> None:
+    def CU(self, target: Qubit, gate: np.ndarray, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Applies a custom gate to a target qubit, with this qubit as the controll qubit
@@ -1189,17 +1061,9 @@ class Qubit:
             /
         """
         
-        gate = get_double_operator('', gate, self._index, target._index, target.num_qubits)
-        
-        if not apply:
-            return gate
-        
-        target.state = dot(target.state, gate)
-        if fidelity < 1.:
-            depolarization_error(self, fidelity)
-            depolarization_error(target, fidelity)
+        return self._controlled_gate(target, gate, fidelity, apply, key='')
     
-    def SWAP(self, target: Qubit, fidelity: float=1., apply: bool=True) -> None:
+    def SWAP(self, target: Qubit, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Swaps the state of this qubit with the target qubit by applying CNOT gates
@@ -1213,12 +1077,12 @@ class Qubit:
         """
         
         key = f'd_sw_{self.num_qubits}_{self._index}_{target._index}'
-        swap_gate = get_swap_operator(key, self._index, target._index, self.num_qubits)
-        
         if not apply:
-            return swap_gate
+            return get_swap_operator(key, self._index, target._index, self.num_qubits)
         
-        self.state = dot(self.state, swap_gate)
+        self.CNOT(target)
+        target.CNOT(self)
+        self.CNOT(target)
         self._qsystem._qubits[self._index], self._qsystem._qubits[target._index] = self._qsystem._qubits[target._index], self._qsystem._qubits[self._index]
         self._index, target._index = target._index, self._index
         
@@ -1502,7 +1366,7 @@ class Qubit:
         if fidelity < 1.:
             depolarization_error(self, fidelity)
     
-    def bell_state(self, target: Qubit, bell_state: int=0, fidelity: float=1., apply: bool=True) -> None:
+    def bell_state(self, target: Qubit, bell_state: int=0, fidelity: float=1., apply: bool=True) -> np.ndarray | None:
         
         """
         Transforms the state into a bell state
@@ -1521,17 +1385,22 @@ class Qubit:
             raise ValueError('Bell state should be between 0 and 3')
         
         key = f'bs_{bell_state}_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_bell_operator(key, bell_state, self._index, target._index, target.num_qubits)
-        
         if not apply:
-            return gate
+            return get_bell_operator(key, bell_state, self._index, target._index, target.num_qubits)
         
-        target.state = dot(target.state, gate)
+        if self.qsystem is not target.qsystem or self is target:
+            raise ValueError('Bell preparation requires two distinct qubits in the same QSystem')
+        if bell_state & 1:
+            target.X()
+        if bell_state & 2:
+            self.X()
+        self.H()
+        self.CNOT(target)
         if fidelity < 1.:
             depolarization_error(self, fidelity)
             depolarization_error(target, fidelity)
     
-    def measure(self, basis: str='z', fid_0: float=1., fid_1: float=1.) -> int:
+    def measure(self, basis: str='z', fid_0: float=1., fid_1: float=1., *, rng: np.random.Generator | None = None) -> int:
         
         """
         Measures this qubit and modifies the state accordingly
@@ -1545,6 +1414,10 @@ class Qubit:
             measurement (int): measurement outcome
         """
         
+        if not 0 <= fid_0 <= 1 or not 0 <= fid_1 <= 1:
+            raise ValueError('Measurement fid_0 and fid_1 must be probabilities in [0,1]')
+        if basis not in ('x', 'X', 'y', 'Y', 'z', 'Z'):
+            raise ValueError('Measurement basis must be x, y, or z')
         if basis in ['x', 'X']:
             self.H()
         if basis in ['y', 'Y']:
@@ -1555,17 +1428,21 @@ class Qubit:
         P1 = np.array([[np.sqrt(1 - fid_0), 0], [0, np.sqrt(fid_1)]])
         
         key = f's_m0_{fid_0}_{fid_1}_{self.num_qubits}_{self._index}'
-        measure_0 = get_single_operator(key, P0, self._index, self.num_qubits)
-        prob = np.real(np.trace(np.dot(measure_0, self.state)))
-        
-        if np.random.uniform(0, 1) <= prob:
-            self.state = dot(self.state, measure_0) / prob
+        branch_0 = self.qsystem.backend.single(self.state, P0, self._index, key=key)
+        prob = float(np.trace(branch_0).real)
+        if not np.isfinite(prob) or not -1e-12 <= prob <= 1 + 1e-12:
+            raise ValueError('Invalid quantum state: measurement probability outside [0,1]')
+        draw = np.random.uniform(0, 1) if rng is None else rng.random()
+        if draw < prob:
+            self.state = branch_0 / prob
             return 0
-        else:
-            key = f's_m1_{fid_0}_{fid_1}_{self.num_qubits}_{self._index}'
-            measure_1 = get_single_operator(key, P1, self._index, self.num_qubits)
-            self.state = dot(self.state, measure_1) / (1 - prob)
-            return 1
+        key = f's_m1_{fid_0}_{fid_1}_{self.num_qubits}_{self._index}'
+        branch_1 = self.qsystem.backend.single(self.state, P1, self._index, key=key)
+        norm = float(np.trace(branch_1).real)
+        if not np.isfinite(norm) or norm <= 0:
+            raise ValueError('Invalid quantum state: selected a zero-probability measurement branch')
+        self.state = branch_1 / norm
+        return 1
 
     def state_transfer(self, source: Qubit, fidelity: float=1.) -> None:
         
@@ -1591,7 +1468,7 @@ class Qubit:
         if fidelity < 1.:
             depolarization_error(self, fidelity)
 
-    def bsm(self, target: Qubit, basis_0: str='z', basis_1: str='z', fid_0: float=1., fid_1: float=1.) -> int:
+    def bsm(self, target: Qubit, basis_0: str='z', basis_1: str='z', fid_0: float=1., fid_1: float=1., *, rng: np.random.Generator | None = None) -> int:
         
         """
         Performs a Bell state measurement on this qubit and another qubit
@@ -1607,11 +1484,10 @@ class Qubit:
             res (int): measurement result
         """
         
-        key = f'bsm_{target.num_qubits}_{self._index}_{target._index}'
-        gate = get_bsm_operator(key, self._index, target._index, target.num_qubits)
-        target.state = dot(target.state, gate)
+        self.CNOT(target)
+        self.H()
         
-        return 2 * self.measure(basis=basis_0, fid_0=fid_0, fid_1=fid_1) + target.measure(basis=basis_1, fid_0=fid_0, fid_1=fid_1)
+        return 2 * self.measure(basis=basis_0, fid_0=fid_0, fid_1=fid_1, rng=rng) + target.measure(basis=basis_1, fid_0=fid_0, fid_1=fid_1, rng=rng)
 
     def custom_gate(self, gate: np.ndarray, fidelity: float=1., apply:bool=True) -> None:
         
@@ -1662,7 +1538,8 @@ class QSystem:
         _state (np.array): density matrix of qsystem
     """
     
-    def __init__(self, num_qubits: int=1, fidelity: float=1.) -> None:
+    def __init__(self, num_qubits: int=1, fidelity: float=1., *, max_bytes: int = DEFAULT_DENSE_BUDGET,
+                 backend: str | PythonBackend = 'python') -> None:
         
         """
         Instantiates the qubit state for a qubit system, initializes to the zero state
@@ -1675,6 +1552,10 @@ class QSystem:
             /
         """
 
+        self._backend = get_backend(backend)
+        self._backend.validate_size(num_qubits)
+        check_dense_allocation(num_qubits, max_bytes)
+        self.max_bytes = max_bytes
         if isinstance(fidelity, float):
             fidelity = [fidelity] * num_qubits
         
@@ -1694,6 +1575,11 @@ class QSystem:
         else:
             self._state: np.ndarray = init_state[0]
     
+    @property
+    def backend(self) -> PythonBackend:
+        """Numerical kernels used by this state; never changes global selection."""
+        return self._backend
+
     def __len__(self) -> int:
         
         """

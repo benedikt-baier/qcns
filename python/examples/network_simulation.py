@@ -22,7 +22,7 @@ class Client(qcns.Node):
     
     def send_request(self):
         
-        packet = qcns.Packet(l2_src=self.id, l2_dst=self.access_router, l3_src=self.id, l3_dst=self.dst, l3_requested=1)
+        packet = qcns.Packet(src=self.id, dst=self.access_router, l3_src=self.id, l3_dst=self.dst, l3_requested=1)
         
         self.send_packet(packet)
     
@@ -36,7 +36,7 @@ class Client(qcns.Node):
             if packet.is_l1:
                 continue
             
-            # qubit = self.l3_retrieve_qubit(packet.l2_src, 1)
+            # qubit = self.l3_retrieve_qubit(packet.src, 1)
             
             counter += 1
     
@@ -65,15 +65,15 @@ class Router(qcns.Node):
     
     def entanglement_swapping(self, packet):
         
-        packet.l2_dst = self.routing_table[packet.l3_dst]
+        packet.dst = self.routing_table[packet.l3_dst]
         
-        qubit_src = self.l3_retrieve_qubit(packet.l2_src, 1)
-        qubit_dst = self.l3_retrieve_qubit(packet.l2_dst, 0)
+        qubit_src = self.l3_retrieve_qubit(packet.src, 1)
+        qubit_dst = self.l3_retrieve_qubit(packet.dst, 0)
         
         res = self.apply_gate('bsm', qubit_src, qubit_dst)
         
         packet.l3_update_es(res)
-        packet.l2_src = self.id
+        packet.src = self.id
         self.send_packet(packet)
     
     async def handle_packets(self):

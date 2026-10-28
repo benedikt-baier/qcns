@@ -1,6 +1,7 @@
 import numpy as np
+from typing import Callable
 
-__all__ = ['StopEvent', 'SendEvent', 'ReceiveEvent', 'GateEvent']
+__all__ = ['StopEvent', 'SendEvent', 'ReceiveEvent', 'GateEvent', 'WaitEvent', 'TimeoutEvent', 'CompletionEvent']
 
 class Event:
     pass
@@ -40,17 +41,7 @@ class Event:
         
     def __lt__(self, other: Event) -> bool:
         
-        """
-        Custom implementation of comparison operator, compares the end time
-        
-        Args:
-            other (Event): event to compare to
-        
-        Returns:
-            less_than (bool): whether this._end_time is less than other._end_time
-        """
-        
-        return self._end_time < other._end_time
+        return (self._end_time, self._event_counter) < (other._end_time, other._event_counter)
 
 class StopEvent(Event):
     
@@ -214,7 +205,8 @@ class GateEvent(Event):
 class WaitEvent(Event):
     
     """
-    Represents a Wait Event
+    Local-clock accounting marker for legacy synchronous operations.
+    It does not suspend or resume a coroutine. Node.wait uses CompletionEvent.
     
     Attr:
         _id (int): ID to distinguish events
@@ -250,3 +242,18 @@ class WaitEvent(Event):
         """
         
         return f'Wait Event: Node: {self._node_id} Time: {self._end_time}'
+
+class TimeoutEvent(Event):
+    """Cancelable wake-up at a simulation deadline."""
+
+    def __init__(self, end_time, node_id):
+        super().__init__(4, end_time, node_id)
+        self.active = True
+
+class CompletionEvent(Event):
+    """Execute a quantum operation at its scheduled completion time."""
+
+    def __init__(self, time: float, node: int, callback: Callable[[], None]) -> None:
+        super().__init__(5, time, node)
+        self.callback = callback
+        self.active = True

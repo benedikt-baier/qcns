@@ -1,5 +1,7 @@
 
 import numpy as np
+from copy import deepcopy
+from qcns.python.components.qubit.qubit import remove_qubits
 from math import comb
 from typing import List, Dict, Tuple, Union, Callable
 
@@ -158,11 +160,22 @@ class QuantumMemory:
         self._transform = {'fifo': self._fifo_transform, 'lifo': self._lifo_transform}
 
         self._size: int = _size
-        self._offsets: List[int] = []
+        self._offsets = {}
+        self._next_reservation = 0
         self._efficiency: float = _efficiency
+        self.rng = np.random.default_rng()
 
-        self._memory: Tuple[List[Qubit]] = ([], [], [], [])
+        self._memory = [[], [], [], []]
+        self._sessions: dict[int, int] = {}
+        self._generation_batches: dict[int, list[Qubit]] = {}
+        self._tracks_generation = False
      
+    def bind_rng(self, rng: np.random.Generator) -> None:
+        self.rng = rng
+        for error in getattr(self, "_errors", ()):
+            if hasattr(error, "bind_rng"):
+                error.bind_rng(rng)
+
     def __len__(self) -> int:
         
         """
@@ -175,7 +188,7 @@ class QuantumMemory:
             _len (int): number of elements in the memory
         """
         
-        return len(self._memory[0]) + len(self._memory[1]) + len(self._memory[2]) + len(self._memory[3])
+        return sum(len(store) for store in self._memory)
 
     @property
     def size(self) -> int:
@@ -306,39 +319,29 @@ class QuantumMemory:
     
     def move_qubits(self, _src_store: int, _dst_store: int, _indices: List[bool]) -> None:
  
-        """
-        Moves qubits given indices from the source memory to the target memory
-        
-        Args:
-            _src_store (int): source store
-            _dst_store (int): target store
-            _indices (list): list of bool whether to remove qubit or not
-            
-        Returns:
-            /
-        """
- 
-        for index in _indices:
-            qubit, time = self._memory[_src_store].pop(0)
-            if index:
+        mask = np.asarray(_indices, dtype=bool)
+        if mask.ndim != 1 or len(mask) > len(self._memory[_src_store]):
+            raise ValueError('Invalid memory selection mask')
+        entries = self._memory[_src_store][:len(mask)]
+        if _src_store == 3 and any(id(entry) in self._reserved_ids() for entry in entries):
+            raise ValueError('Cannot move reserved qubits')
+        del self._memory[_src_store][:len(mask)]
+        for keep, (qubit, time) in zip(mask, entries):
+            if keep:
                 self.store_qubit(_dst_store, qubit, -1, time)
+            elif qubit is not None:
+                remove_qubits([qubit])
     
     def discard_qubits(self, _store: int=None) -> None:
         
-        """
-        Discards all qubits in memory
-        
-        Args:
-            _store (int): which store to use
-            
-        Returns:
-            /
-        """
-        
         if _store is None:
             self._memory = [[], [], [], []]
+            self._offsets.clear()
+            self._sessions.clear()
+            self._generation_batches.clear()
             return
-        
+        if _store == 3:
+            self._offsets.clear()
         self._memory[_store] = []
     
     def purify(self, _index_src: int, _index_dst: int, _time: float) -> Tuple[Qubit, Qubit]:
@@ -366,35 +369,22 @@ class QuantumMemory:
         
         return self.retrieve_qubit(L1, _index_src, _time), self.retrieve_qubit(L1, _index_dst, _time)
     
-    def add_offset(self, _offset: int) -> None:
+    def add_offset(self, _offset: int, *, ready: bool = False) -> int:
         
-        """
-        Adds an offset to the existing offset
-        
-        Args:
-            _offset (int): L3 offset to add
-            
-        Returns:
-            /
-        """
-        
-        self._offsets.append(_offset)
-        
-        return len(self._offsets) - 1
+        # Stable reservation IDs identify concrete L3 entries, not shifting indices.
+        if _offset < 1:
+            raise ValueError('Reservation size must be positive')
+        entries = self._ready_entries() if ready else self._available_entries(3)
+        if len(entries) < _offset:
+            raise ValueError('Not enough unreserved qubits')
+        identifier = self._next_reservation
+        self._next_reservation += 1
+        self._offsets[identifier] = entries[:_offset]
+        return identifier
     
     def remove_offset(self, _index: int) -> None:
         
-        """
-        Removes an offset from the offset array
-        
-        Args:
-            _index (int): index to remove
-            
-        Returns:
-            /
-        """
-        
-        self._offsets.pop(_index)
+        del self._offsets[_index]
     
     def retrieve_time_stamp(self, _store: int, _index: int) -> float:
         
@@ -447,53 +437,156 @@ class QuantumMemory:
         
         return -1 * _index - 1
 
+    def _reserved_ids(self):
+        return {id(entry) for entries in self._offsets.values() for entry in entries}
+
+    def _available_entries(self, store, reservation=None):
+        if reservation is not None:
+            if store != 3:
+                raise ValueError('Reservations apply to L3 only')
+            return list(self._offsets[reservation])
+        reserved = self._reserved_ids()
+        entries = [entry for entry in self._memory[store]
+                   if id(entry) not in reserved and id(entry[0]) not in self._sessions]
+        return entries if self._extraction_mode == 'fifo' else entries[::-1]
+
+    def available_qubits(self, store, reservation=None):
+        return len(self._available_entries(store, reservation))
+
+    def _extract_entry(self, store, index, peek, reservation):
+        index = 0 if index is None else index
+        if index < 0:
+            raise IndexError('Extraction index cannot be negative')
+        entries = self._available_entries(store, reservation)
+        if index >= len(entries):
+            raise ValueError('No available qubit at this index')
+        entry = entries[index]
+        if not peek:
+            position = next(i for i, value in enumerate(self._memory[store]) if value is entry)
+            self._memory[store].pop(position)
+            if reservation is not None:
+                self._offsets[reservation] = [value for value in self._offsets[reservation] if value is not entry]
+        return entry
+
+    def _ready_entries(self) -> list[tuple[Qubit, float]]:
+        """Confirmed raw inputs first, then confirmed improved inputs."""
+        return self._available_entries(L1) + self._available_entries(L3)
+
+    def ready_count(self, reservation: int | None = None) -> int:
+        return len(self._ready_entries() if reservation is None else self._offsets[reservation])
+
+    def ready_layer(self, index: int = 0, reservation: int | None = None) -> int:
+        entries = self._ready_entries() if reservation is None else self._offsets[reservation]
+        entry = entries[index]
+        return next(layer for layer in (L1, L3) if any(value is entry for value in self._memory[layer]))
+
+    def session_layer(self, qubit: Qubit) -> int:
+        return self._sessions[id(qubit)]
+
+    def retrieve_ready(self, time: float, index: int | None = None, reservation: int | None = None) -> Qubit | None:
+        entries = self._ready_entries() if reservation is None else self._offsets[reservation]
+        if not entries:
+            raise ValueError('No confirmed pair available')
+        entry = entries[0 if index is None else index]
+        layer = next(layer for layer in (L1, L3) if any(value is entry for value in self._memory[layer]))
+        if reservation is not None:
+            self._offsets[reservation].remove(entry)
+        position = next(i for i, value in enumerate(self._available_entries(layer)) if value is entry)
+        return self.retrieve_qubit(layer, position, time, False)
+
+    def reserve_session(self, qubit: Qubit, layer: int) -> None:
+        self._sessions[id(qubit)] = layer
+
+    def retrieve_session(self, qubit: Qubit, time: float) -> Qubit | None:
+        layer = self._sessions.pop(id(qubit))
+        index = next(i for i, entry in enumerate(self._available_entries(layer)) if entry[0] is qubit)
+        return self.retrieve_qubit(layer, index, time, False)
+
+    def confirm_session(self, qubit: Qubit) -> None:
+        self.stage_session(qubit, L3)
+
+    def stage_session(self, qubit: Qubit, destination: int) -> None:
+        """Move an owned input while preserving its storage-noise timestamp."""
+        layer = self._sessions[id(qubit)]
+        self.move_selected_qubits(layer, destination, [qubit], [True])
+        self._sessions[id(qubit)] = destination
+
+    def finish_session_operation(self, qubit: Qubit, time: float, layer: int, *, consumed: bool = False) -> None:
+        """Release a consumed slot or timestamp an ideal operation's survivor."""
+        source = self._sessions.pop(id(qubit))
+        index = next(i for i, entry in enumerate(self._memory[source]) if entry[0] is qubit)
+        self._memory[source].pop(index)
+        if consumed:
+            return
+        self.store_qubit(layer, qubit, -1, time)
+        self.reserve_session(qubit, layer)
+
+    def discard_session_qubit(self, qubit: Qubit) -> None:
+        layer = self._sessions.pop(id(qubit))
+        index = next(i for i, entry in enumerate(self._memory[layer]) if entry[0] is qubit)
+        self._memory[layer].pop(index)
+        remove_qubits([qubit])
+
+    def register_generation(self, identifier: int, qubits: list[Qubit]) -> None:
+        if identifier in self._generation_batches:
+            raise ValueError('Duplicate generation batch identifier')
+        self._generation_batches[identifier] = qubits
+        self._tracks_generation = True
+
+    def register_recent_generation(self, identifier: int, count: int) -> None:
+        """Bind inputs just synchronously inserted by a connection model."""
+        if count < 1 or count > len(self._memory[L0]):
+            raise ValueError('Generation count does not match inserted L0 resources')
+        self.register_generation(identifier, [entry[0] for entry in self._memory[L0][-count:]])
+
+    def confirm_generation(self, identifier: int, success: np.ndarray) -> bool | None:
+        qubits = self._generation_batches.pop(identifier, None)
+        if qubits is None:
+            return None if self._tracks_generation else False
+        self.move_selected_qubits(L0, L1, qubits, success)
+        return True
+
+    def move_selected_qubits(self, source, destination, qubits, success):
+        """Confirm one purification batch even when results arrive out of order."""
+        if len(qubits) != len(success):
+            raise ValueError('Selection and result counts differ')
+        entries = []
+        for qubit in qubits:
+            entry = next((entry for entry in self._memory[source] if entry[0] is qubit), None)
+            if entry is None:
+                raise ValueError('Purification survivor is no longer in memory')
+            entries.append(entry)
+        selected = {id(entry) for entry in entries}
+        self._memory[source] = [entry for entry in self._memory[source] if id(entry) not in selected]
+        for keep, (qubit, time) in zip(success, entries):
+            if keep:
+                self.store_qubit(destination, qubit, -1, time)
+            else:
+                remove_qubits([qubit])
+
 class PhysicalQuantumMemory(QuantumMemory):
     
     def __init__(self, model: PQM_Model) -> None:
         super(PhysicalQuantumMemory, self).__init__(model._size, model._extraction_mode, model._efficiency)
         
-        self._errors: List[QuantumError] = model._memory_errors
+        self._errors: List[QuantumError] = deepcopy(model._memory_errors)
         if self._errors is None:
             self._errors = []
     
     def retrieve_qubit(self, _store: int, _index: int, _time: float, _mode: bool, _offset_index: int=None) -> Qubit | None:
     
-        """
-        Retrieves a qubit from the memory
-        
-        Args:
-            _store (int): which store to use
-            _index (int): index of qubit to retrieve
-            _time (float): time of retrieval
-            _offset_index (int): index of the offset
-            
-        Returns:
-            _qubit (Qubit/None): qubit to retrieve
-        """
-    
-        if not self._memory[_store]:
-            raise ValueError('No Qubit in memory')
-        
-        if _index is None:
-            _index = 0
-        
-        _index = self._transform[self._extraction_mode](_index + sum(self._offsets[:_offset_index]))
-        
-        if _mode:
-            _qubit, _store_time = self._memory[_store][_index]
-        else:
-            _qubit, _store_time = self._memory[_store].pop(_index)
-        
-        if np.random.uniform(0, 1) > self._efficiency:
+        _qubit, _store_time = self._extract_entry(_store, _index, _mode, _offset_index)
+        if self.rng.uniform(0, 1) > self._efficiency:
+            remove_qubits([_qubit])
             return None
-        
+
         _diff = _time - _store_time
         if _diff <= 0.:
             return _qubit
-        
+
         for error in self._errors:
             _qubit = error.apply(_qubit, _diff)
-    
+
         return _qubit
     
 class LogicalQuantumMemory(QuantumMemory):
@@ -558,7 +651,7 @@ class LogicalQuantumMemory(QuantumMemory):
         
     def apply_stochastic(self, _qubit: Qubit, p_i: float, p_x: float, p_y: float, p_z: float) -> Qubit:
         
-        num_random = np.random.uniform(0, 1)
+        num_random = self.rng.uniform(0, 1)
         
         if num_random < p_i:
             return _qubit
@@ -575,46 +668,21 @@ class LogicalQuantumMemory(QuantumMemory):
     
     def retrieve_qubit(self, _store: int, _index: int, _time: float, _mode: bool, _offset_index: int=None) -> Qubit | None:
         
-        """
-        Retrieves a qubit from the memory
-        
-        Args:
-            _store (int): which store to use
-            _index (int): index of qubit to retrieve
-            _time (float): time of retrieval
-            _offset_index (int): index of the offset
-            
-        Returns:
-            _qubit (Qubit/None): qubit to retrieve
-        """
-    
-        if not self._memory[_store]:
-            raise ValueError('No Qubit in memory')
-        
-        if _index is None:
-            _index = 0
-        
-        _index = self._transform[self._extraction_mode](_index + sum(self._offsets[:_offset_index]))
-        
-        if _mode:
-            _qubit, _store_time = self._memory[_store][_index]
-        else:
-            _qubit, _store_time = self._memory[_store].pop(_index)
-        
+        _qubit, _store_time = self._extract_entry(_store, _index, _mode, _offset_index)
         e_max = 2 * min(self._x_errors, self._z_errors)
-        
-        if np.random.binomial(n=self._code_length, p=1.0 - self._efficiency) > e_max:
+
+        if self.rng.binomial(n=self._code_length, p=1.0 - self._efficiency) > e_max:
             return None
-        
+
         _diff = _time - _store_time
         if _diff <= 0.:
             return _qubit
-    
+
         p_i, p_x, p_y, p_z = self._compute_pauli_probs(_diff)
-        
+
         for _ in range(int(np.floor(_diff / self._correction_frequency))):
             _qubit = self.apply(_qubit, p_i, p_x, p_y, p_z)
-    
+
         return _qubit
     
 def _binomial_tail(n, q, t):

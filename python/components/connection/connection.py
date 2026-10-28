@@ -8,7 +8,7 @@ from qcns.python.components.hardware.photon_source import *
 from qcns.python.components.hardware.photon_detector import *
 from qcns.python.components.hardware.memory import QuantumMemory
 from qcns.python.components.hardware.connection import *
-from qcns.python.components.packet import Packet
+from qcns.python.components.packet import Packet, L1_SRP, L1_TPSP, L1_BSMP, L1_FSP
 from qcns.python.components.simulation.event import ReceiveEvent
 from qcns.python.components.simulation import Simulation
 
@@ -58,6 +58,17 @@ FOCK_STATE_MODELS = {'perfect': (0., 1., 0., 0.), 'standard': (3.8e-6, 0.9, 0., 
 # fock state model:
 #   standard: Realization of a multinode quantum network of remote solidstate qubits
 
+def _generation_packet(source, destination, requested, needed, request, header_type=L1_SRP):
+    fresh = Packet(source, destination, layer1=header_type(requested, needed))
+    if request is None:
+        return fresh
+    packet = request.copy()
+    packet.request_id = fresh.request_id
+    packet.layer1 = header_type(requested, needed)
+    packet.set_hop(source, destination)
+    return packet
+
+
 class SingleQubitConnection:
     
     """
@@ -104,7 +115,7 @@ class SingleQubitConnection:
 
         self._sim: Simulation = _sim
 
-        self._success_prob: float = self._source._visibility * self._source._pmf[1] * _model._channel_model._in_coupling
+        self._success_prob: float = self._source._visibility * self._source._pmf[1]
 
         if -np.log10(self._success_prob) >= 6:
             raise ValueError('Too low success probability')
@@ -125,11 +136,11 @@ class SingleQubitConnection:
             /
         """
         
-        _sample = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance)
-        qsys = Simulation.create_qsystem(1)
+        _sample = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._source._fidelity_variance, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id))
+        qsys = self._sim.create_qsystem(1)
         qsys._state = self._state + np.array([[_sample, -2 * _sample * self._source._fidelity], [-2 * _sample * self._source._fidelity, -_sample]], dtype=np.complex128)
         q_1 = qsys.qubits
-        self._sender._channels['qc'][self._receiver][SEND].put(q_1, _arrival_time)
+        self._sender._channels['qc'][self._receiver_id][SEND].put(q_1, _arrival_time)
         
     def failure_creation(self, _arrival_time) -> None:
         
@@ -143,7 +154,7 @@ class SingleQubitConnection:
             /
         """
         
-        self._sender._channels['qc'][self._receiver][SEND].put(None, _arrival_time)
+        self._sender._channels['qc'][self._receiver_id][SEND].put(None, _arrival_time)
       
     def attempt_qubit(self, _needed: int=1) -> None:
         
@@ -166,11 +177,11 @@ class SingleQubitConnection:
         if self._num_sources + 1:
             _curr_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._source._duration
         
-        _success_samples = np.random.uniform(0, 1) < self._success_prob
+        _success_samples = self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, _needed) < self._success_prob
         
         for success, _curr_time in zip(_success_samples, _curr_time_samples):
-            self._creation_functions[success](_curr_time + self._channel._sending_time)
-            self._sim.schedule_event(ReceiveEvent(_curr_time + self._channel._sending_time, self._receiver_id))
+            self._creation_functions[success](_curr_time + self._sender._channels['qc'][self._receiver_id][SEND]._propagation_time)
+            self._sim.schedule_event(ReceiveEvent(_curr_time + self._sender._channels['qc'][self._receiver_id][SEND]._propagation_time, self._receiver_id))
             
     def create_qubit(self, _requested: int=1) -> None:
         
@@ -186,12 +197,12 @@ class SingleQubitConnection:
         
         _curr_time = self._sender._time + self._source._duration
         
-        _curr_time_samples = np.zeros(_requested + self._num_sources + 1) + _curr_time
+        _curr_time_samples = np.zeros(_requested + max(1, self._num_sources)) + _curr_time
         _num_successfull = 0
         _current_try = 0
         
         while _num_successfull < _requested and self._num_sources + 1:
-            _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
+            _successes = np.count_nonzero(self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
             _curr_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source._duration
             _num_successfull += _successes
@@ -199,10 +210,23 @@ class SingleQubitConnection:
         _curr_time_samples = _curr_time_samples[:_requested]
         
         for _curr_time in _curr_time_samples:
-            self.success_creation(_curr_time + self._channel._sending_time)
-            self._sim.schedule_event(ReceiveEvent(_curr_time + self._channel._sending_time, self._receiver_id))
+            self.success_creation(_curr_time + self._sender._channels['qc'][self._receiver_id][SEND]._propagation_time)
+            self._sim.schedule_event(ReceiveEvent(_curr_time + self._sender._channels['qc'][self._receiver_id][SEND]._propagation_time, self._receiver_id))
         
-class SenderReceiverConnection:
+class EntanglementConnection:
+    """Nominal link characterization, independent of generated pair outcomes."""
+
+    def estimate_fidelity(self) -> float:
+        """Return conditional Phi+ fidelity of the configured mean output state.
+
+        Includes the source/device/channel model, but excludes subsequent memory
+        storage and realization-specific fluctuations. This is configuration,
+        not a measurement of a generated qubit.
+        """
+        return float(np.trace(B_0 @ self._state).real)
+
+
+class SenderReceiverConnection(EntanglementConnection):
     
     """
     Represents a sender receiver connection
@@ -322,9 +346,9 @@ class SenderReceiverConnection:
         
         _sample = 0
         if self._source_std > 0.:
-            _sample = 4 * sp.stats.truncnorm.rvs(-self._source_fidelity / self._source_std, 1 - self._source_fidelity / self._source_std, loc=0, scale=self._source_std) / 3
+            _sample = 4 * sp.stats.truncnorm.rvs(-self._source_fidelity / self._source_std, 1 - self._source_fidelity / self._source_std, loc=0, scale=self._source_std, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id)) / 3
         
-        qsys = Simulation.create_qsystem(2)
+        qsys = self._sim.create_qsystem(2)
         qsys._state = self._state + self._state_weight * ((4 * self._state_transfer_fidelity - 1) / 3) * _sample * B_I_0
         q_1, q_2 = qsys.qubits
 
@@ -343,12 +367,12 @@ class SenderReceiverConnection:
             /
         """
         
-        q_1 = Simulation.create_qsystem(1).qubits
-        q_2 = Simulation.create_qsystem(1).qubits
+        q_1 = self._sim.create_qsystem(1).qubits
+        q_2 = self._sim.create_qsystem(1).qubits
         self._sender_memory.store_qubit(L0, q_1, -1, _curr_time)
         self._receiver_memory.store_qubit(L0, q_2, -1, _curr_time)
     
-    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1) -> None:
+    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1, *, request=None) -> None:
         
         """
         Attempts to create the needed number of qubits
@@ -361,7 +385,7 @@ class SenderReceiverConnection:
             /
         """
         
-        packet = Packet(self._sender.id, self._receiver_id, _requested, _needed)
+        packet = _generation_packet(self._sender.id, self._receiver_id, _requested, _needed, request)
         
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -372,19 +396,20 @@ class SenderReceiverConnection:
         if self._num_sources + 1:
             _curr_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._source_duration
         
-        _success_samples = np.random.uniform(0, 1, _needed) < self._success_prob
+        _success_samples = self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, _needed) < self._success_prob
         
         for success, _curr_time in zip(_success_samples, _curr_time_samples):
             self._creation_functions[success](_curr_time)
         
+        self._sender_memory.register_recent_generation(packet.request_id, _needed)
+        self._receiver_memory.register_recent_generation(packet.request_id, _needed)
         packet.l1_success = _success_samples
-        packet.l1_protocol = 1
         
         _event = ReceiveEvent(self._sender._time + self._sending_duration + (_num_tries - 1) * self._source_duration, self._receiver_id)
         self._sim.schedule_event(_event)
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet, _event._end_time, _event._event_counter)
     
-    def create_bell_pairs(self, _requested: int=1) -> None:
+    def create_bell_pairs(self, _requested: int=1, *, request=None) -> None:
         
         """
         Creates the number of requested qubits, no matter how long it takes
@@ -396,16 +421,16 @@ class SenderReceiverConnection:
             /
         """
         
-        packet = Packet(self._sender._node_id, self._receiver_id, _requested, _requested)
+        packet = _generation_packet(self._sender.id, self._receiver_id, _requested, _requested, request)
         
         _curr_time = self._sender._time + self._source_duration
         
-        _curr_time_samples = np.zeros(_requested + self._num_sources + 1) + _curr_time
+        _curr_time_samples = np.zeros(_requested + max(1, self._num_sources)) + _curr_time
         _num_successfull = 0
         _current_try = 0
         
         while _num_successfull < _requested and self._num_sources + 1:
-            _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
+            _successes = np.count_nonzero(self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
             _curr_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source_duration
             _num_successfull += _successes
@@ -415,14 +440,15 @@ class SenderReceiverConnection:
         for _curr_time in _curr_time_samples:
             self.success_creation(_curr_time)
         
+        self._sender_memory.register_recent_generation(packet.request_id, _requested)
+        self._receiver_memory.register_recent_generation(packet.request_id, _requested)
         packet.l1_success = np.ones(_requested, dtype=np.bool_)
-        packet.l1_protocol = 1
         
         _event = ReceiveEvent(self._sender._time + self._sending_duration + (_current_try - 1) * self._source_duration, self._receiver_id)
         self._sim.schedule_event(_event)
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet, _event._end_time, _event._event_counter)
         
-class TwoPhotonSourceConnection:
+class TwoPhotonSourceConnection(EntanglementConnection):
     
     """
     Represents a Two Photon Source Connection
@@ -583,9 +609,9 @@ class TwoPhotonSourceConnection:
         
         _sample = 0
         if self._source_std > 0.:
-            _sample = 8 * (4 * self._source_fidelity + 1) * sp.stats.truncnorm.rvs(-self._source_fidelity / self._source_std, 1 - self._source_fidelity / self._source_std, loc=0, scale=self._source_std) / 9
+            _sample = 8 * (4 * self._source_fidelity + 1) * sp.stats.truncnorm.rvs(-self._source_fidelity / self._source_std, 1 - self._source_fidelity / self._source_std, loc=0, scale=self._source_std, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id)) / 9
 
-        qsys = Simulation.create_qsystem(2)
+        qsys = self._sim.create_qsystem(2)
         qsys._state = self._state + self._state_weight * ((4 * self._sender_state_transfer_fidelity - 1) / 3) * ((4 * self._receiver_state_transfer_fidelity - 1) / 3) * _sample * B_I_0
     
         q_1, q_2 = qsys.qubits
@@ -605,12 +631,12 @@ class TwoPhotonSourceConnection:
             /
         """
         
-        q_1 = Simulation.create_qsystem(1).qubits
-        q_2 = Simulation.create_qsystem(1).qubits
+        q_1 = self._sim.create_qsystem(1).qubits
+        q_2 = self._sim.create_qsystem(1).qubits
         self._sender_memory.store_qubit(L0, q_1, -1, _curr_time)
         self._receiver_memory.store_qubit(L0, q_2, -1, _curr_time)
 
-    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1) -> None:
+    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1, *, request=None) -> None:
         
         """
         Attempts to create the needed number of qubits
@@ -623,8 +649,8 @@ class TwoPhotonSourceConnection:
             /
         """
         
-        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _needed)
-        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _needed)
+        packet_s = _generation_packet(self._receiver_id, self._sender.id, _requested, _needed, request, L1_TPSP)
+        packet_r = _generation_packet(self._sender.id, self._receiver_id, _requested, _needed, request, L1_TPSP)
         
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -635,9 +661,9 @@ class TwoPhotonSourceConnection:
         if self._num_sources + 1:
             _curr_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._source_duration
         
-        _success_samples = np.random.uniform(0, 1, _needed) < self._success_prob
+        _success_samples = self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, _needed) < self._success_prob
         
-        _trials = np.random.uniform(0, 1, _needed)
+        _trials = self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, _needed)
         _m_10 = (~_success_samples) & (_trials <  self._p_10)
         _m_01 = (~_success_samples) & (_trials >= self._p_10) & (_trials < self._p_10 + self._p_01)
         
@@ -655,9 +681,10 @@ class TwoPhotonSourceConnection:
         
         packet_s.l1_set_ps()
         packet_r.l1_set_ps()
+        self._sender_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        self._receiver_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        packet_r.request_id = packet_s.request_id
         packet_r.l1_set_ack()
-        packet_s.l1_protocol = 2
-        packet_r.l1_protocol = 2
         
         _send_event = ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._source_duration, self._sender.id)
         _recv_event = ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._source_duration, self._receiver_id)
@@ -666,7 +693,7 @@ class TwoPhotonSourceConnection:
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet_r, _recv_event._end_time, _recv_event._event_counter)
         self._sender._channels['pc'][self._receiver_id][RECEIVE].put(packet_s, _send_event._end_time, _send_event._event_counter)
 
-    def create_bell_pairs(self, _requested: int=1):
+    def create_bell_pairs(self, _requested: int=1, *, request=None):
         
         """
         Creates the number of requested qubits, no matter how long it takes
@@ -678,19 +705,17 @@ class TwoPhotonSourceConnection:
             /
         """
         
-        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _requested)
-        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _requested)
+        packet_s = _generation_packet(self._receiver_id, self._sender.id, _requested, _requested, request, L1_TPSP)
+        packet_r = _generation_packet(self._sender.id, self._receiver_id, _requested, _requested, request, L1_TPSP)
         
         _curr_time = self._sender._time + self._source_duration
         
-        _curr_time_samples = np.zeros(_requested + self._num_sources + 1) + _curr_time
+        _curr_time_samples = np.zeros(_requested + max(1, self._num_sources)) + _curr_time
         _num_successfull = 0
         _current_try = 0
         
         while _num_successfull < _requested and self._num_sources + 1:
-            _sender_successes = np.random.uniform(0, 1, self._num_sources) < self._sender_success_prob
-            _receiver_successes = np.random.uniform(0, 1, self._num_sources) < self._receiver_success_prob
-            _successes = np.count_nonzero(np.logical_and(_sender_successes, _receiver_successes))
+            _successes = np.count_nonzero(self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
             _curr_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source_duration
             _num_successfull += _successes
@@ -705,9 +730,10 @@ class TwoPhotonSourceConnection:
         
         packet_s.l1_set_ps()
         packet_r.l1_set_ps()
+        self._sender_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        self._receiver_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        packet_r.request_id = packet_s.request_id
         packet_r.l1_set_ack()
-        packet_s.l1_protocol = 2
-        packet_r.l1_protocol = 2
         
         _send_event = ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_current_try - 1) * self._source_duration, self._sender.id)
         _recv_event = ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._source_duration, self._receiver_id)
@@ -716,7 +742,7 @@ class TwoPhotonSourceConnection:
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet_r, _recv_event._end_time, _recv_event._event_counter)
         self._sender._channels['pc'][self._receiver_id][RECEIVE].put(packet_s, _send_event._end_time, _send_event._event_counter)
 
-class BellStateMeasurementConnection:
+class BellStateMeasurementConnection(EntanglementConnection):
     
     """
     Represents a Bell State Measurement Connection
@@ -951,14 +977,14 @@ class BellStateMeasurementConnection:
         
         _sender_sample = 0
         if self._sender_std > 0.:
-            _sender_sample = 4 * sp.stats.truncnorm.rvs(-self._sender_fidelity / self._sender_std, 1 - self._sender_fidelity / self._sender_std, loc=0, scale=self._sender_std) / 3
+            _sender_sample = 4 * sp.stats.truncnorm.rvs(-self._sender_fidelity / self._sender_std, 1 - self._sender_fidelity / self._sender_std, loc=0, scale=self._sender_std, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id)) / 3
             
         _receiver_sample = 0
         if self._receiver_std > 0.:
-            _receiver_sample = 4 * sp.stats.truncnorm.rvs(-self._receiver_fidelity / self._receiver_std, 1 - self._receiver_fidelity / self._receiver_std, loc=0, scale=self._receiver_std) / 3
+            _receiver_sample = 4 * sp.stats.truncnorm.rvs(-self._receiver_fidelity / self._receiver_std, 1 - self._receiver_fidelity / self._receiver_std, loc=0, scale=self._receiver_std, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id)) / 3
         _sample = self._sender_depol * _receiver_sample + self._receiver_depol * _sender_sample + _sender_sample * _receiver_sample
         
-        qsys = Simulation.create_qsystem(2)
+        qsys = self._sim.create_qsystem(2)
         qsys._state = self._state + self._state_weight * _sample * B_I_0
         
         q_1, q_2 = qsys.qubits
@@ -979,12 +1005,12 @@ class BellStateMeasurementConnection:
             /
         """
     
-        q_1 = Simulation.create_qsystem(1).qubits
-        q_2 = Simulation.create_qsystem(1).qubits
+        q_1 = self._sim.create_qsystem(1).qubits
+        q_2 = self._sim.create_qsystem(1).qubits
         self._sender_memory.store_qubit(L0, q_1, -1, _sender_time)
         self._receiver_memory.store_qubit(L0, q_2, -1, _receiver_time)
     
-    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1) -> None:
+    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1, *, request=None) -> None:
         
         """
         Attempts to create the number of needed qubits
@@ -997,8 +1023,8 @@ class BellStateMeasurementConnection:
             /
         """
         
-        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _needed)
-        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _needed)
+        packet_s = _generation_packet(self._receiver_id, self._sender.id, _requested, _needed, request, L1_BSMP)
+        packet_r = _generation_packet(self._sender.id, self._receiver_id, _requested, _needed, request, L1_BSMP)
 
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -1014,7 +1040,7 @@ class BellStateMeasurementConnection:
             _sender_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._sender_source_duration
             _receiver_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._receiver_source_duration
         
-        _success_samples = np.random.uniform(0, 1, _needed) < self._success_prob
+        _success_samples = self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, _needed) < self._success_prob
         
         for success, _sender_time, _receiver_time in zip(_success_samples, _sender_time_samples, _receiver_time_samples):
             self._creation_functions[success](_sender_time, _receiver_time)
@@ -1022,9 +1048,10 @@ class BellStateMeasurementConnection:
         packet_s.l1_success = _success_samples
         packet_r.l1_success = _success_samples
         
+        self._sender_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        self._receiver_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        packet_r.request_id = packet_s.request_id
         packet_r.l1_set_ack()
-        packet_s.l1_protocol = 3
-        packet_r.l1_protocol = 3
         
         _send_event = ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender.id)
         _recv_event = ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver_id)
@@ -1033,7 +1060,7 @@ class BellStateMeasurementConnection:
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet_r, _recv_event._end_time, _recv_event._event_counter)
         self._sender._channels['pc'][self._receiver_id][RECEIVE].put(packet_s, _send_event._end_time, _send_event._event_counter)
     
-    def create_bell_pairs(self, _requested: int=1) -> None:
+    def create_bell_pairs(self, _requested: int=1, *, request=None) -> None:
         
         """
         Creates the number of requested qubits, no matter how long it takes
@@ -1045,20 +1072,20 @@ class BellStateMeasurementConnection:
             /
         """
         
-        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _requested)
-        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _requested)
+        packet_s = _generation_packet(self._receiver_id, self._sender.id, _requested, _requested, request, L1_BSMP)
+        packet_r = _generation_packet(self._sender.id, self._receiver_id, _requested, _requested, request, L1_BSMP)
         
         _sender_time = self._sender._time + self._sender_source_duration
         _receiver_time = self._sender._time + self._receiver_source_duration
         
-        _sender_time_samples = np.zeros(_requested + self._num_sources + 1) + _sender_time
-        _receiver_time_samples = np.zeros(_requested + self._num_sources + 1) + _receiver_time
+        _sender_time_samples = np.zeros(_requested + max(1, self._num_sources)) + _sender_time
+        _receiver_time_samples = np.zeros(_requested + max(1, self._num_sources)) + _receiver_time
         
         _num_successfull = 0
         _current_try = 0
         
         while _num_successfull < _requested and self._num_sources + 1:
-            _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
+            _successes = np.count_nonzero(self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
             _sender_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._sender_source_duration
             _receiver_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._receiver_source_duration
@@ -1073,9 +1100,10 @@ class BellStateMeasurementConnection:
         packet_s.l1_success = np.ones(_requested, dtype=np.bool_)
         packet_r.l1_success = np.ones(_requested, dtype=np.bool_)
         
+        self._sender_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        self._receiver_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        packet_r.request_id = packet_s.request_id
         packet_r.l1_set_ack()
-        packet_s.l1_protocol = 3
-        packet_r.l1_protocol = 3
     
         _send_event = ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender.id)
         _recv_event = ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver_id)
@@ -1084,7 +1112,7 @@ class BellStateMeasurementConnection:
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet_r, _recv_event._end_time, _recv_event._event_counter)
         self._sender._channels['pc'][self._receiver_id][RECEIVE].put(packet_s, _send_event._end_time, _send_event._event_counter)
     
-class FockStateConnection:
+class FockStateConnection(EntanglementConnection):
     
     """
     Represents a Fock state connection
@@ -1353,15 +1381,15 @@ class FockStateConnection:
         
         _sample_sender = 0
         if self._sender_std > 0.:
-            _sample_sender = 4 * sp.stats.truncnorm.rvs(-self._sender_alpha / self._sender_std, 1 - self._sender_alpha / self._sender_std, loc=0, scale=self._sender_std) / 3
+            _sample_sender = 4 * sp.stats.truncnorm.rvs(-self._sender_alpha / self._sender_std, 1 - self._sender_alpha / self._sender_std, loc=0, scale=self._sender_std, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id)) / 3
             
         _sample_receiver = 0
         if self._receiver_std > 0.:
-            _sample_receiver = 4 * sp.stats.truncnorm.rvs(-self._receiver_alpha / self._receiver_std, 1 - self._receiver_alpha / self._receiver_std, loc=0, scale=self._receiver_std) / 3
+            _sample_receiver = 4 * sp.stats.truncnorm.rvs(-self._receiver_alpha / self._receiver_std, 1 - self._receiver_alpha / self._receiver_std, loc=0, scale=self._receiver_std, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id)) / 3
         
         _depol = self._spin_photon_correlation * self._state_weight * (self._sender_depol * _sample_receiver + self._receiver_depol * _sample_sender + _sample_sender * _sample_receiver)
         
-        qsys = Simulation.create_qsystem(2)
+        qsys = self._sim.create_qsystem(2)
         qsys._state = self._state + _depol * B_I_0
         
         q_1, q_2 = qsys.qubits
@@ -1382,12 +1410,12 @@ class FockStateConnection:
             /
         """
         
-        q_1 = Simulation.create_qsystem(1).qubits
-        q_2 = Simulation.create_qsystem(1).qubits
+        q_1 = self._sim.create_qsystem(1).qubits
+        q_2 = self._sim.create_qsystem(1).qubits
         self._sender_memory.store_qubit(L0, q_1, -1, _sender_time)
         self._receiver_memory.store_qubit(L0, q_2, -1, _receiver_time)
     
-    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1) -> None:
+    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1, *, request=None) -> None:
         
         """
         Attempts to create the needed number of qubits
@@ -1400,8 +1428,8 @@ class FockStateConnection:
             /
         """
         
-        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _needed)
-        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _needed)
+        packet_s = _generation_packet(self._receiver_id, self._sender.id, _requested, _needed, request, L1_FSP)
+        packet_r = _generation_packet(self._sender.id, self._receiver_id, _requested, _needed, request, L1_FSP)
 
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
@@ -1417,7 +1445,7 @@ class FockStateConnection:
             _sender_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._sender_source_duration
             _receiver_time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._receiver_source_duration
         
-        _success_samples = np.random.uniform(0, 1, _needed) < self._success_prob
+        _success_samples = self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, _needed) < self._success_prob
         
         for success, _sender_time, _receiver_time in zip(_success_samples, _sender_time_samples, _receiver_time_samples):
             self._creation_functions[success](_sender_time, _receiver_time)
@@ -1425,9 +1453,10 @@ class FockStateConnection:
         packet_s.l1_success = _success_samples
         packet_r.l1_success = _success_samples
         
+        self._sender_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        self._receiver_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        packet_r.request_id = packet_s.request_id
         packet_r.l1_set_ack()
-        packet_s.l1_protocol = 4
-        packet_r.l1_protocol = 4
         
         _send_event = ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_num_tries - 1) * self._sender_source_duration, self._sender.id)
         _recv_event = ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_num_tries - 1) * self._receiver_source_duration, self._receiver_id)
@@ -1436,7 +1465,7 @@ class FockStateConnection:
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet_r, _recv_event._end_time, _recv_event._event_counter)
         self._sender._channels['pc'][self._receiver_id][RECEIVE].put(packet_s, _send_event._end_time, _send_event._event_counter)
 
-    def create_bell_pairs(self, _requested: int=1) -> None:
+    def create_bell_pairs(self, _requested: int=1, *, request=None) -> None:
         
         """
         Creates the number of requested qubits, no matter how long it takes
@@ -1448,20 +1477,20 @@ class FockStateConnection:
             /
         """
         
-        packet_s = Packet(self._receiver_id, self._sender.id, _requested, _requested)
-        packet_r = Packet(self._sender.id, self._receiver_id, _requested, _requested)
+        packet_s = _generation_packet(self._receiver_id, self._sender.id, _requested, _requested, request, L1_FSP)
+        packet_r = _generation_packet(self._sender.id, self._receiver_id, _requested, _requested, request, L1_FSP)
         
         _sender_time = self._sender._time + self._sender_source_duration
         _receiver_time = self._sender._time + self._receiver_source_duration
         
-        _sender_time_samples = np.zeros(_requested + self._num_sources + 1) + _sender_time
-        _receiver_time_samples = np.zeros(_requested + self._num_sources + 1) + _receiver_time
+        _sender_time_samples = np.zeros(_requested + max(1, self._num_sources)) + _sender_time
+        _receiver_time_samples = np.zeros(_requested + max(1, self._num_sources)) + _receiver_time
         
         _num_successfull = 0
         _current_try = 0
         
         while _num_successfull < _requested and self._num_sources + 1:
-            _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
+            _successes = np.count_nonzero(self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
             _sender_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._sender_source_duration
             _receiver_time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._receiver_source_duration
@@ -1476,9 +1505,10 @@ class FockStateConnection:
         packet_s.l1_success = np.ones(_requested, dtype=np.bool_)
         packet_r.l1_success = np.ones(_requested, dtype=np.bool_)
         
+        self._sender_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        self._receiver_memory.register_recent_generation(packet_s.request_id, len(packet_s.l1_success))
+        packet_r.request_id = packet_s.request_id
         packet_r.l1_set_ack()
-        packet_s.l1_protocol = 4
-        packet_r.l1_protocol = 4
         
         _send_event = ReceiveEvent(self._sender._time + self._total_duration + self._sender_duration + (_current_try - 1) * self._sender_source_duration, self._sender.id)
         _recv_event = ReceiveEvent(self._sender._time + self._total_duration + self._receiver_duration + (_current_try - 1) * self._receiver_source_duration, self._receiver_id)
@@ -1487,7 +1517,7 @@ class FockStateConnection:
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet_r, _recv_event._end_time, _recv_event._event_counter)
         self._sender._channels['pc'][self._receiver_id][RECEIVE].put(packet_s, _send_event._end_time, _send_event._event_counter)
         
-class L3Connection:
+class L3Connection(EntanglementConnection):
     
     """
     Represents a Layer 3 connection
@@ -1546,7 +1576,7 @@ class L3Connection:
         
         self._creation_functions = {0: self.failure_creation, 1: self.success_creation}
         
-    def success_creation(self, _time: float) -> None:
+    def success_creation(self, _time: float, *, layer: int = L1) -> tuple:
         
         """
         Sucessful creation of entanglement
@@ -1558,16 +1588,19 @@ class L3Connection:
             /
         """
         
-        _sample = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._fidelity_variance)
+        _sample = 0.0
+        if self._fidelity_variance != 0.0:
+            _sample = sp.stats.truncnorm.rvs(-1, 1, loc=0, scale=self._fidelity_variance, random_state=self._sim.rng('connection', self._sender.id, self._receiver_id))
         
-        qsys = Simulation.create_qsystem(2)
+        qsys = self._sim.create_qsystem(2)
         qsys._state = self._state + (4 * _sample) / 3 * B_I_0
         q_1, q_2 = qsys.qubits
         
-        self._sender_memory.store_qubit(L3, q_1, -1, _time)
-        self._receiver_memory.store_qubit(L3, q_2, -1, _time)
+        self._sender_memory.store_qubit(layer, q_1, -1, _time)
+        self._receiver_memory.store_qubit(layer, q_2, -1, _time)
+        return q_1, q_2
     
-    def failure_creation(self, _time: float) -> None:
+    def failure_creation(self, _time: float, *, layer: int = L0) -> tuple:
         
         """
         Unsuccessful creation of qubits
@@ -1579,10 +1612,13 @@ class L3Connection:
             /
         """
         
-        q_1 = Simulation.create_qsystem(1).qubits
-        self._receiver_memory.store_qubit(L3, q_1, -1, _time)
+        q_1 = self._sim.create_qsystem(1).qubits
+        q_2 = self._sim.create_qsystem(1).qubits
+        self._sender_memory.store_qubit(layer, q_1, -1, _time)
+        self._receiver_memory.store_qubit(layer, q_2, -1, _time)
+        return q_1, q_2
     
-    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1) -> None:
+    def attempt_bell_pairs(self, _requested: int=1, _needed: int=1, *, request=None) -> None:
         
         """
         Attempt the number of bell pairs
@@ -1595,28 +1631,31 @@ class L3Connection:
             /
         """
         
-        packet = Packet(self._sender.id, self._receiver_id, _requested, _needed)
+        packet = _generation_packet(self._sender.id, self._receiver_id, _requested, _needed, request)
 
         _num_tries = 1
         if self._num_sources + 1 and self._num_sources < _needed:
             _num_tries = int(np.ceil(_needed / self._num_sources))
 
         _time_samples = np.zeros(_needed) + self._sender._time + self._propagation_time
-        _success_samples = np.random.uniform(0, 1, _needed) < self._success_prob
+        _success_samples = self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, _needed) < self._success_prob
         
         if self._num_sources + 1:
             _time_samples += np.repeat(np.arange(1, _num_tries + 1).reshape(-1, 1), self._num_sources, axis=1).flatten()[:_needed] * self._source_duration
         
-        for success, _time_sample in zip(_success_samples, _time_samples):
-            self._creation_functions[success](_time_sample)
+        if self._num_sources == -1:
+            _time_samples += self._source_duration
+        pairs = [self._creation_functions[success](time, layer=L0)
+                 for success, time in zip(_success_samples, _time_samples)]
+        self._register_batch(packet.request_id, pairs)
         
         packet.l1_success = _success_samples
         
-        _event = ReceiveEvent(self._sender._time + self._propagation_time + (_num_tries - 1) * self._source_duration, self._receiver_id)
+        _event = ReceiveEvent(float(_time_samples.max()), self._receiver_id)
         self._sim.schedule_event(_event)
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet, _event._end_time, _event._event_counter)
     
-    def create_bell_pairs(self, _requested: int=1) -> None:
+    def create_bell_pairs(self, _requested: int=1, *, request=None) -> None:
         
         """
         Creates the number of requested qubits
@@ -1628,26 +1667,34 @@ class L3Connection:
             /
         """
         
-        packet = Packet(self._sender.id, self._receiver_id, _requested, _requested)
+        if self._success_prob <= 0:
+            raise ValueError("Cannot create pairs with zero generation success probability")
+        packet = _generation_packet(self._sender.id, self._receiver_id, _requested, _requested, request)
         
-        _time_samples = np.zeros(_requested + self._num_sources + 1) + self._sender._time + self._propagation_time
+        _time_samples = np.zeros(_requested + max(1, self._num_sources)) + self._sender._time + self._propagation_time
         
         _num_successfull = 0
         _current_try = 0
         
         while _num_successfull < _requested and self._num_sources + 1:
-            _successes = np.count_nonzero(np.random.uniform(0, 1, self._num_sources) < self._success_prob)
+            _successes = np.count_nonzero(self._sim.rng('connection', self._sender.id, self._receiver_id).uniform(0, 1, self._num_sources) < self._success_prob)
             _current_try += 1
             _time_samples[_num_successfull:_num_successfull + _successes] += _current_try * self._source_duration
             _num_successfull += _successes
         
         _time_samples = _time_samples[:_requested]
         
-        for _time_sample in _time_samples:
-            self.success_creation(_time_sample)
+        if self._num_sources == -1:
+            _time_samples += self._source_duration
+        pairs = [self.success_creation(time, layer=L0) for time in _time_samples]
+        self._register_batch(packet.request_id, pairs)
         
         packet.l1_success = np.ones(_requested, dtype=np.bool_)
         
-        _event = ReceiveEvent(self._sender._time + self._propagation_time + (_current_try - 1) * self._source_duration, self._receiver_id)
+        _event = ReceiveEvent(float(_time_samples.max()), self._receiver_id)
         self._sim.schedule_event(_event)
         self._sender._channels['pc'][self._receiver_id][SEND].put(packet, _event._end_time, _event._event_counter)
+
+    def _register_batch(self, identifier: int, pairs: list[tuple]) -> None:
+        self._sender_memory.register_generation(identifier, [pair[0] for pair in pairs])
+        self._receiver_memory.register_generation(identifier, [pair[1] for pair in pairs])

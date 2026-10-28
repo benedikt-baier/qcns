@@ -1,3 +1,6 @@
 
 **/__pycache__/**
 **/*.log
+**/tests/**
+**/benchmarks/**
+native/qmath/build/

@@ -1,6 +1,6 @@
 import numpy as np
 
-from qcns.python.components.qubit.qubit import Qubit, dot, get_single_operator
+from qcns.python.components.qubit.qubit import Qubit
 
 __all__ = ['DepolarizationError', 'DephasingError', 'DepolarizationDephasingError', 'RandomDepolarizationError', 'RandomDephasingError', 'RandomError', 'SystematicDepolarizationError', 'SystematicDephasingError', 'SystematicError', 'pauli_error']
 
@@ -11,7 +11,7 @@ full_gates = {'P0': np.array([[1, 0], [0, 0]], dtype=np.complex128),
               'Y': np.array([[0, -1j], [1j, 0]], dtype=np.complex128),
               'Z': np.array([[1, 0], [0, -1]], dtype=np.complex128)}
 
-class DepolarizationError:
+class AmplitudeDampingError:
     
     """
     Represents a Depolarization Error
@@ -49,15 +49,41 @@ class DepolarizationError:
             /
         """
         
-        depolar_prob = np.exp(-_time / self._depolar_time)
-        gate_e0 = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
-        gate_e1 = np.sqrt(1 - depolar_prob) * full_gates['P01']
-        
-        gate_e0 = get_single_operator('', gate_e0, _qubit._index, _qubit.num_qubits)
-        gate_e1 = get_single_operator('', gate_e1, _qubit._index, _qubit.num_qubits)
-        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
+        probability = 1 - np.exp(-_time / self._depolar_time)
+        _qubit.state = _qubit.qsystem.backend.amplitude_damping(_qubit.state, _qubit._index, probability)
         
         return _qubit
+
+class DepolarizationError(AmplitudeDampingError):
+    """Legacy name for amplitude damping; retained for existing experiments.
+
+    Use DepolarizingError for the isotropic, unital Pauli channel.
+    """
+
+
+class DepolarizingError:
+    """Local isotropic noise: Bloch-vector contraction exp(-elapsed/time).
+
+    Applies I with probability (1+3*exp(-t/T))/4 and each nonidentity
+    Pauli with (1-exp(-t/T))/4, including on entangled inputs.
+    """
+
+    def __init__(self, depolar_time: float = 1e-3) -> None:
+        if np.isnan(depolar_time) or depolar_time <= 0:
+            raise ValueError('depolar_time must be positive')
+        self.depolar_time = depolar_time
+
+    def apply(self, qubit: Qubit, elapsed: float) -> Qubit:
+        if not np.isfinite(elapsed) or elapsed < 0:
+            raise ValueError('Noise elapsed time must be finite and nonnegative')
+        contraction = np.exp(-elapsed / self.depolar_time)
+        probability = (1 - contraction) / 4
+        qubit.state = qubit.qsystem.backend.depolarizing(qubit.state, qubit._index, 3 * probability)
+        return qubit
+
+
+__all__ += ['AmplitudeDampingError', 'DepolarizingError']
+
 
 class DephasingError:
     
@@ -98,11 +124,7 @@ class DephasingError:
         """
         
         dephase_prob = 0.5 * (1 - np.exp(-_time / self._dephase_time))
-        dephase_prob_inv = 1 - dephase_prob
-         
-        key = f's_z_{_qubit.num_qubits}_{_qubit._index}'
-        gate_z = get_single_operator(key, full_gates['Z'], _qubit._index, _qubit.num_qubits)
-        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
+        _qubit.state = _qubit.qsystem.backend.dephasing(_qubit.state, _qubit._index, dephase_prob)
         
         return _qubit
 
@@ -154,23 +176,19 @@ class DepolarizationDephasingError:
 
         depolar_prob = np.exp(-_time / self._depolar_time)
         
-        gate_e0 = full_gates['P0'] + np.sqrt(depolar_prob) * full_gates['P1']
-        gate_e1 = np.sqrt(1 - depolar_prob) * full_gates['P01']
-        
         dephase_prob = 0.5 * (1 - np.exp(-_time * (1/self._dephase_time - 1/(2 * self._depolar_time))))
-        dephase_prob_inv = 1 - dephase_prob
-        
-        key = f's_z_{_qubit.num_qubits}_{_qubit._index}'
-        gate_e0 = get_single_operator('', gate_e0, _qubit._index, _qubit.num_qubits)
-        gate_e1 = get_single_operator('', gate_e1, _qubit._index, _qubit.num_qubits)
-        gate_z = get_single_operator(key, full_gates['Z'], _qubit._index, _qubit.num_qubits)
-        
-        _qubit.state = dot(_qubit.state, gate_e0) + dot(_qubit.state, gate_e1)
-        _qubit.state = dephase_prob_inv * _qubit.state + dephase_prob * dot(_qubit.state, gate_z)
+        backend = _qubit.qsystem.backend
+        _qubit.state = backend.amplitude_damping(_qubit.state, _qubit._index, 1 - depolar_prob)
+        _qubit.state = backend.dephasing(_qubit.state, _qubit._index, dephase_prob)
         
         return _qubit
         
-class RandomDepolarizationError:
+class _SampledNoise:
+    def bind_rng(self, rng: np.random.Generator) -> None:
+        self._rng = rng
+
+
+class RandomDepolarizationError(_SampledNoise):
     
     """
     Represents a Random Depolarization Error
@@ -179,7 +197,7 @@ class RandomDepolarizationError:
         _variance (float): variance of normally distributed angles
     """
     
-    def __init__(self, variance: float) -> None:
+    def __init__(self, variance: float, *, rng: np.random.Generator | None = None) -> None:
         
         """
         Initializes a Random Depolarization Error
@@ -190,6 +208,7 @@ class RandomDepolarizationError:
         Returns:
             /
         """
+        self._rng = np.random.default_rng() if rng is None else rng
         
         self._variance: float = variance
     
@@ -205,12 +224,12 @@ class RandomDepolarizationError:
             /
         """
 
-        theta = np.random.normal(0, self._variance)
+        theta = self._rng.normal(0, self._variance)
         _qubit.Rx(theta)
         
         return _qubit    
             
-class RandomDephasingError:
+class RandomDephasingError(_SampledNoise):
     
     """
     Represents a Random Dephasing Error
@@ -219,7 +238,7 @@ class RandomDephasingError:
         _variance (float): variance of normally distributed angles
     """
     
-    def __init__(self, variance: float) -> None:
+    def __init__(self, variance: float, *, rng: np.random.Generator | None = None) -> None:
         
         """
         Initializes a Random Dephasing Error
@@ -230,6 +249,7 @@ class RandomDephasingError:
         Returns:
             /
         """
+        self._rng = np.random.default_rng() if rng is None else rng
         
         self._variance: float = variance
     
@@ -245,12 +265,12 @@ class RandomDephasingError:
             /
         """
         
-        theta = np.random.normal(0, self._variance)
+        theta = self._rng.normal(0, self._variance)
         _qubit.Rz(theta)
         
         return _qubit
             
-class RandomError:
+class RandomError(_SampledNoise):
     
     """
     Represents a Random Error
@@ -259,7 +279,7 @@ class RandomError:
         _variance (float): variance of normally distributed angles
     """
     
-    def __init__(self, x_variance: float, z_variance: float) -> None:
+    def __init__(self, x_variance: float, z_variance: float, *, rng: np.random.Generator | None = None) -> None:
         
         """
         Initializes a Random Error
@@ -271,6 +291,7 @@ class RandomError:
         Returns:
             /
         """
+        self._rng = np.random.default_rng() if rng is None else rng
         
         self._x_variance: float = x_variance
         self._z_variance: float = z_variance
@@ -287,8 +308,8 @@ class RandomError:
             /
         """
 
-        theta_x = np.random.normal(0, self._x_variance)
-        theta_z = np.random.normal(0, self._z_variance)
+        theta_x = self._rng.normal(0, self._x_variance)
+        theta_z = self._rng.normal(0, self._z_variance)
         _qubit.Rx(theta_x)
         _qubit.Rz(theta_z)
         
@@ -302,7 +323,7 @@ class SystematicDepolarizationError:
     _theta (float): depolarization angle
     """
     
-    def __init__(self, variance: float) -> None:
+    def __init__(self, variance: float, *, rng: np.random.Generator | None = None) -> None:
         
         """
         Initializes a Systematic Depolarization Error
@@ -313,8 +334,9 @@ class SystematicDepolarizationError:
         Returns:
             /
         """
+        self._rng = np.random.default_rng() if rng is None else rng
         
-        self._theta: float = np.random.normal(0, variance)
+        self._theta: float = self._rng.normal(0, variance)
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -341,7 +363,7 @@ class SystematicDephasingError:
         _theta (float): dephasing angle
     """
     
-    def __init__(self, variance: float) -> None:
+    def __init__(self, variance: float, *, rng: np.random.Generator | None = None) -> None:
         
         """
         Initializes a Systematic Dephasing Error
@@ -352,8 +374,9 @@ class SystematicDephasingError:
         Returns:
             /
         """
+        self._rng = np.random.default_rng() if rng is None else rng
         
-        self._theta: float = np.random.normal(0, variance)
+        self._theta: float = self._rng.normal(0, variance)
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -380,7 +403,7 @@ class SystematicError:
     _theta_z (float): dephasing angle
     """
 
-    def __init__(self, x_variance: float, z_variance: float) -> None:
+    def __init__(self, x_variance: float, z_variance: float, *, rng: np.random.Generator | None = None) -> None:
         
         """
         Initializes a Systematic Error
@@ -392,9 +415,10 @@ class SystematicError:
         Returns:
             /
         """
+        self._rng = np.random.default_rng() if rng is None else rng
         
-        self._theta_x: float = np.random.normal(0, x_variance)
-        self._theta_z: float = np.random.normal(0, z_variance)
+        self._theta_x: float = self._rng.normal(0, x_variance)
+        self._theta_z: float = self._rng.normal(0, z_variance)
     
     def apply(self, _qubit: Qubit, _time: float=None) -> None:
         
@@ -419,10 +443,10 @@ def pauli_error(_qubit: Qubit, p_i: float, p_x: float, p_y: float, p_z: float) -
     key_y = f's_y_{_qubit.num_qubits}_{_qubit._index}'
     key_z = f's_z_{_qubit.num_qubits}_{_qubit._index}'
     
-    gate_x = get_single_operator(key_x, full_gates['X'], _qubit._index, _qubit.num_qubits)    
-    gate_y = get_single_operator(key_y, full_gates['Y'], _qubit._index, _qubit.num_qubits)
-    gate_z = get_single_operator(key_z, full_gates['Z'], _qubit._index, _qubit.num_qubits)
-    
-    _qubit.state = p_i * _qubit.state + p_x * dot(_qubit.state, gate_x) + p_y * dot(_qubit.state, gate_y) + p_z * dot(_qubit.state, gate_z)
+    backend = _qubit.qsystem.backend
+    x_state = backend.single(_qubit.state, full_gates['X'], _qubit._index, key=key_x)
+    y_state = backend.single(_qubit.state, full_gates['Y'], _qubit._index, key=key_y)
+    z_state = backend.single(_qubit.state, full_gates['Z'], _qubit._index, key=key_z)
+    _qubit.state = p_i * _qubit.state + p_x * x_state + p_y * y_state + p_z * z_state
     
     return _qubit

@@ -1,348 +1,199 @@
-from re import sub, findall
-import itertools as it
-import json as js
+"""Safe experiment persistence and general simulator utilities."""
+from __future__ import annotations
 
-import numpy as np
-from numpy import pi
+import ast
+import itertools
+import json
+import os
+from pathlib import Path
+import platform
+import tempfile
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Any
+
 import networkx as nx
-import scipy.sparse as sp
+import numpy as np
 
-from typing import List, Dict, Tuple, Any
+__all__ = ['get_measure_dict', 'save_config', 'load_config', 'parameter_sweep',
+           'experiment_metadata']
+PathLike = str | os.PathLike[str]
+NetworkConfig = tuple[nx.Graph, int, int, dict | None, str | None, np.ndarray | None, str]
 
-from qcns.python.components.qubit import combine_gates
-from qcns.python.components.network.node import Node
+def _encode(value: Any) -> Any:
+    """Tag mappings as well as special values to avoid reserved-key collisions."""
+    if isinstance(value, np.ndarray):
+        if value.dtype.kind not in 'biufcUS':
+            raise TypeError(f'Unsupported array dtype: {value.dtype}; use numeric or string arrays.')
+        return {'type': 'array', 'dtype': value.dtype.str, 'shape': list(value.shape),
+                'data': _encode(value.tolist())}
+    if isinstance(value, np.generic):
+        return _encode(value.item())
+    if isinstance(value, complex):
+        return {'type': 'complex', 'real': value.real, 'imag': value.imag}
+    if isinstance(value, Path):
+        return {'type': 'path', 'value': str(value)}
+    if isinstance(value, nx.Graph):
+        edges = list(value.edges(keys=True, data=True)) if value.is_multigraph() else list(value.edges(data=True))
+        return {'type': 'graph', 'directed': value.is_directed(), 'multi': value.is_multigraph(),
+                'attributes': _encode(value.graph), 'nodes': _encode(list(value.nodes(data=True))),
+                'edges': _encode(edges)}
+    if isinstance(value, Mapping):
+        return {'type': 'mapping', 'items': [[_encode(k), _encode(v)] for k, v in value.items()]}
+    if isinstance(value, tuple):
+        return {'type': 'tuple', 'items': [_encode(v) for v in value]}
+    if isinstance(value, list):
+        return [_encode(v) for v in value]
+    if value is None or isinstance(value, (str, bool, int, float)):
+        return value
+    raise TypeError(f'Cannot save {type(value).__name__}; describe it using configuration values.')
 
-class Qubit:
-    pass
+def _decode(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_decode(v) for v in value]
+    if not isinstance(value, dict):
+        return value
+    kind = value.get('type')
+    if kind == 'mapping':
+        return {_decode(k): _decode(v) for k, v in value['items']}
+    if kind == 'tuple':
+        return tuple(_decode(v) for v in value['items'])
+    if kind == 'path':
+        return Path(value['value'])
+    if kind == 'complex':
+        return complex(value['real'], value['imag'])
+    if kind == 'array':
+        dtype = np.dtype(value['dtype'])
+        if dtype.kind not in 'biufcUS':
+            raise ValueError(f'Unsupported array dtype: {dtype}')
+        return np.asarray(_decode(value['data']), dtype=dtype).reshape(value['shape'])
+    if kind == 'graph':
+        classes = {(False, False): nx.Graph, (True, False): nx.DiGraph,
+                   (False, True): nx.MultiGraph, (True, True): nx.MultiDiGraph}
+        graph = classes[value['directed'], value['multi']]()
+        graph.graph.update(_decode(value['attributes']))
+        graph.add_nodes_from(_decode(value['nodes']))
+        graph.add_edges_from(_decode(value['edges']))
+        return graph
+    raise ValueError(f'Unknown configuration value type: {kind!r}')
 
-__all__ = ['get_measure_dict', 'load_qasm_2_0_file', 'save_config', 'load_config', 'load_qasm_3_0_file', 'apply_circuit', 'dqc_apply_circuit']
-  
-def get_measure_dict(num_qubits: int) -> Dict[str, int]:
-    
+def _count(value: int, name: str) -> None:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or value < 0:
+        raise ValueError(f'{name} must be a non-negative integer.')
+
+def save_config(path: PathLike, graph: nx.Graph | Mapping[str, Any],
+                num_routers: int | None = None, num_clients: int = 0,
+                routing_table: dict | None = None, traffic_type: str | None = None,
+                traffic_matrix: np.ndarray | None = None, connection_type: str = 'l3') -> None:
+    """Atomically save a config mapping or the legacy network-config arguments.
+
+    Supports mappings, tuples, Paths, NumPy numeric/string arrays and NetworkX
+    graphs. Creates parent folders. Unsupported objects and non-finite values fail
+    before replacing an existing file. Live models/callables must be represented
+    by explicit configuration values; loading never imports or executes code.
     """
-    Creates a measurement dictionary with the binary states as keys and 0 as values
-    
-    Args:
-        num_qubits (int): number of qubits to measure
-        
-    Returns:
-        meas_stats (dict): dictonary with str as keys and 0s as values
-    """
-    
-    return {np.binary_repr(i, width=num_qubits): 0 for i in range(2 ** num_qubits)}
+    if isinstance(graph, nx.Graph):
+        if num_routers is None:
+            raise ValueError('num_routers is required when saving a graph.')
+        _count(num_routers, 'num_routers')
+        _count(num_clients, 'num_clients')
+        payload = (graph, num_routers, num_clients, routing_table, traffic_type,
+                   None if traffic_matrix is None else np.asarray(traffic_matrix), connection_type)
+        kind = 'network'
+    elif isinstance(graph, Mapping):
+        if num_routers is not None or num_clients != 0 or routing_table is not None or traffic_type is not None or traffic_matrix is not None or connection_type != 'l3':
+            raise ValueError('A config mapping cannot be combined with network-config arguments.')
+        payload, kind = dict(graph), 'config'
+    else:
+        raise TypeError('graph must be a NetworkX graph or a configuration mapping.')
+    text = json.dumps({'qcns_config_version': 1, 'kind': kind, 'data': _encode(payload)},
+                      indent=2, allow_nan=False)
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=target.parent,
+                                         delete=False, suffix='.tmp') as stream:
+            temporary = stream.name
+            stream.write(text + '\n')
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
 
-def load_qasm_2_0_file(path: str, parse_comments: bool=False):
-    
-    circuit = []
-    num_qubits = 1
-    circuit_str = []
-    circuit_start = -1
-    comments = []
-    
-    with open(path, 'r') as f:
-        for line_num, line in enumerate(f):
-            if line.startswith('qreg'):
-                num_qubits = list(map(int, findall(r'\d+', line)))[0]
-                circuit_start = line_num
-                continue
-            if line.startswith('creg'):
-                circuit_start = line_num
-                continue
-            if circuit_start == -1:
-                continue
-        
-            if line.startswith('\n'):
-                continue
-        
-            line, comment = line.split(';')
-            circuit_str.append(line)
-            
-            if parse_comments:
-                comments.append(comment.replace('\n', ''))
-    
-    for gate in circuit_str:
-        if gate.startswith('u3'):
-            gate = gate.replace('u3', '')
-            thetas, qubit = gate.split(' ')
-            qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
-            thetas = thetas.replace(f'(', '').replace(')', '').strip().split(',')
-            thetas_new = []
-            for theta in thetas:
-                thetas_new.append(eval(theta))
-            circuit.append(['U', qubit] + thetas_new)
-            continue
-        if gate.startswith('u1'):
-            gate = gate.replace('u1', '')
-            thetas, qubit = gate.split(' ')
-            qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
-            thetas = thetas.replace(f'(', '').replace(')', '').strip().split(',')
-            thetas_new = []
-            for theta in thetas:
-                thetas_new.append(eval(theta))
-            circuit.append(['Rz', qubit] + thetas_new)
-            continue
-        if gate.startswith('u'):
-            gate = gate.replace('u', '')
-            thetas, qubit = gate.split(' ')
-            qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
-            thetas = thetas.replace(f'(', '').replace(')', '').strip().split(',')
-            thetas_new = []
-            for theta in thetas:
-                thetas_new.append(eval(theta))
-            circuit.append(['U', qubit] + thetas_new)
-            continue
-        if gate.startswith('rx'):
-            gate = gate.replace('rx', '')
-            theta, qubit = gate.split(' ')
-            qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
-            theta = eval(theta.replace(f'(', '').replace(')', '').strip())
-            circuit.append(['Rx', qubit, theta])
-            continue
-        if gate.startswith('ry'):
-            gate = gate.replace('ry', '')
-            theta, qubit = gate.split(' ')
-            qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
-            theta = eval(theta.replace(f'(', '').replace(')', '').strip())
-            circuit.append(['Ry', qubit, theta])
-            continue
-        if gate.startswith('rz'):
-            gate = gate.replace('rz', '')
-            theta, qubit = gate.split(' ')
-            qubit = int(qubit.replace(f'q[', '').replace(']', '').strip())
-            theta = eval(theta.replace(f'(', '').replace(')', '').strip())
-            circuit.append(['Rz', qubit, theta])
-            continue
-        if gate.startswith('cx'):
-            gate = gate.replace('cx ', '')
-            qubits = []
-            gates = gate.split(f',')
-            for l in gates:
-                qubits.append(int(l.replace(f'q[', '').replace(']', '')))
-            circuit.append(['CNOT'] + qubits)
-            continue
-        if gate.startswith('h'):
-            gate = gate.replace('h ', '')
-            qubit = int(gate.replace(f'q[', '').replace(']', '').strip())
-            circuit.append(['h', qubit])
-            continue
-    
-    if parse_comments:
-        
-        for gate, comment in zip(circuit, comments):
-            if not comment:
-                gate.append(None)
-                continue
-            comment = comment.replace(' // ', '')
-            
-            if not (comment.startswith('Encoding') or comment.startswith('Variational')):
-                gate.append(comment)
-                continue
-            
-            gate[-1] = None
-            gate.append(comment)
-     
-    return circuit, num_qubits
-    
-def load_qasm_3_0_file(path: str):
-    
-    circuit = []
-    circuit_str = []
-    classical_bits = []
-    circuit_name = None
-    num_qubits = 1
-    with open(path, 'r') as f:
-        for x in f:
-            if x.startswith('qubit'):
-                num_qubits = list(map(int, findall(r'\d+', x)))[0]
-                circuit_name = x.replace(f'qubit[{num_qubits}]', '').replace(';', '').strip()
-            if x.startswith('bit'):
-                classical_bits.append(x.replace('bit ', '').replace(';\n', ''))
-            if not x.startswith('//'):
-                line = sub(r'// .*', '', x)
-                circuit_str.append(line.replace('\n', '').replace(';', ''))
-    
-    for i, line in enumerate(circuit_str):
-        if 'qubit' in line:
-            circuit_str = circuit_str[i + 1:]
-            break
-    
-    if classical_bits:
-        for i, line in enumerate(circuit_str):
-            if line == f'bit {classical_bits[-1]}':
-                circuit_str = circuit_str[i + 1:]
-    
-    for line in circuit_str:
-        if 'measure' in line:
-            line = line.replace(' = measure ', '')
-            for bit in classical_bits:
-                if line.startswith(bit):
-                    line = line.replace(bit, '')
-            qubit = int(line.replace(f'{circuit_name}[', '').replace(']', ''))
-            circuit.append(['measure', qubit])
-            continue
-        if line.startswith('U'):
-            line = line.replace('U(', '')
-            lines = line.split(')')
-            qubit = int(lines[1].replace(f' {circuit_name}[', '').replace(']', ''))
-            angles = lines[0].split(',')
-            for i, angle in enumerate(angles):
-                angles[i] = float(angle)
-            circuit.append(['U', qubit] + angles)
-            continue
-        if line.startswith('cx'):
-            line = line.replace('cx ', '')
-            qubits = []
-            lines = line.split(f',')
-            for l in lines:
-                qubits.append(int(l.replace(f'{circuit_name}[', '').replace(']', '')))
-            circuit.append(['cx'] + qubits)
-            continue
-        if line.startswith('x'):
-            line = line.replace('x ', '')
-            qubit = int(line.replace(f'{circuit_name}[', '').replace(']', '').strip())
-            circuit.append(['x', qubit])
-            continue
-        if line.startswith('y'):
-            line = line.replace('y ', '')
-            qubit = int(line.replace(f'{circuit_name}[', '').replace(']', '').strip())
-            circuit.append(['y', qubit])
-            continue
-        if line.startswith('z'):
-            line = line.replace('z ', '')
-            qubit = int(line.replace(f'{circuit_name}[', '').replace(']', '').strip())
-            circuit.append(['z', qubit])
-            continue
-        if line.startswith('h'):
-            line = line.replace('h ', '')
-            qubit = int(line.replace(f'{circuit_name}[', '').replace(']', '').strip())
-            circuit.append(['h', qubit])
-            continue
-        if line.startswith('rx'):
-            line = line.replace('rx ', '')
-    
-    classical_bits = {b: None for b in classical_bits}
-    
-    return circuit, num_qubits, classical_bits
+def _legacy_label(value: str | int) -> str | int:
+    """Recover integer IDs from JSON keys while retaining named nodes."""
+    if not isinstance(value, str):
+        return value
+    try:
+        return int(value)
+    except ValueError:
+        return value
 
-def save_config(path: str, graph: nx.Graph, num_routers: int, num_clients: int=0, routing_table: Dict[int, Dict[int, int]]=None, traffic_type: str=None, traffic_matrix: np.array=None, connection_type: str='l3') -> None:
-    
-    output = {}
-    output['graph'] = {'nodes': dict(graph.nodes(data=True)), 'edges': {str((u, v)): data for u, v, data in graph.edges(data=True)}}
-    output['num_routers'] = num_routers
-    output['num_clients'] = num_clients
-    output['routing_table'] = routing_table
-    output['traffic_type'] = traffic_type
-    output['traffic_matrix'] = traffic_matrix.tolist() if isinstance(traffic_matrix, np.ndarray) else traffic_matrix
-    output['connection_type'] = connection_type
-    
-    with open(path, 'w') as f:
-        js.dump(output, f)
 
-def load_config(path: str) -> None:
-    
-    with open(path, 'r') as f:
-        data = js.load(f)
-        
+def _load_legacy(data: Mapping[str, Any]) -> NetworkConfig:
+    """Read the original unversioned network format without evaluating code."""
     graph = nx.Graph()
-    
-    graph.add_nodes_from([(eval(k), v) for k, v in data['graph']['nodes'].items()])
-    graph.add_edges_from([(*eval(k), v) for k, v in data['graph']['edges'].items()])
-    
-    return graph, data['num_routers'], data['num_clients'], data['routing_table'], data['traffic_type'], np.array(data['traffic_matrix']), data['connection_type']
+    graph.add_nodes_from((_legacy_label(node), attributes)
+                         for node, attributes in data['graph']['nodes'].items())
+    for key, attributes in data['graph']['edges'].items():
+        try:
+            edge = ast.literal_eval(key)
+        except (ValueError, SyntaxError) as error:
+            raise ValueError(f'Invalid legacy edge key: {key!r}') from error
+        if not isinstance(edge, tuple) or len(edge) != 2:
+            raise ValueError(f'Legacy edge key must contain two endpoints: {key!r}')
+        graph.add_edge(_legacy_label(edge[0]), _legacy_label(edge[1]), **attributes)
+    routes = data['routing_table']
+    if routes is not None:
+        routes = {_legacy_label(source): {_legacy_label(destination): _legacy_label(hop)
+                                         for destination, hop in destinations.items()}
+                  for source, destinations in routes.items()}
+    traffic = data['traffic_matrix']
+    return (graph, data['num_routers'], data['num_clients'], routes, data['traffic_type'],
+            None if traffic is None else np.asarray(traffic), data['connection_type'])
 
-def apply_circuit(circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
-    
-    if not circuit:
-        return
-    
-    gates = []
-    
-    for circuit_p in circuit:
-        
-        if circuit_p[0] == 'U':
-            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=apply))
-            continue
-        if circuit_p[0] == 'CNOT':
-            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=apply))
-            continue
-        if circuit_p[0] == 'Rx':
-            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=apply))
-            continue
-        if circuit_p[0] == 'Ry':
-            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=apply))
-            continue
-        if circuit_p[0] == 'Rz':
-            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=apply))
-            continue
-        if circuit_p[0] == 'x':
-            gates.append(qubits[circuit_p[1]].X(apply=apply))
-            continue
-        if circuit_p[0] == 'y':
-            gates.append(qubits[circuit_p[1]].Y(apply=apply))
-            continue
-        if circuit_p[0] == 'z':
-            gates.append(qubits[circuit_p[1]].Z(apply=apply))
-            continue
-        if circuit_p[0] == 'h':
-            gates.append(qubits[circuit_p[1]].H(apply=apply))
-            continue
-    
-    if apply:
-        return
-    
-    gate = combine_gates(0, gates)
-    
-    next(iter(qubits)).custom_gate(gate)
-    
-def dqc_apply_circuit(node: Node, circuit: List[List[Any]], qubits: Dict[int, Qubit], apply: bool=True):
-    
-    if not circuit:
-        return
-    
-    gates = []
-    
-    for circuit_p in circuit:
-        
-        if circuit_p[0] == 'U':
-            gates.append(qubits[circuit_p[1]].general_rotation(circuit_p[2], circuit_p[3], circuit_p[4], apply=apply))
-            continue
-        if circuit_p[0] == 'CNOT':
-            gates.append(qubits[circuit_p[1]].CNOT(qubits[circuit_p[2]], apply=apply))
-            continue
-        if circuit_p[0] == 'Rx':
-            gates.append(qubits[circuit_p[1]].Rx(circuit_p[2], apply=apply))
-            continue
-        if circuit_p[0] == 'Ry':
-            gates.append(qubits[circuit_p[1]].Ry(circuit_p[2], apply=apply))
-            continue
-        if circuit_p[0] == 'Rz':
-            gates.append(qubits[circuit_p[1]].Rz(circuit_p[2], apply=apply))
-            continue
-        if circuit_p[0] == 'x':
-            gates.append(qubits[circuit_p[1]].X(apply=apply))
-            continue
-        if circuit_p[0] == 'y':
-            gates.append(qubits[circuit_p[1]].Y(apply=apply))
-            continue
-        if circuit_p[0] == 'z':
-            gates.append(qubits[circuit_p[1]].Z(apply=apply))
-            continue
-        if circuit_p[0] == 'h':
-            gates.append(qubits[circuit_p[1]].H(apply=apply))
-            continue
-    
-    if apply:
-        return
-    
-    gate = combine_gates(gates)
-    
-    node.apply_gate('custom_gate', next(iter(qubits.values())), gate)
-    
-def update_circuit(circuit: List[Tuple[int]], parameter: List[float]) -> List[Tuple[int]]:
-    
-    for gate, param in zip(circuit, parameter):
-        if gate[0] == 1:
-            continue
-        gate[-1] = param
-        
-    return circuit
+
+def load_config(path: PathLike) -> dict[str, Any] | NetworkConfig:
+    """Load a mapping or seven-item network tuple without executing code.
+
+    Accepts hand-written plain JSON mappings and old network files. Numeric-looking
+    string labels in old files are ambiguous; new files preserve label types.
+    """
+    with Path(path).open(encoding='utf-8') as stream:
+        data = json.load(stream)
+    if not isinstance(data, dict):
+        raise ValueError('Configuration must contain a JSON object.')
+    if 'qcns_config_version' not in data:
+        fields = {'graph', 'num_routers', 'num_clients', 'routing_table',
+                  'traffic_type', 'traffic_matrix', 'connection_type'}
+        return _load_legacy(data) if fields <= data.keys() else data
+    if data['qcns_config_version'] != 1 or data.get('kind') not in ('config', 'network'):
+        raise ValueError('Unsupported QCNS configuration version or kind.')
+    result = _decode(data['data'])
+    if data['kind'] == 'config' and not isinstance(result, dict):
+        raise ValueError('Configuration payload must be a mapping.')
+    if data['kind'] == 'network' and (not isinstance(result, tuple) or len(result) != 7 or not isinstance(result[0], nx.Graph)):
+        raise ValueError('Network configuration must contain a graph and six settings.')
+    return result
+
+def parameter_sweep(parameters: Mapping[str, Sequence[Any]]) -> Iterator[dict[str, Any]]:
+    """Yield combinations in insertion order without storing the Cartesian product.
+
+    Values are shared with the input; treat them as immutable.
+    """
+    for values in itertools.product(*parameters.values()):
+        yield dict(zip(parameters, values))
+
+def experiment_metadata(*, seed: int | None = None, revision: str | None = None) -> dict[str, Any]:
+    """Record environment and caller-supplied provenance; does not seed any RNG."""
+    return {'seed': seed, 'revision': revision, 'python': platform.python_version(),
+            'platform': platform.platform(), 'numpy': np.__version__, 'networkx': nx.__version__}
+
+def get_measure_dict(num_qubits: int, *, max_states: int = 1 << 20) -> dict[str, int]:
+    """Zero computational-basis counts; use sparse counts for large registers."""
+    _count(num_qubits, 'num_qubits')
+    _count(max_states, 'max_states')
+    if max_states == 0 or int(num_qubits) >= int(max_states).bit_length():
+        raise ValueError('Measurement dictionary exceeds max_states; use sparse counts or raise the limit.')
+    return {format(i, f'0{num_qubits}b') if num_qubits else '': 0 for i in range(1 << int(num_qubits))}
+
